@@ -1,0 +1,10 @@
+# 평문 데이터는 절대 올리지 않는다 — 암호문 data.enc.json 만 커밋
+data.json
+*.plain.json
+live/
+export/
+*.xlsx
+*.csv
+node_modules/
+tests/_*.png
+tests/_*.enc.json

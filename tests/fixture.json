@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-01-01 09:00",
+  "meetings": [
+    {"id": "20260115-sample-lp", "date": "2026-01-15", "org": "샘플공제회", "orgType": "공제회", "dept": "대체투자팀", "category": "LP",
+     "attendees": "홍길동 팀장 - 해외대체 총괄\n김예시 과장 - PD 담당", "kbAttendees": "테스트 차장", "assets": ["PD/DL", "인프라 Debt"],
+     "body": "*조직/인사 및 운용 규모\n- 테스트용 가상 데이터임\n*최근 투자현황/계획\n- 올해 PD 2건 검토 중\n--> 하반기 재접촉 필요",
+     "nextAction": "자료 송부", "tags": ["테스트"], "flags": [], "truncated": false, "truncAt": "", "source": "테스트 픽스처",
+     "createdAt": "2026-01-15T00:00:00.000Z", "updatedAt": "2026-01-15T00:00:00.000Z"},
+    {"id": "20260110-sample-gp", "date": "2026-01-10", "org": "Sample Capital", "orgType": "GP", "dept": "", "category": "GP",
+     "attendees": "Jane Doe MD - IR", "kbAttendees": "테스트 차장", "assets": ["PE Buyout"],
+     "body": "*운용사/펀드 현황\n- 가상 운용사임\n*논의 내용\n- Fund II 소개", "nextAction": "", "tags": ["Sample"], "flags": ["원문 잘림"],
+     "truncated": true, "truncAt": "Fund II 소개", "source": "테스트 픽스처", "createdAt": "2026-01-10T00:00:00.000Z", "updatedAt": "2026-01-10T00:00:00.000Z"}
+  ],
+  "orgs": [
+    {"id": "sample", "name": "샘플공제회", "type": "공제회", "aliases": ["샘공"], "summary": "테스트용 가상 기관", "prefs": "", "ticket": "USD 30mn",
+     "process": "", "hr": "", "signals": {"PD/DL": {"s": "진행", "note": "검토 중", "date": "2026-01-15"}}, "basis": "테스트",
+     "createdAt": "2026-01-15T00:00:00.000Z", "updatedAt": "2026-01-15T00:00:00.000Z"}
+  ],
+  "people": [
+    {"id": "p-test1", "name": "홍길동", "org": "샘플공제회", "dept": "대체투자팀", "team": "", "role": "팀장", "title": "팀장", "ext": "", "phone": "",
+     "mobile": "", "email": "", "note": "가상 인물", "lastSeen": "2026-01-15", "source": "테스트", "createdAt": "2026-01-15T00:00:00.000Z", "updatedAt": "2026-01-15T00:00:00.000Z"}
+  ]
+}

@@ -1,0 +1,31 @@
+name: App check (배포 전 점검)
+
+# 화면 코드가 바뀌면 가상 데이터(tests/fixture.json)로 실제 브라우저에서 비밀번호 화면·열기·탭 이동·잠그기를 점검한다.
+# 그리고 평문 데이터 파일이 실수로 올라오지 않았는지 확인한다. 실패하면 GitHub 이 저장소 관리자에게 메일로 알린다.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Block plaintext data
+        run: |
+          bad=$(git ls-files | grep -Ei '(^|/)data\.json$|\.plain\.json$|\.xlsx$|\.csv$|^live/|^export/' || true)
+          if [ -n "$bad" ]; then echo "::error::평문 데이터 파일이 커밋되어 있습니다: $bad"; exit 1; fi
+          node -e "const j=require('./data.enc.json');if(!j.ct||!j.iv||!j.salt||j.meetings||j.people)process.exit(1)" \
+            || { echo "::error::data.enc.json 이 암호문 형식이 아닙니다"; exit 1; }
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: npm i --no-save --no-audit --no-fund playwright@1.56.1 && npx playwright install --with-deps chromium
+      - name: Smoke test
+        run: node tests/smoke.mjs
