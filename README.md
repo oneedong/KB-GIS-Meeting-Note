@@ -4,6 +4,7 @@
 자매 앱 **KB GIS Market**(`KB-GIS-App`)과 같은 방식으로 GitHub Pages에서 빌드 없이 배포되고, 홈 화면에 설치해 씁니다.
 
 - 앱 주소: **https://oneedong.github.io/KB-GIS-Meeting-Note/**
+- 설치 링크(공유용): **https://oneedong.github.io/KB-GIS-Meeting-Note/install.html** — 아이폰·안드로이드·PC·카카오톡을 알아서 구분해 설치 방법을 보여주고, PC에서는 QR 코드를 띄운다
 - 화면: 미팅노트 · 기관 · 전략 수요판 · 인물/조직도 (읽기 전용)
 - 업데이트: Claude에게 미팅노트 txt 파일이나 텍스트를 주고 "미팅노트 업데이트해줘" → DB에 반영해 다시 배포
 
@@ -19,6 +20,8 @@
 - 검색엔진 수집 차단(`noindex`)도 걸어 두었습니다.
 
 ## 휴대폰에 설치
+
+설치 링크(`install.html`)를 휴대폰에서 열면 기기에 맞는 안내가 나옵니다. 카카오톡으로 받은 링크는 자동으로 사파리·크롬으로 넘깁니다(카카오톡 안에서는 설치 불가).
 
 **아이폰(사파리)**: 앱 주소 열기 → 공유 버튼 → "홈 화면에 추가" → 홈 화면의 "KB GIS Meeting Note" 실행 → 비밀번호 입력
 
@@ -47,6 +50,7 @@ git add data.enc.json && git commit -m "data: 미팅노트 갱신" && git push
 | `vault.js` | 암호문 열기·비밀번호 화면·기기 키 기억/잠그기 |
 | `data.enc.json` | 암호화된 미팅노트 DB (원본) |
 | `sw.js` · `manifest.webmanifest` · `icons/` | 홈 화면 설치·오프라인 |
+| `install.html` | 설치 안내(기기별 안내·QR·안드로이드 설치 버튼) |
 | `scripts/vault.mjs` | 암호화·복호화·확인 |
 | `scripts/upsert.mjs` | 새 미팅·인물·기관 레코드 넣기/고치기(검증 포함) |
 | `docs/CONVERT.md` | 미팅노트 텍스트 → 레코드 변환 규칙 |

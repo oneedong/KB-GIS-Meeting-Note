@@ -87,6 +87,28 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('콘솔 오류 없음' + (errors.length ? ': ' + errors.join(' | ') : ''), errors.length === 0);
   await ctx.close();
 }
+// 설치 안내 페이지 — 기기별로 맞는 안내가 뜨는지
+const UAS = {
+  ios: ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1', '#s-ios'],
+  android: ['Mozilla/5.0 (Linux; Android 14; SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36', '#s-android'],
+  kakao: ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 KAKAOTALK 25.8.0', '#s-inapp'],
+  desktop: ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36', '#s-desktop'],
+};
+for (const [name, [ua, sel]] of Object.entries(UAS)) {
+  const ctx = await browser.newContext({ userAgent: ua, viewport: name === 'desktop' ? { width: 1280, height: 900 } : { width: 390, height: 844 }, serviceWorkers: 'block' });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.route(/cdn\.jsdelivr\.net/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await page.goto(URL_ + 'install.html', { waitUntil: 'domcontentloaded' });   // 카카오톡은 곧 외부 브라우저로 넘김
+  await page.waitForTimeout(150);
+  const shown = await Promise.all(['#s-ios', '#s-android', '#s-inapp', '#s-desktop'].map((s) => page.locator(s).isVisible()));
+  ok(`설치 안내(${name}): ${sel}만 보임`, shown.filter(Boolean).length === 1 && await page.locator(sel).isVisible());
+  ok(`설치 안내(${name}) 오류 없음` + (errors.length ? ': ' + errors.join(' | ') : ''), errors.length === 0);
+  await page.screenshot({ path: join(ROOT, `tests/_install-${name}.png`), fullPage: true });
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 console.log(fail ? `\n${fail}개 실패` : '\n모두 통과');
