@@ -45,7 +45,7 @@ const Vault = (() => {
   function showGate(env, onData, note) {
     const gate = el("#gate"), form = el("#gateForm"), pw = el("#pw"), btn = el("#unlock"), msg = el("#gateMsg");
     gate.hidden = false;
-    el("#gateAsof").textContent = env && env.generatedAt ? `${env.generatedAt} 기준 사본` : "";
+    el("#gateAsof").textContent = env && env.generatedAt ? `${env.generatedAt} 업데이트` : "";
     msg.textContent = note || "";
     if (!env) { form.querySelectorAll("input,button").forEach((x) => x.disabled = true); return; }
     setTimeout(() => pw.focus(), 50);

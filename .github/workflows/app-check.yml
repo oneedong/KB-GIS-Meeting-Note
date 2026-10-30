@@ -20,8 +20,10 @@ jobs:
         run: |
           bad=$(git ls-files | grep -Ei '(^|/)data\.json$|\.plain\.json$|\.xlsx$|\.csv$|^live/|^export/' || true)
           if [ -n "$bad" ]; then echo "::error::평문 데이터 파일이 커밋되어 있습니다: $bad"; exit 1; fi
-          node -e "const j=require('./data.enc.json');if(!j.ct||!j.iv||!j.salt||j.meetings||j.people)process.exit(1)" \
-            || { echo "::error::data.enc.json 이 암호문 형식이 아닙니다"; exit 1; }
+          if [ -f data.enc.json ]; then
+            node -e "const j=require('./data.enc.json');if(!j.ct||!j.iv||!j.salt||j.meetings||j.people)process.exit(1)" \
+              || { echo "::error::data.enc.json 이 암호문 형식이 아닙니다"; exit 1; }
+          fi
       - uses: actions/setup-node@v5
         with:
           node-version: '22'

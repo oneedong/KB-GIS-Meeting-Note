@@ -14,7 +14,7 @@ catch { ({ chromium } = require('/opt/node22/lib/node_modules/playwright')); }
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PW = 'smoke-test-password';
 const ENC = join(ROOT, 'tests', '_fixture.enc.json');
-execFileSync(process.execPath, [join(ROOT, 'scripts/encrypt.mjs'), join(ROOT, 'tests/fixture.json'), ENC],
+execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', join(ROOT, 'tests/fixture.json'), ENC],
   { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
@@ -65,7 +65,8 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-detail.png`) });
 
   const tabSel = vp.width < 760 ? '.bnav button' : '.tab';
-  for (const t of ['orgs', 'demand', 'people', 'glossary']) {
+  ok('약어 사전 탭 없음', (await page.locator('[data-tab="glossary"]').count()) === 0);
+  for (const t of ['orgs', 'demand', 'people']) {
     await page.locator(`${tabSel}[data-tab="${t}"]`).click();
     ok(`${t} 탭`, await page.locator(`#p-${t}`).isVisible());
   }

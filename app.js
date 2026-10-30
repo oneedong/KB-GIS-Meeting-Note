@@ -3,11 +3,6 @@ const SHORT={"PE Buyout":"Buyout","PE Secondary":"PE Sec.","Co-invest":"Co-inv",
 const STATES=["진행","관심","약정","보류","불가"];
 const STATE_DESC={"약정":"올해 약정 완료(Re-up·추가 후보)","진행":"실사·심의·선정 진행 중","관심":"검토 의향 있음","보류":"일시 중단·재개 대기","불가":"규정·방침상 어려움"};
 const TYPES=["연기금","공제회","보험","운용사","은행","증권","캐피탈","저축은행","기타","GP","내부"];
-const GLOSS=[
-["교공 / KTCU / The-K","한국교직원공제회",""],["군공","군인공제회",""],["행공 / POBA","행정공제회","POBA = Korea Public Officials Benefit Association"],["과기공 / SEMA","과학기술인공제회",""],["소공","대한소방공제회",""],["건근공","건설근로자공제회",""],["전문건설","전문건설공제조합",""],["중기중 / Kbiz / K-Biz","중소기업중앙회(노란우산공제)",""],["농중","농협중앙회",""],["신협","신협중앙회",""],["방위","방위산업공제조합",""],["기계설비","기계설비건설공제조합",""],["사학 / KTP","사학연금(사립학교교직원연금공단)",""],["GEPS","공무원연금공단",""],["우본","우정사업본부(보험과·예금과)",""],["NPS","국민연금",""],["KIC","한국투자공사",""],["서울보증","SGI서울보증",""],["KB LDI","KB자산운용 LDI","KB손해보험·KB라이프 보험자산 운용"],["DB LDI","DB자산운용 LDI","DB손해보험·DB생명 보험자산 운용"],["삼성 LDI","삼성자산운용 LDI","삼성생명·삼성화재 위탁"],["SLAMS / 신한 LDI","신한라이프 일반계정 운용조직","특별계정(퇴직연금)과 별도 자금"],["삼자","삼성자산운용",""],["삼증","삼성증권",""],["한투","한국투자증권",""],["현대인베","현대인베스트먼트자산운용",""],["미래증권 / 미래자산","미래에셋증권 / 미래에셋자산운용",""],["금상부 / 금상팀","KB증권 금융상품영업부","추정"],["글상부","KB증권 글로벌상품영업부(당 부서)",""],["대체신디부","KB증권 대체투자 신디케이션 부서","추정"],
-["TJ / BJ / CJ / GJ / DL","팀장 / 부장 / 차장 / 과장 / 대리","카톡 직급 약어"],["MNG / JM","매니저 / 전무","JM=전무는 추정"],
-["블펀","블라인드 펀드",""],["코인베","Co-investment",""],["리업","Re-up(후속 펀드 재약정)",""],["투심","투자심의(위원회)",""],["SS","Special Situations",""],["Opp","Opportunistic Credit",""],["DL","Direct Lending",""],["PD","Private Debt",""],["SMA","Separately Managed Account",""],["FoF","Fund of Funds",""],["OE","Open-end 펀드",""],["BDC","Business Development Company(미국 상장·비상장 대출펀드)",""],["Subline","Subscription Line(캐피탈콜 브릿지 대출)",""],["SRT","Significant Risk Transfer(은행 자본경감 구조화)",""],["WAL","가중평균만기",""],["PA","Placement Agent",""],["AMC","국내 재간접 운용사(Asset Management Company)",""],["Equalization fee","후속 클로징 참여 시 선행 투자자에게 내는 보정 이자",""],
-["블루아울 사태 / PD 사태","2026년 초 Blue Owl BDC 환매 제한 이후 Private Credit 위축","Gating·Valuation·소프트웨어 익스포저 노이즈 포함"],["ADS","Apollo Debt Solutions(BDC)",""],["GID","BlackRock Global Infrastructure Debt",""],["CAPS","GIP CAPS(인프라 크레딧·우선주 전략)",""],["EMMPD / ESDLF","BlackRock European Middle Market Private Debt / European Senior DL Fund",""],["HLSF VII","Hamilton Lane Secondary Fund VII",""],["BC","BC Partners",""],["NB / 누버거","Neuberger Berman",""],["MPW","MPW Capital(PA, 박성호 대표)",""],["EICF","EQT Exeter Industrial Core-Plus Fund","추정"],["CICF","Carlyle Infrastructure Credit Fund","펀드 약칭"],["JCP","Jefferies Credit Partners","펀드 약칭"],["OLEND","Oak Hill(OHA) 펀드","펀드 약칭"]];
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -53,12 +48,12 @@ function memoText(r){const {m,d}=md(r.date),att=parseAtt(r.attendees);
 
 // ── 탭 ──
 function setTab(t,push=true){tab=t;document.querySelectorAll(".tab,.bnav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t?"true":"false"));
-  ["meetings","orgs","demand","people","glossary"].forEach(k=>$("#p-"+k).hidden=k!==t);
+  ["meetings","orgs","demand","people"].forEach(k=>$("#p-"+k).hidden=k!==t);
   if(push){try{history.replaceState(null,"","#"+t)}catch(e){}}
   renderTab();window.scrollTo({top:0});fabSync()}
 document.querySelectorAll(".tab,.bnav button").forEach(b=>b.onclick=()=>{if(b.dataset.tab===tab&&isMob()){closeDetail();return}setTab(b.dataset.tab)});
 mq.addEventListener?.("change",()=>{if(!isMob())document.querySelectorAll(".split.detail").forEach(s=>s.classList.remove("detail"));if(tab==="demand")renderDemand();fabSync()});
-function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,people:()=>{renderPList();renderPMain()},glossary:renderGloss})[tab]()}
+function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,people:()=>{renderPList();renderPMain()}})[tab]()}
 function gotoOrg(name){const o=orgOf(name);if(!o){toast("기관 프로필이 아직 없습니다. 기관 탭에서 추가하세요.");return}oSel=o.id;oMode="view";setTab("orgs");openDetail()}
 function gotoMeeting(id){mSel=id;mMode="view";setTab("meetings");if(isMob()){openDetail();return}setTimeout(()=>{const el=document.querySelector(`#mList [data-id="${CSS.escape(id)}"]`);if(el)el.scrollIntoView({block:"nearest"})},30)}
 function gotoPerson(id){const p=P.find(x=>x.id===id);if(!p)return;pSel=id;pMode="view";setTab("people");openDetail()}
@@ -274,9 +269,6 @@ $("#pList").addEventListener("click",e=>{const b=e.target.closest(".item");if(!b
 $("#pq").addEventListener("input",renderPList);$("#pOrg").addEventListener("input",()=>{pSel=null;pMode="view";renderPList();renderPMain();if($("#pOrg").value&&isMob())openDetail()});
 $("#pNew").onclick=()=>{if(!canWrite)return toast("이 링크에서는 수정 권한이 없습니다.");pMode="new";confirmDel=false;renderPMain();openDetail()};
 
-// ═════ 약어 ═════
-function renderGloss(){const q=$("#gq").value.trim().toLowerCase();$("#gBody").innerHTML=GLOSS.filter(g=>!q||g.join(" ").toLowerCase().includes(q)).map(g=>`<tr><td>${esc(g[0])}</td><td>${esc(g[1])}</td><td class="ro">${esc(g[2])}</td></tr>`).join("")}
-$("#gq").addEventListener("input",renderGloss);
 
 // ── 공통 저장 ──
 async function write(col,id,data,after,btn){if(!col){toast("저장소에 연결되지 않아 저장할 수 없습니다.");return}const b=$(btn);if(b)b.disabled=true;
@@ -286,13 +278,14 @@ async function copy(t){try{await navigator.clipboard.writeText(t);toast("메모 
   catch(e){const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("복사했습니다.")}catch(_){toast("복사하지 못했습니다.")}ta.remove()}}
 
 // ── 초기화 ──
-const h=(location.hash||"").replace("#","");if(["meetings","orgs","demand","people","glossary"].includes(h))setTab(h,false);else renderTab();
+const h=(location.hash||"").replace("#","");if(["meetings","orgs","demand","people"].includes(h))setTab(h,false);else renderTab();
 fabSync();
-addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");if(t!==tab&&["meetings","orgs","demand","people","glossary"].includes(t))setTab(t,false)});
-// 암호화된 사본(data.enc.json)을 풀어서 읽기 전용으로 보여준다. 추가·수정은 claude.ai 아티팩트에서.
+addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");if(t!==tab&&["meetings","orgs","demand","people"].includes(t))setTab(t,false)});
+// 암호화된 DB(data.enc.json)를 풀어서 읽기 전용으로 보여준다. 미팅 추가·수정은 Claude에 미팅노트 텍스트를 주면
+// data.enc.json 을 갱신해 다시 배포한다(CLAUDE.md).
 ["#mNew","#oNew","#pNew"].forEach(s=>$(s).hidden=true);fabSync();
 function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];
   mSel=M.length?M[0].id:null;oSel=null;pSel=null;
   authorsRefresh();orgSelRefresh();stats();renderTab();
-  $("#asof").textContent=j.generatedAt?`${j.generatedAt} 기준`:"";document.body.classList.add("ready")}
+  $("#asof").textContent=j.generatedAt?`${j.generatedAt} 업데이트`:"";document.body.classList.add("ready")}
 Vault.boot(load);

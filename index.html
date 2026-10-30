@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>KB GIS · LP 미팅노트</title>
-<meta name="description" content="글로벌상품영업부 LP 미팅노트 DB — 휴대폰용 읽기 전용 사본(암호화)">
+<title>KB GIS Meeting Note</title>
+<meta name="description" content="글로벌상품영업부 LP·GP 미팅노트 DB (암호화)">
 <meta name="robots" content="noindex, nofollow">
 
 <!-- PWA -->
 <link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#6B4E33" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#3A2E24" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#60584C" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#4A443B" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
 
@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="GIS 미팅노트">
+<meta name="apple-mobile-web-app-title" content="KB GIS Meeting Note">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
@@ -28,7 +28,7 @@
 <header class="band"><div class="band-in">
   <div class="brand">
     <div class="mark">KB</div>
-    <div><div class="sub">글로벌상품영업부 · GIS</div><h1>LP 미팅노트</h1></div>
+    <div><div class="sub">글로벌상품영업부</div><h1>GIS Meeting Note</h1></div>
     <div class="grow"></div>
     <div class="hr">
       <div class="meta-r"><div class="stats" id="stats">불러오는 중…</div><div class="asof" id="asof"></div></div>
@@ -40,7 +40,6 @@
     <button class="tab" role="tab" data-tab="orgs" aria-selected="false">기관</button>
     <button class="tab" role="tab" data-tab="demand" aria-selected="false">전략 수요판</button>
     <button class="tab" role="tab" data-tab="people" aria-selected="false">인물·조직도</button>
-    <button class="tab" role="tab" data-tab="glossary" aria-selected="false">약어 사전</button>
   </nav>
 </div></header>
 
@@ -101,18 +100,13 @@
     <main class="main" id="pMain"><div class="empty">기관을 고르면 조직도가, 인물을 고르면 상세가 보입니다.</div></main>
   </section>
 
-  <!-- 약어 사전 -->
-  <section id="p-glossary" hidden>
-    <div class="toolbar"><input id="gq" type="search" placeholder="약어·풀이 검색"></div>
-    <div class="mx-wrap" style="max-height:none"><table class="gl"><thead><tr><th>약어</th><th>풀이</th><th>비고</th></tr></thead><tbody id="gBody"></tbody></table></div>
-  </section>
 </div>
 <div class="gate" id="gate" hidden>
   <form class="gate-card" id="gateForm" autocomplete="off">
     <div class="mark">KB</div>
-    <div class="sub">글로벌상품영업부 · GIS</div>
-    <h2>LP 미팅노트</h2>
-    <p>암호화된 사본입니다. 비밀번호를 넣으면 이 기기에서만 풀어서 보여줍니다.</p>
+    <div class="sub">글로벌상품영업부</div>
+    <h2>KB GIS Meeting Note</h2>
+    <p>암호화된 미팅노트 DB입니다. 비밀번호를 넣으면 이 기기에서만 풀어서 보여줍니다.</p>
     <input type="password" id="pw" name="password" autocomplete="current-password" placeholder="비밀번호" aria-label="비밀번호" required>
     <label class="remember"><input type="checkbox" id="remember" checked> 이 기기에서 기억하기</label>
     <button class="btn primary" id="unlock" type="submit">열기</button>
@@ -126,14 +120,13 @@
   <button type="button" data-tab="orgs" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14M9 21v-5h6v5M8 10h.01M12 10h.01M16 10h.01"/></svg>기관</button>
   <button type="button" data-tab="demand" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>수요판</button>
   <button type="button" data-tab="people" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>인물</button>
-  <button type="button" data-tab="glossary" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11"/></svg>약어</button>
 </nav>
 <div class="toast" id="toast" hidden></div>
 
 <script src="./vault.js"></script>
 <script src="./app.js"></script>
 <script>
-  // 서비스워커: 오프라인에서도 열리고(마지막으로 받은 암호화 사본), 새 배포는 다음 실행 때 자동 반영.
+  // 서비스워커: 오프라인에서도 열리고(마지막으로 받은 암호화 DB), 새 배포는 다음 실행 때 자동 반영.
   if ('serviceWorker' in navigator) {
     var refreshing = false, hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
