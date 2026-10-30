@@ -61,6 +61,10 @@ ol li::before{content:counter(s);width:26px;height:26px;border-radius:50%;backgr
 .qrbox .q{background:#fff;padding:24px;border-radius:12px;border:1px solid var(--line)}
 .qr{width:200px;height:200px;display:block}
 .url{font:500 12px ui-monospace,Menlo,monospace;color:var(--muted);overflow-wrap:anywhere}
+.alt{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.alt summary{cursor:pointer;font-weight:600;color:var(--muted);font-size:13.5px}
+.alt[open] summary{margin-bottom:12px}
+.alt .btn{margin-bottom:12px}
 .done{background:var(--sel);border:1px solid var(--kb-yellow);border-radius:12px;padding:12px 14px;font-size:14px;text-align:center}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--kb-ink);color:#fff;padding:9px 16px;border-radius:8px;font-size:13px}
 </style>
@@ -96,15 +100,25 @@ ol li::before{content:counter(s);width:26px;height:26px;border-radius:50%;backgr
     <p class="note" id="iosOther" hidden>Safari가 아닌 브라우저라면, 공유 메뉴에 "홈 화면에 추가"가 없을 수 있습니다. 그때는 Safari로 이 링크를 여세요.</p>
   </section>
 
-  <!-- 안드로이드 -->
+  <!-- 안드로이드: APK 설치(기본) · 크롬 앱 설치(대안) -->
   <section class="card" id="s-android" hidden>
     <h2>안드로이드에 설치</h2>
-    <button class="btn primary" id="installBtn" type="button" hidden>앱 설치</button>
-    <ol id="androidSteps">
-      <li><div>크롬 오른쪽 위 <span class="k">⋮</span> 메뉴를 누릅니다.<br><span class="note" style="margin:0">삼성 인터넷은 아래쪽 <span class="k">≡</span> 메뉴 → "현재 페이지 추가" → "홈 화면"</span></div></li>
-      <li><div><span class="k">앱 설치</span> 또는 <span class="k">홈 화면에 추가</span> 를 누르고 <span class="k">설치</span> 를 누릅니다.</div></li>
-      <li><div>홈 화면(또는 앱 목록)의 아이콘으로 열고 비밀번호를 입력합니다.</div></li>
+    <a class="btn primary" id="apkBtn" href="https://github.com/oneedong/KB-GIS-Meeting-Note/releases/download/android/KB-GIS-Meeting-Note.apk">APK 내려받기</a>
+    <ol style="margin-top:14px">
+      <li><div>받은 <span class="k">KB-GIS-Meeting-Note.apk</span> 를 다운로드 알림(또는 내 파일 → 다운로드)에서 엽니다.</div></li>
+      <li><div>"출처를 알 수 없는 앱" 안내가 나오면 <span class="k">설정</span> → <span class="k">이 출처 허용</span> 을 켜고 돌아옵니다.</div></li>
+      <li><div><span class="k">설치</span> 를 누릅니다. Play 프로텍트 경고가 나오면 <span class="k">세부정보 더보기</span> → <span class="k">그래도 설치</span>.</div></li>
+      <li><div>앱 목록의 <b>KB GIS Meeting Note</b> 를 열고 비밀번호를 입력합니다.</div></li>
     </ol>
+    <p class="note">새 버전 APK가 설치되지 않으면("기존 패키지와 충돌") 기존 앱을 지운 뒤 설치하세요.</p>
+    <details class="alt">
+      <summary>설치 파일 없이 크롬으로 설치</summary>
+      <button class="btn" id="installBtn" type="button" hidden>크롬으로 앱 설치</button>
+      <ol>
+        <li><div>크롬 오른쪽 위 <span class="k">⋮</span> 메뉴 → <span class="k">앱 설치</span> 또는 <span class="k">홈 화면에 추가</span><br><span class="note" style="margin:0">삼성 인터넷은 아래쪽 <span class="k">≡</span> → "현재 페이지 추가" → "홈 화면"</span></div></li>
+        <li><div>앱 목록의 아이콘으로 열고 비밀번호를 입력합니다.</div></li>
+      </ol>
+    </details>
   </section>
 
   <!-- PC -->
@@ -117,6 +131,7 @@ ol li::before{content:counter(s);width:26px;height:26px;border-radius:50%;backgr
     </div>
     <p class="note">PC에서도 설치할 수 있습니다: 크롬·엣지 주소창 오른쪽의 설치 아이콘을 누르거나 아래 버튼을 누르세요.</p>
     <button class="btn" id="installBtnPc" type="button" hidden style="margin-top:10px">PC에 앱 설치</button>
+    <p class="note" style="text-align:center"><a href="https://github.com/oneedong/KB-GIS-Meeting-Note/releases/download/android/KB-GIS-Meeting-Note.apk" style="color:inherit">안드로이드 APK 파일 직접 받기</a></p>
   </section>
 
   <div class="done" id="installed" hidden>설치했습니다. 홈 화면(또는 앱 목록)의 <b>KB GIS Meeting Note</b> 아이콘으로 여세요.</div>

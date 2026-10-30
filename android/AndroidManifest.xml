@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- KB GIS Meeting Note — 웹앱(GitHub Pages)을 전체 화면 WebView 로 여는 안드로이드 앱 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.oneedong.kbgis.meetingnote">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- allowBackup=false: 기기에 기억된 DB 키(WebView 저장소)가 클라우드 백업으로 나가지 않게 -->
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@style/AppTheme"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

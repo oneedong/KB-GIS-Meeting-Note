@@ -8,3 +8,4 @@ export/
 node_modules/
 tests/_*.png
 tests/_*.enc.json
+android/build/

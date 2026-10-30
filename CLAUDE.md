@@ -26,3 +26,10 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 - 화면 파일을 바꾸면 `sw.js`의 `CACHE` 버전을 올린다.
 - 아이콘: `node scripts/gen-icons.mjs note icons` (Market 아이콘은 `market`).
 - 점검: `node tests/smoke.mjs` (Playwright, 가상 데이터).
+
+## 안드로이드 APK
+- `android/`: 웹앱 주소를 전체 화면 WebView로 여는 앱(패키지 `io.github.oneedong.kbgis.meetingnote`). DB 갱신과 무관.
+- 이 세션 컨테이너에서는 Android SDK(dl.google.com)를 받을 수 없어 로컬 빌드 불가. `android/**`를 push하면
+  GitHub Actions가 빌드해 Release `android`에 올린다. 실패 시 로그는 `gh release view android-build-log`의 본문.
+- 서명 키는 빌드마다 새로 생성(공개 저장소라 키를 두지 않음) → 새 APK는 기존 앱 삭제 후 설치. 앱 소스는 꼭 필요할 때만 바꾼다.
+- 아이콘: `node scripts/gen-icons.mjs note android/res --android`.

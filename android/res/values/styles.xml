@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light 테마면 WebView 가 prefers-color-scheme: light 로 알린다 -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/kb_gray</item>
+        <item name="android:windowBackground">@color/bg</item>
+    </style>
+</resources>

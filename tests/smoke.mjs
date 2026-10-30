@@ -104,6 +104,7 @@ for (const [name, [ua, sel]] of Object.entries(UAS)) {
   await page.waitForTimeout(150);
   const shown = await Promise.all(['#s-ios', '#s-android', '#s-inapp', '#s-desktop'].map((s) => page.locator(s).isVisible()));
   ok(`설치 안내(${name}): ${sel}만 보임`, shown.filter(Boolean).length === 1 && await page.locator(sel).isVisible());
+  if (name === 'android') ok('APK 내려받기 링크', /releases\/download\/android\/KB-GIS-Meeting-Note\.apk$/.test(await page.getAttribute('#apkBtn', 'href')) && await page.locator('#apkBtn').isVisible());
   ok(`설치 안내(${name}) 오류 없음` + (errors.length ? ': ' + errors.join(' | ') : ''), errors.length === 0);
   await page.screenshot({ path: join(ROOT, `tests/_install-${name}.png`), fullPage: true });
   await ctx.close();

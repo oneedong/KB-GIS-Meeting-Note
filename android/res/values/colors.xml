@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- KB 회색 · 앱 바탕 (웹앱 app.css 토큰과 같음) -->
+    <color name="kb_gray">#60584C</color>
+    <color name="bg">#F7F6F3</color>
+    <color name="ic_launcher_background">#60584C</color>
+</resources>

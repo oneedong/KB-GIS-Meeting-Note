@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 다크 모드: 어두운 테마 → WebView 가 prefers-color-scheme: dark 로 알려 웹앱도 어둡게 -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/kb_gray</item>
+        <item name="android:windowBackground">@color/bg</item>
+    </style>
+</resources>
