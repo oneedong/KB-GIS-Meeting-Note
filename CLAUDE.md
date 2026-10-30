@@ -23,6 +23,7 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 
 ## 화면 수정
 - `app.js`/`app.css`는 아티팩트 페이지(lp_meeting_db.html) 원본에서 저장 기능·약어 사전을 뺀 것. KB 노랑·회색 토큰.
+- 화면 모드: 기본 라이트, 헤더 버튼으로 다크(`localStorage` `kbnote-theme`, `<html data-theme>`). 색을 바꾸면 두 모드 다 확인.
 - 화면 파일을 바꾸면 `sw.js`의 `CACHE` 버전을 올린다.
 - 아이콘: `node scripts/gen-icons.mjs note icons` (Market 아이콘은 `market`).
 - 점검: `node tests/smoke.mjs` (Playwright, 가상 데이터).

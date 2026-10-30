@@ -34,7 +34,8 @@ const ok = (name, cond) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}`); 
 const browser = await chromium.launch();
 for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', width: 1280, height: 860 }]) {
   console.log(`— ${vp.name} ${vp.width}×${vp.height}`);
-  const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, serviceWorkers: 'block' });
+  // 휴대폰 설정이 다크여도 앱은 라이트로 시작해야 한다
+  const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, colorScheme: 'dark', serviceWorkers: 'block' });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -57,6 +58,10 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('맞는 비밀번호로 열림', (await page.locator('#mList .item').count()) === 2);
   ok('건수 표시', (await page.textContent('#stats')).includes('미팅 2'));
   ok('추가 버튼 숨김(읽기 전용)', !(await page.locator('#mNew').isVisible()));
+  const theme = () => page.evaluate(() => [document.documentElement.dataset.theme, getComputedStyle(document.body).backgroundColor].join(' '));
+  ok('기본은 라이트 모드(휴대폰이 다크여도)', (await theme()) === 'light rgb(247, 246, 243)');
+  await page.click('#themeBtn');
+  ok('다크 모드로 전환', (await theme()) === 'dark rgb(27, 25, 21)');
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-list.png`) });
 
   await page.locator('#mList .item').first().click();
@@ -75,8 +80,11 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
 
   // 기억하기 → 새로고침해도 바로 열림
   await page.reload();
-  await page.locator('#stats', { hasText: '미팅 2' }).waitFor();
+  await page.locator('#stats', { hasText: '미팅 2' }).waitFor({ state: 'attached' });   // 휴대폰에선 건수 줄이 숨겨져 있음
   ok('기억된 키로 자동 열림', !(await page.locator('#gate').isVisible()));
+  ok('다크 모드 기억', (await theme()).startsWith('dark'));
+  await page.click('#themeBtn');
+  ok('라이트 모드로 되돌리기', (await theme()) === 'light rgb(247, 246, 243)');
 
   // 잠그기 → 다시 비밀번호 화면
   await page.click('#lockBtn');

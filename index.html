@@ -23,6 +23,11 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <link rel="stylesheet" href="./app.css">
+<script>
+  // 화면 모드: 라이트(기본)·다크. 헤더 버튼으로 바꾸고 이 기기에 기억한다(설치 안내 페이지와 같은 값).
+  // 그리기 전에 정해야 깜빡이지 않는다.
+  (function () { var t = 'light'; try { t = localStorage.getItem('kbnote-theme') || 'light'; } catch (e) {} document.documentElement.dataset.theme = t; })();
+</script>
 </head>
 <body>
 <header class="band"><div class="band-in">
@@ -32,7 +37,8 @@
     <div class="grow"></div>
     <div class="hr">
       <div class="meta-r"><div class="stats" id="stats">불러오는 중…</div><div class="asof" id="asof"></div></div>
-      <button class="lockbtn" id="lockBtn" type="button" aria-label="잠그기 (이 기기에서 비밀번호 지우기)" title="잠그기"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></button>
+      <button class="iconbtn" id="themeBtn" type="button" aria-label="다크 모드로" title="다크 모드로"><svg class="moon" viewBox="0 0 24 24"><path d="M19.5 14.6A7.6 7.6 0 0 1 9.4 4.5a7.6 7.6 0 1 0 10.1 10.1z"/></svg><svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5 7 7M17 17l1.5 1.5M5.5 18.5 7 17M17 7l1.5-1.5"/></svg></button>
+      <button class="iconbtn lockbtn" id="lockBtn" type="button" aria-label="잠그기 (이 기기에서 비밀번호 지우기)" title="잠그기"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></button>
     </div>
   </div>
   <nav class="tabs" role="tablist" aria-label="보기">

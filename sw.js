@@ -1,5 +1,5 @@
 /* KB GIS Meeting Note service worker — 오프라인 앱 셸 + 새 배포 자동 반영 */
-const CACHE = 'kbnote-v1';
+const CACHE = 'kbnote-v2';
 
 // 설치 때 미리 받아 두는 파일. data.enc.json 은 암호문이라 캐시에 둬도 된다.
 const SHELL = [

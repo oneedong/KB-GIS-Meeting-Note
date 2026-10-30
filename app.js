@@ -284,6 +284,12 @@ addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");i
 // 암호화된 DB(data.enc.json)를 풀어서 읽기 전용으로 보여준다. 미팅 추가·수정은 Claude에 미팅노트 텍스트를 주면
 // data.enc.json 을 갱신해 다시 배포한다(CLAUDE.md).
 ["#mNew","#oNew","#pNew"].forEach(s=>$(s).hidden=true);fabSync();
+// 화면 모드(라이트·다크) — 처음 값은 index.html 머리말 스크립트가 정한다
+function setTheme(t){const r=document.documentElement;r.dataset.theme=t;try{localStorage.setItem("kbnote-theme",t)}catch(e){}
+  const lbl=t==="dark"?"라이트 모드로":"다크 모드로",b=$("#themeBtn");b.setAttribute("aria-label",lbl);b.title=lbl;
+  const band=getComputedStyle(r).getPropertyValue("--kb-gray").trim();document.querySelectorAll('meta[name="theme-color"]').forEach(m=>m.content=band)}
+$("#themeBtn").onclick=()=>setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
+setTheme(document.documentElement.dataset.theme==="dark"?"dark":"light");
 function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];
   mSel=M.length?M[0].id:null;oSel=null;pSel=null;
   authorsRefresh();orgSelRefresh();stats();renderTab();
