@@ -26,7 +26,7 @@
 <script>
   // 화면 모드: 라이트(기본)·다크. 헤더 버튼으로 바꾸고 이 기기에 기억한다(설치 안내 페이지와 같은 값).
   // 그리기 전에 정해야 깜빡이지 않는다.
-  (function () { var t = 'light'; try { t = localStorage.getItem('kbnote-theme') || 'light'; } catch (e) {} document.documentElement.dataset.theme = t; })();
+  (function () { var t = 'light', f = 'm'; try { t = localStorage.getItem('kbnote-theme') || 'light'; f = localStorage.getItem('kbnote-fs') || 'm'; } catch (e) {} document.documentElement.dataset.theme = t; document.documentElement.dataset.fs = f; })();
 </script>
 </head>
 <body>
@@ -37,6 +37,7 @@
     <div class="grow"></div>
     <div class="hr">
       <div class="meta-r"><div class="stats" id="stats">불러오는 중…</div><div class="asof" id="asof"></div></div>
+      <button class="iconbtn fsbtn" id="fsBtn" type="button" aria-label="글자 크기" title="글자 크기"><span aria-hidden="true">가</span></button>
       <button class="iconbtn" id="themeBtn" type="button" aria-label="다크 모드로" title="다크 모드로"><svg class="moon" viewBox="0 0 24 24"><path d="M19.5 14.6A7.6 7.6 0 0 1 9.4 4.5a7.6 7.6 0 1 0 10.1 10.1z"/></svg><svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5 7 7M17 17l1.5 1.5M5.5 18.5 7 17M17 7l1.5-1.5"/></svg></button>
       <button class="iconbtn lockbtn" id="lockBtn" type="button" aria-label="잠그기 (이 기기에서 비밀번호 지우기)" title="잠그기"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></button>
     </div>
@@ -59,9 +60,12 @@
         <select id="mType" class="opt"><option value="">업권 전체</option></select>
         <select id="mAsset" class="opt"><option value="">전략 전체</option></select>
         <select id="mAuthor" class="opt"><option value="">작성자 전체</option></select>
-        <select id="mFlag" class="full opt"><option value="">표시 전체</option><option value="원문 잘림">원문 잘림(보완 필요)</option><option value="내부용">내부용</option><option value="확인">이름·날짜 확인 필요</option></select>
+        <select id="mFlag" class="opt"><option value="">표시 전체</option><option value="원문 잘림">원문 잘림(보완 필요)</option><option value="내부용">내부용</option><option value="확인">이름·날짜 확인 필요</option></select>
       </div>
-      <div class="quick"><button class="qbtn" id="mCut" type="button" aria-pressed="false">✂ 원문 잘림 <span id="mCutN"></span>건</button><button class="qbtn ftog" id="mFt" type="button">필터</button></div>
+      <div class="quick" id="mQuick" role="group" aria-label="구분">
+        <button class="qbtn" type="button" data-cat="">전체</button><button class="qbtn" type="button" data-cat="LP">LP</button><button class="qbtn" type="button" data-cat="GP">GP</button><button class="qbtn" type="button" data-cat="시장정보">시장정보</button><button class="qbtn" type="button" data-cat="내부">내부</button>
+        <button class="qbtn new" id="mNewOnly" type="button" hidden>새 소식 <span></span></button><button class="qbtn ftog" id="mFt" type="button">필터</button>
+      </div>
       <div class="count"><span id="mCnt">불러오는 중…</span><button class="btn sm primary" id="mNew" type="button">+ 미팅 추가</button></div>
       <div class="list" id="mList"><div class="empty">미팅노트를 불러오는 중입니다.</div></div>
     </aside>

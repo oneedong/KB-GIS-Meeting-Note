@@ -42,6 +42,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   page.on('console', (m) => { if (m.type() === 'error' && !/pretendard|ERR_|Failed to load resource/i.test(m.text())) errors.push(m.text()); });
   page.route(/cdn\.jsdelivr\.net/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
 
+  await page.addInitScript(() => { try { if (!sessionStorage.getItem('t')) { localStorage.setItem('kbnote-seen', '2026-01-01T00:00:00.000Z'); sessionStorage.setItem('t', '1'); } } catch (e) {} });
   await page.goto(URL_);
   await page.locator('#gate').waitFor({ state: 'visible' });
   ok('비밀번호 화면이 뜬다', await page.locator('#gate').isVisible());
@@ -57,6 +58,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator('#gate').waitFor({ state: 'hidden' });
   ok('맞는 비밀번호로 열림', (await page.locator('#mList .item').count()) === 2);
   ok('건수 표시', (await page.textContent('#stats')).includes('미팅 2'));
+  ok('지난 방문 이후 새 미팅 NEW 표시', (await page.locator('#mList .badge.new').count()) === 2 && await page.locator('#mNewOnly').isVisible());
   ok('추가 버튼 숨김(읽기 전용)', !(await page.locator('#mNew').isVisible()));
   const theme = () => page.evaluate(() => [document.documentElement.dataset.theme, getComputedStyle(document.body).backgroundColor].join(' '));
   ok('기본은 라이트 모드(휴대폰이 다크여도)', (await theme()) === 'light rgb(247, 246, 243)');
@@ -85,6 +87,36 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('다크 모드 기억', (await theme()).startsWith('dark'));
   await page.click('#themeBtn');
   ok('라이트 모드로 되돌리기', (await theme()) === 'light rgb(247, 246, 243)');
+
+  // 읽기 기능: 구분 칩·검색 강조·미리보기·이전/다음·뒤로가기·글자 크기·연락처 링크
+  await page.locator(vp.width < 760 ? '.bnav button[data-tab="meetings"]' : '.tab[data-tab="meetings"]').click();
+  await page.locator('#mQuick [data-cat="GP"]').click();
+  ok('구분 칩(GP)으로 거르기', (await page.textContent('#mCnt')).startsWith('1건'));
+  await page.locator('#mQuick [data-cat=""]').click();
+  ok('미리보기에 시사점', (await page.locator('#mList .pv').first().textContent()).includes('하반기 재접촉'));
+  ok('월 구분 머리', (await page.locator('#mList .mhead').first().textContent()).includes('2026년 1월'));
+  await page.fill('#mq', 'PD 2건');
+  ok('검색어 강조(목록)', (await page.locator('#mList mark').count()) > 0);
+  await page.locator('#mList .item').first().click();
+  ok('핵심 상자가 맨 위', (await page.locator('#mMain .body > :first-child').getAttribute('class')) === 'key');
+  ok('검색어 강조(상세)', (await page.locator('#mMain mark').count()) > 0);
+  ok('금액·비율 굵게', (await page.locator('#mMain b.num', { hasText: 'USD 30mn' }).count()) === 1);
+  if (vp.width < 760) await page.locator('#mMain [data-back]').click();
+  await page.fill('#mq', '');
+  await page.locator('#mList .item').first().click();
+  await page.locator('#mMain [data-nav]').first().click();
+  ok('이전/다음 미팅', (await page.locator('#mMain h2').textContent()).includes('Sample Capital'));
+  if (vp.width < 760) {
+    await page.goBack();
+    ok('뒤로가기로 상세 닫힘', !(await page.locator('#p-meetings').evaluate((e) => e.classList.contains('detail'))) && await page.locator('#mList').isVisible());
+  }
+  await page.click('#fsBtn');
+  ok('글자 크기 크게', await page.evaluate(() => document.documentElement.dataset.fs) === 'l');
+  await page.click('#fsBtn'); await page.click('#fsBtn');
+  ok('글자 크기 보통으로 돌아옴', await page.evaluate(() => document.documentElement.dataset.fs) === 'm');
+  await page.evaluate(() => gotoPerson('p-test1'));
+  const links = await page.locator('#pMain a.contact').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+  ok('전화·메일 링크', links.includes('tel:01000000000') && links.includes('mailto:hong@example.com'));
 
   // 잠그기 → 다시 비밀번호 화면
   await page.click('#lockBtn');

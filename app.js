@@ -14,8 +14,10 @@ let cutOnly=false, showMatrix=false; const listY={};
 const mq=matchMedia("(max-width:760px)"); const isMob=()=>mq.matches;
 const BACK=`<div class="backbar"><button class="btn sm" type="button" data-back>← 목록</button></div>`;
 function fabSync(){$("#fab").hidden=!(tab==="meetings"&&canWrite&&!$("#p-meetings").classList.contains("detail"))}
-function openDetail(){if(!isMob()||!["meetings","orgs","people"].includes(tab))return;const sec=$("#p-"+tab);if(!sec.classList.contains("detail")){listY[tab]=scrollY;sec.classList.add("detail")}scrollTo({top:0});fabSync()}
-function closeDetail(){const sec=$("#p-"+tab);if(!sec)return;sec.classList.remove("detail");
+function openDetail(){if(!isMob()||!["meetings","orgs","people"].includes(tab))return;const sec=$("#p-"+tab);if(!sec.classList.contains("detail")){listY[tab]=scrollY;sec.classList.add("detail");try{history.pushState({detail:tab},"",location.hash)}catch(e){}}scrollTo({top:0});fabSync()}
+// 휴대폰 뒤로가기(안드로이드 버튼·제스처)는 상세를 닫는다. 화면의 "← 목록"으로 닫을 때는 쌓아 둔 기록도 되돌린다.
+addEventListener("popstate",()=>{const sec=$("#p-"+tab);if(sec&&sec.classList.contains("detail"))closeDetail(true)});
+function closeDetail(fromPop){const sec=$("#p-"+tab);if(!sec)return;const was=sec.classList.contains("detail");sec.classList.remove("detail");if(was&&!fromPop&&history.state&&history.state.detail){try{history.back()}catch(e){}}
   if(tab==="meetings"&&mMode!=="view"){mMode="view";renderMMain()} if(tab==="orgs"&&oMode!=="view"){oMode="view";renderOMain()} if(tab==="people"&&pMode!=="view"){pMode="view";renderPMain()}
   confirmDel=false;requestAnimationFrame(()=>scrollTo({top:listY[tab]||0}));fabSync()}
 document.addEventListener("click",e=>{if(e.target.closest("[data-back]"))closeDetail()});
@@ -64,39 +66,66 @@ function stats(){$("#stats").textContent=`미팅 ${M.length} · 기관 ${O.lengt
 function authorsRefresh(){const el=$("#mAuthor"),cur=el.value;const set=[...new Set(M.map(m=>(m.kbAttendees||"").split(/[,·\/]/)[0].trim()).filter(Boolean))].sort();
   el.innerHTML=`<option value="">작성자 전체</option>`+set.map(a=>`<option${a===cur?" selected":""}>${esc(a)}</option>`).join("")}
 function mFiltered(){const q=$("#mq").value.trim().toLowerCase(),c=$("#mCat").value,t=$("#mType").value,a=$("#mAsset").value,au=$("#mAuthor").value,f=$("#mFlag").value;
-  return M.filter(r=>(!c||(r.category||"LP")===c)&&(!t||r.orgType===t)&&(!a||(r.assets||[]).includes(a))&&(!au||(r.kbAttendees||"").includes(au))&&(!cutOnly||r.truncated)&&
+  return M.filter(r=>(!c||(r.category||"LP")===c)&&(!t||r.orgType===t)&&(!a||(r.assets||[]).includes(a))&&(!au||(r.kbAttendees||"").includes(au))&&(!cutOnly||r.truncated)&&(!newOnly||NEWS.has(r.id)||UPDS.has(r.id))&&
     (!f||(f==="원문 잘림"?r.truncated:(r.flags||[]).some(x=>f==="확인"?/확인/.test(x):x.startsWith(f))))&&
     (!q||[r.org,r.dept,r.attendees,r.body,r.nextAction,(r.tags||[]).join(" "),(r.assets||[]).join(" ")].join(" ").toLowerCase().includes(q)))}
-function renderMList(){const f=mFiltered(),L=$("#mList");
-  $("#mCnt").textContent=`${f.length}건 / 전체 ${M.length}건`;$("#mCutN").textContent=M.filter(r=>r.truncated).length;$("#mCut").setAttribute("aria-pressed",cutOnly?"true":"false");
-  const nf=["mCat","mType","mAsset","mAuthor","mFlag"].filter(i=>$("#"+i).value).length;$("#mFt").textContent=nf?`필터 ${nf}`:"필터";
-  if(!M.length){L.innerHTML=`<div class="empty">아직 미팅노트가 없습니다. <b>+ 미팅 추가</b>로 첫 미팅을 남기세요.</div>`;return}
+// ── 읽기 도우미: 검색어 강조·금액 강조·미리보기 ──
+const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+function hl(html,q){if(!q)return html;  // 이미 이스케이프된 html 의 글자 부분에서만 검색어를 <mark>
+  return html.replace(new RegExp(`(<[^>]+>|&(?:amp|lt|gt|quot);)|(${reEsc(esc(q))})`,"gi"),(m,keep,hit)=>keep||`<mark>${hit}</mark>`)}
+const NUM=/(?:USD|EUR|GBP|JPY|KRW|AUD|US\$|\$|€|£)\s?\d[\d,.]*\s?(?:bn|mn|m|b|k|조|억|만)?|\d[\d,.]*\s?(?:조|억|천만|백만|만)\s?(?:원|달러|불)?|\d[\d,.]*\s?(?:%|bp|bps|x|배)(?![A-Za-z가-힣])|\d[\d,.]*\s?(?:bn|mn)(?![A-Za-z])/gi;
+function rich(t,q){return hl(esc(t).replace(NUM,m=>`<b class="num">${m}</b>`),q)}  // 본문 한 줄: 금액·비율 굵게 + 검색어
+function snippet(line,q){const i=line.toLowerCase().indexOf(q);if(i<0)return esc(line);
+  const a=Math.max(0,i-24),b=Math.min(line.length,i+q.length+60);return (a?"…":"")+hl(esc(line.slice(a,b)),q)+(b<line.length?"…":"")}
+function preview(r,q){const {secs,take}=parseBody(r.body),lines=secs.flatMap(s=>s.b);
+  if(q){const hit=[...take,...lines,r.nextAction||"",...parseAtt(r.attendees).map(a=>a.who+" "+a.note),(r.tags||[]).join(" ")].find(l=>l.toLowerCase().includes(q));if(hit)return snippet(hit,q)}
+  return take[0]?`<span class="arrow">→</span> ${esc(take[0])}`:esc(lines[0]||"")}
+let seenAt="",newOnly=false;const NEWS=new Set(),UPDS=new Set();
+const CAT_CLS={"GP":"gp","시장정보":"intel","내부":"inner"};
+function renderMList(){const f=mFiltered(),L=$("#mList"),q=$("#mq").value.trim().toLowerCase();
+  $("#mCnt").textContent=`${f.length}건 / 전체 ${M.length}건`;
+  const cat=$("#mCat").value;document.querySelectorAll("#mQuick [data-cat]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.cat===cat?"true":"false"));
+  const nb=$("#mNewOnly");nb.hidden=!NEWS.size&&!UPDS.size;nb.querySelector("span").textContent=NEWS.size+UPDS.size;nb.setAttribute("aria-pressed",newOnly?"true":"false");
+  const nf=["mType","mAsset","mAuthor","mFlag"].filter(i=>$("#"+i).value).length;$("#mFt").textContent=nf?`필터 ${nf}`:"필터";$("#mFt").setAttribute("aria-pressed",nf?"true":"false");
+  if(!M.length){L.innerHTML=`<div class="empty">아직 미팅노트가 없습니다.</div>`;return}
   if(!f.length){L.innerHTML=`<div class="empty">조건에 맞는 미팅이 없습니다. 검색어나 필터를 바꿔 보세요.</div>`;return}
-  L.innerHTML=f.map(r=>{const {y,m,d}=md(r.date),att=parseAtt(r.attendees).map(a=>a.who).join(", ");const cat=r.category||"LP";
-    return `<button type="button" class="item${r.id===mSel?" on":""}" data-id="${esc(r.id)}"><div class="date"><b>${m}/${d}</b>${y}</div>
-      <div style="min-width:0"><div class="ttl">${esc(r.org)}${r.dept?` <span class="sub2" style="display:inline">${esc(r.dept)}</span>`:""}</div><div class="sub2">${esc(att||r.kbAttendees||"")}</div>
-      <div class="chips">${cat!=="LP"?`<span class="chip cat">${esc(cat)}</span>`:""}${(r.assets||[]).slice(0,3).map(t=>`<span class="chip asset">${esc(SHORT[t]||t)}</span>`).join("")}${r.truncated?`<span class="chip cut">✂ 원문 잘림</span>`:""}${(r.flags||[]).some(x=>x.startsWith("내부용"))?`<span class="chip flag">내부용</span>`:""}</div></div></button>`}).join("")}
+  const per={};f.forEach(r=>{const k=(r.date||"").slice(0,7);per[k]=(per[k]||0)+1});let last="";
+  L.innerHTML=f.map(r=>{const {y,m,d}=md(r.date),k=(r.date||"").slice(0,7),att=parseAtt(r.attendees).map(a=>a.who).join(", "),cat=r.category||"LP";
+    const head=k!==last?`<div class="mhead">${y}년 ${m}월<span>${per[k]}건</span></div>`:"";last=k;
+    const badge=NEWS.has(r.id)?`<span class="badge new">NEW</span>`:UPDS.has(r.id)?`<span class="badge upd">수정</span>`:"";
+    return head+`<button type="button" class="item${r.id===mSel?" on":""}" data-id="${esc(r.id)}"><div class="date"><b>${d}</b>${wk(r.date)}</div>
+      <div style="min-width:0"><div class="ttl">${cat!=="LP"?`<span class="cattag ${CAT_CLS[cat]||""}">${esc(cat)}</span>`:""}${hl(esc(r.org),q)}${r.dept?` <span class="mdept">${hl(esc(r.dept),q)}</span>`:""}${badge}</div>
+      <div class="sub2">${hl(esc(att||r.kbAttendees||""),q)}</div>
+      ${(()=>{const pv=preview(r,q);return pv?`<div class="pv">${pv}</div>`:""})()}
+      <div class="chips">${(r.assets||[]).slice(0,3).map(t=>`<span class="chip asset">${esc(SHORT[t]||t)}</span>`).join("")}${r.truncated?`<span class="chip cut">✂ 잘림</span>`:""}${(r.flags||[]).some(x=>x.startsWith("내부용"))?`<span class="chip flag">내부용</span>`:""}</div></div></button>`}).join("")}
+function ago(d){const n=Math.round((Date.parse(today())-Date.parse(d))/864e5);return n<=0?"오늘":n===1?"어제":n<7?`${n}일 전`:n<35?`${Math.round(n/7)}주 전`:n<365?`${Math.round(n/30)}개월 전`:""}
 function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm();
   const r=M.find(x=>x.id===mSel);if(!r){W.innerHTML=`<div class="empty">왼쪽에서 미팅을 선택하세요.</div>`;return}
-  const {y,m,d}=md(r.date),att=parseAtt(r.attendees),{secs,take}=parseBody(r.body),o=orgOf(r.org);
-  const cut=r.truncated?`<div class="trunc"><div style="flex:1;min-width:0"><b>✂ 장문 원문 잘림 — 보완 필요</b><div>카톡 내보내기에서 긴 메시지 뒷부분이 잘렸습니다. 아래 마지막 문장 이후 내용을 카톡 '전체보기'에서 확인해 보완하세요.</div>${r.truncAt?`<q>${esc(r.truncAt)}</q>`:""}${r.source?`<div class="ro" style="margin-top:4px">원문: ${esc(r.source)}</div>`:""}</div>${canWrite?`<button class="btn sm" id="mFix" type="button">보완하기</button>`:""}</div>`:"";
-  W.innerHTML=BACK+`<div class="head"><div class="t">
-    <div class="eyebrow">${y}.${String(m).padStart(2,"0")}.${String(d).padStart(2,"0")} (${wk(r.date)}) · ${esc(r.category||"LP")}${r.orgType?" · "+esc(r.orgType):""}${r.dept?" · "+esc(r.dept):""}</div>
-    <h2>${o?`<button class="link" id="mOrg" type="button">${esc(r.org)}</button>`:esc(r.org)}</h2>
-    <div class="chips">${(r.assets||[]).map(t=>`<span class="chip asset">${esc(t)}</span>`).join("")}${(r.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join("")}</div></div>
+  const {y,m,d}=md(r.date),att=parseAtt(r.attendees),{secs,take}=parseBody(r.body),o=orgOf(r.org),q=$("#mq").value.trim().toLowerCase();
+  const inner=(r.flags||[]).some(x=>x.startsWith("내부용")),checks=(r.flags||[]).filter(x=>!x.startsWith("내부용")&&x!=="원문 잘림");
+  const list=mFiltered(),i=list.findIndex(x=>x.id===r.id),newer=i>0?list[i-1]:null,older=i>=0&&i<list.length-1?list[i+1]:null;
+  const cut=r.truncated?`<div class="trunc"><div style="flex:1;min-width:0"><b>✂ 원문 잘림 — 보완 필요</b><div>카톡 내보내기에서 긴 메시지 뒷부분이 잘렸습니다. 카톡 '전체보기'에서 확인한 내용을 Claude에 주면 보완합니다.</div>${r.truncAt?`<q>${esc(r.truncAt)}</q>`:""}</div></div>`:"";
+  const nav=(x,dir)=>x?`<button type="button" class="pn-b ${dir}" data-nav="${esc(x.id)}"><small>${dir==="newer"?"← 더 최근":"더 이전 →"}</small><b>${esc(x.org)}</b><span>${esc(x.date)}</span></button>`:`<span></span>`;
+  W.innerHTML=`<div class="backbar"><button class="btn sm" type="button" data-back>← 목록</button><span class="grow"></span><button class="btn sm" id="mCopyM" type="button">메모 복사</button></div>
+  <div class="head"><div class="t">
+    <div class="eyebrow">${y}.${String(m).padStart(2,"0")}.${String(d).padStart(2,"0")} (${wk(r.date)})${ago(r.date)?` · ${ago(r.date)}`:""} · ${esc(r.category||"LP")}${r.orgType?" · "+esc(r.orgType):""}</div>
+    <h2>${o?`<button class="link" id="mOrg" type="button">${hl(esc(r.org),q)}</button>`:hl(esc(r.org),q)}${r.dept?` <span class="h-dept">${hl(esc(r.dept),q)}</span>`:""}</h2>
+    <div class="chips">${inner?`<span class="chip flag">내부용 · 외부 공유 금지</span>`:""}${(r.assets||[]).map(t=>`<span class="chip asset">${esc(t)}</span>`).join("")}</div></div>
     <div class="actions"><button class="btn" id="mCopy" type="button">메모 복사</button>${canWrite?`<button class="btn" id="mEdit" type="button">수정</button>`:""}</div></div>
   <div class="body">
-    ${cut}
-    ${(r.flags||[]).length?`<div class="warnbox">${(r.flags||[]).map(esc).join(" · ")}</div>`:""}
-    ${att.length?`<div class="attendees">${att.map(a=>`<div class="att"><b>${esc(a.who)}</b><div>${esc(a.note)||"<span class='ro'>소개 없음</span>"}</div></div>`).join("")}</div>`:""}
-    ${secs.map(s=>`<div class="sec">${s.h?`<h3>${esc(s.h)}</h3>`:""}<ul>${s.b.map(b=>`<li>${esc(b)}${r.truncated&&b===r.truncAt?`<p class="cutline" style="margin-top:6px">✂ 여기서 원문이 잘렸습니다</p>`:""}</li>`).join("")}</ul></div>`).join("")}
+    ${take.length||r.nextAction?`<div class="key">${take.length?`<div class="key-h">핵심</div><ul>${take.map(t=>`<li>${rich(t,q)}</li>`).join("")}</ul>`:""}${r.nextAction?`<div class="key-next"><span>다음 액션</span>${rich(r.nextAction,q)}</div>`:""}</div>`:""}
+    ${att.length?`<div class="attendees">${att.map(a=>`<div class="att"><b>${hl(esc(a.who),q)}</b><div>${a.note?hl(esc(a.note),q):"<span class='ro'>소개 없음</span>"}</div></div>`).join("")}</div>`:""}
+    ${secs.map(s=>`<div class="sec">${s.h?`<h3>${esc(s.h)}</h3>`:""}<ul>${s.b.map(b=>`<li>${rich(b,q)}${r.truncated&&b===r.truncAt?`<p class="cutline" style="margin-top:6px">✂ 여기서 원문이 잘렸습니다</p>`:""}</li>`).join("")}</ul></div>`).join("")}
     ${r.truncated&&!secs.some(s=>s.b.includes(r.truncAt))?`<p class="cutline">✂ 원문이 잘린 노트입니다</p>`:""}
-    ${take.length?`<div class="take">${take.map(t=>`<p>→ ${esc(t)}</p>`).join("")}</div>`:""}
-    <div class="meta"><div><span>다음 액션</span>${esc(r.nextAction)||"—"}</div><div><span>작성·당사 참석</span>${esc(r.kbAttendees)||"—"}</div>
-      <div><span>출처</span>${esc(r.source)||"직접 입력"}</div><div><span>최종 수정</span>${r.updatedAt?esc(r.updatedAt.slice(0,10)):"—"}</div></div>
+    ${cut}
+    ${checks.length?`<div class="warnbox">${checks.map(esc).join(" · ")}</div>`:""}
+    <div class="meta"><div><span>작성·당사 참석</span>${esc(r.kbAttendees)||"—"}</div><div><span>출처</span>${esc(r.source)||"직접 입력"}</div><div><span>최종 수정</span>${r.updatedAt?esc(r.updatedAt.slice(0,10)):"—"}</div>
+      ${(r.tags||[]).length?`<div class="tags"><span>태그</span>${(r.tags||[]).map(t=>`<button type="button" class="chip tag" data-tag="${esc(t)}">#${esc(t)}</button>`).join("")}</div>`:""}</div>
+    ${newer||older?`<div class="pn">${nav(newer,"newer")}${nav(older,"older")}</div>`:""}
   </div>`;
-  $("#mCopy").onclick=()=>copy(memoText(r));const e=$("#mEdit");if(e)e.onclick=()=>{mMode="edit";confirmDel=false;renderMMain()};
-  const fx=$("#mFix");if(fx)fx.onclick=()=>{mMode="edit";confirmDel=false;renderMMain();const b=$("#fBody");b.focus();b.setSelectionRange(b.value.length,b.value.length);b.scrollIntoView({block:"center"})};
+  $("#mCopy").onclick=$("#mCopyM").onclick=()=>copy(memoText(r));const e=$("#mEdit");if(e)e.onclick=()=>{mMode="edit";confirmDel=false;renderMMain()};
+  W.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{mSel=b.dataset.nav;renderMList();renderMMain();if(isMob())scrollTo({top:0});else{W.scrollIntoView({block:"nearest"});const el=document.querySelector(`#mList [data-id="${CSS.escape(mSel)}"]`);if(el)el.scrollIntoView({block:"nearest"})}});
+  W.querySelectorAll("[data-tag]").forEach(b=>b.onclick=()=>{$("#mq").value=b.dataset.tag;renderMList();if(isMob())closeDetail();else renderMMain()});
   const mo=$("#mOrg");if(mo)mo.onclick=()=>gotoOrg(r.org)}
 function renderMForm(){const r=mMode==="edit"?M.find(x=>x.id===mSel)||{}:{date:today(),category:"LP"};
   $("#mMain").innerHTML=BACK+`<form id="mFrm" novalidate><div class="eyebrow">${mMode==="edit"?"미팅노트 수정":"새 미팅노트"}</div>
@@ -128,8 +157,9 @@ function renderMForm(){const r=mMode==="edit"?M.find(x=>x.id===mSel)||{}:{date:t
     await write(C.meetings,mMode==="edit"?mSel:null,data,id=>{mSel=id;mMode="view"},"#fSave")}}
 function keepForm(fn,sel){const vals=[...document.querySelectorAll(sel+" input,"+sel+" select,"+sel+" textarea")].map(el=>[el.id,el.type==="checkbox"?el.checked:el.value]);fn();vals.forEach(([id,v])=>{const el=document.getElementById(id);if(!el)return;if(el.type==="checkbox")el.checked=v;else el.value=v})}
 $("#mList").addEventListener("click",e=>{const b=e.target.closest(".item");if(!b)return;mSel=b.dataset.id;mMode="view";renderMList();renderMMain();if(isMob())openDetail();else if(innerWidth<=900)$("#mMain").scrollIntoView()});
-["mq","mCat","mType","mAsset","mAuthor","mFlag"].forEach(i=>$("#"+i).addEventListener("input",renderMList));
-$("#mCut").onclick=()=>{cutOnly=!cutOnly;renderMList()};
+["mq","mCat","mType","mAsset","mAuthor","mFlag"].forEach(i=>$("#"+i).addEventListener("input",()=>{renderMList();if(!isMob())renderMMain()}));  // PC는 상세의 검색어 강조·이전/다음도 갱신
+document.querySelectorAll("#mQuick [data-cat]").forEach(b=>b.onclick=()=>{$("#mCat").value=b.dataset.cat;renderMList();if(!isMob())renderMMain()});
+$("#mNewOnly").onclick=()=>{newOnly=!newOnly;renderMList()};
 $("#mFt").onclick=()=>$("#mFilters").classList.toggle("open");
 $("#mNew").onclick=$("#fab").onclick=()=>{if(!canWrite)return toast("이 링크에서는 수정 권한이 없습니다.");mMode="new";confirmDel=false;renderMMain();openDetail()};
 
@@ -155,7 +185,7 @@ function renderOMain(){const W=$("#oMain");if(oMode!=="view")return renderOForm(
     <div class="kv">${[["선호·제약",o.prefs],["티켓",o.ticket],["심사·의사결정",o.process],["조직·인사",o.hr]].filter(x=>x[1]).map(([k,v])=>`<div><span>${k}</span>${esc(v)}</div>`).join("")}</div>
     ${sig.length?`<div class="sec"><h3>전략 시그널</h3><div class="sigrows">${sig.map(([k,v])=>`<div class="sigrow"><b>${esc(k)}</b><span class="sg s-${esc(v.s)}">${esc(v.s)}</span><span>${esc(v.note)}</span><span class="d">${esc(v.date||"")}</span></div>`).join("")}</div></div>`:""}
     ${ps.length?`<div class="sec"><h3>인물</h3><div class="pgrid">${ps.sort((a,b)=>(b.lastSeen||"").localeCompare(a.lastSeen||"")).slice(0,18).map(p=>`<button type="button" class="pcard" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b> ${esc(p.title||"")}<div class="sub2">${esc([p.dept,p.team].filter(Boolean).join(" · ")||p.note||"")}</div></button>`).join("")}</div>${ps.length>18?`<p class="basis">외 ${ps.length-18}명은 인물·조직도 탭에서 볼 수 있습니다.</p>`:""}</div>`:""}
-    <div class="sec"><h3>미팅 이력</h3>${ms.length?`<div class="timeline">${ms.map(m=>{const {secs}=parseBody(m.body);const first=secs.flatMap(s=>s.b).slice(0,2).join(" / ");
+    <div class="sec"><h3>미팅 이력</h3>${ms.length?`<div class="timeline">${ms.map(m=>{const {secs,take}=parseBody(m.body);const first=(take.length?take.map(t=>"→ "+t):secs.flatMap(s=>s.b)).slice(0,2).join(" / ");
       return `<button type="button" class="tl" data-mid="${esc(m.id)}"><span class="d">${esc(m.date)}</span><span style="min-width:0"><b>${esc(m.dept||m.category||"")}</b> ${esc(parseAtt(m.attendees).map(a=>a.who).join(", "))}${m.truncated?` <span class="chip cut">✂ 잘림</span>`:""}<span class="s">${esc(first)}</span></span></button>`}).join("")}</div>`:`<p class="ro">기록된 미팅이 없습니다.</p>`}</div>
     <p class="basis">${esc(o.basis||"")}${o.updatedAt?` · 최종 수정 ${esc(o.updatedAt.slice(0,10))}`:""}</p>
   </div>`;
@@ -237,7 +267,7 @@ function renderPMain(){const W=$("#pMain");if(pMode!=="view")return renderPForm(
   if(p){const o=orgOf(p.org),ms=M.filter(m=>(m.attendees||"").includes(p.name)&&(m.org===p.org||(o&&meetingsOf(o).includes(m)))).sort((a,b)=>b.date.localeCompare(a.date));
     h+=BACK+`<div class="head"><div class="t"><div class="eyebrow">${esc(p.org)}${p.dept?" · "+esc(p.dept):""}${p.team?" · "+esc(p.team):""}</div><h2>${esc(p.name)} ${esc(p.title||"")}</h2></div>
       <div class="actions">${canWrite?`<button class="btn" id="pEdit" type="button">수정</button>`:""}</div></div>
-      <div class="body"><div class="kv">${[["전화",p.phone||p.ext],["휴대폰",p.mobile],["이메일",p.email],["최근 언급",p.lastSeen],["출처",p.source]].filter(x=>x[1]).map(([k,v])=>`<div><span>${k}</span>${esc(v)}</div>`).join("")}</div>
+      <div class="body"><div class="kv">${[["전화",p.phone||p.ext,p.phone?"tel:":""],["휴대폰",p.mobile,"tel:"],["이메일",p.email,"mailto:"],["최근 언급",p.lastSeen],["출처",p.source]].filter(x=>x[1]).map(([k,v,ln])=>`<div><span>${k}</span>${ln?`<a class="contact" href="${ln}${esc(ln==="tel:"?v.replace(/[^\d+]/g,""):v.trim())}">${esc(v)}</a>`:esc(v)}</div>`).join("")}</div>
       ${p.note?`<div class="sec"><h3>메모</h3><p>${esc(p.note)}</p></div>`:""}
       ${ms.length?`<div class="sec"><h3>참석한 미팅</h3><div class="timeline">${ms.map(m=>`<button type="button" class="tl" data-mid="${esc(m.id)}"><span class="d">${esc(m.date)}</span><span>${esc(m.org)} ${esc(m.dept||"")}</span></button>`).join("")}</div></div>`:""}</div>`}
   const chartOrg=org||(p&&p.org);
@@ -289,8 +319,18 @@ function setTheme(t){const r=document.documentElement;r.dataset.theme=t;try{loca
   const lbl=t==="dark"?"라이트 모드로":"다크 모드로",b=$("#themeBtn");b.setAttribute("aria-label",lbl);b.title=lbl;
   const band=getComputedStyle(r).getPropertyValue("--kb-gray").trim();document.querySelectorAll('meta[name="theme-color"]').forEach(m=>m.content=band)}
 $("#themeBtn").onclick=()=>setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
+const FS=[["m","보통"],["l","크게"],["xl","아주 크게"]];
+function setFs(v,say){document.documentElement.dataset.fs=v;try{localStorage.setItem("kbnote-fs",v)}catch(e){}
+  const n=FS.find(x=>x[0]===v)||FS[0],b=$("#fsBtn"),lbl=`글자 크기: ${n[1]} (누르면 바꿈)`;b.setAttribute("aria-label",lbl);b.title=lbl;if(say)toast(`글자 크기: ${n[1]}`)}
+$("#fsBtn").onclick=()=>{const i=FS.findIndex(x=>x[0]===document.documentElement.dataset.fs);setFs(FS[(i+1)%FS.length][0],true);if(tab==="demand")renderDemand()};
+setFs(document.documentElement.dataset.fs||"m");
 setTheme(document.documentElement.dataset.theme==="dark"?"dark":"light");
-function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];
+function markNew(){let seen="";try{seen=localStorage.getItem("kbnote-seen")||""}catch(e){}
+  const latest=M.reduce((a,r)=>[r.createdAt||"",r.updatedAt||"",a].sort().pop(),"");NEWS.clear();UPDS.clear();
+  if(seen)M.forEach(r=>{if((r.createdAt||"")>seen)NEWS.add(r.id);else if((r.updatedAt||"")>seen)UPDS.add(r.id)});
+  try{if(latest)localStorage.setItem("kbnote-seen",latest)}catch(e){}  // 다음에 열 때는 이번 것 이후만 새 소식
+  if(NEWS.size||UPDS.size)toast(`지난번 이후 새 미팅 ${NEWS.size}건${UPDS.size?` · 수정 ${UPDS.size}건`:""}`)}
+function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];markNew();
   mSel=M.length?M[0].id:null;oSel=null;pSel=null;
   authorsRefresh();orgSelRefresh();stats();renderTab();
   $("#asof").textContent=j.generatedAt?`${j.generatedAt} 업데이트`:"";document.body.classList.add("ready")}
