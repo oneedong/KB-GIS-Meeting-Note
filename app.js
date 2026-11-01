@@ -62,28 +62,55 @@ function gotoPerson(id){const p=P.find(x=>x.id===id);if(!p)return;pSel=id;pMode=
 
 function stats(){$("#stats").textContent=`미팅 ${M.length} · 기관 ${O.length} · 인물 ${P.length}`}
 
+// ═════ 검색 ═════
+// 여러 단어는 모두 들어 있어야 맞음. 각 단어는 기관 약칭(DB의 aliases: 교공→한국교직원공제회)과
+// 아래 한·영 표기 묶음(블루아울↔Blue Owl)으로 넓혀서 찾는다. 공개 코드이므로 일반 GP명·업계 용어만 둔다.
+const SYN=[["blue owl","블루아울","블루 아울"],["apollo","아폴로"],["blackrock","블랙록"],["blackstone","블랙스톤"],["carlyle","칼라일"],["kkr","케이케이알"],
+  ["ares","아레스"],["brookfield","브룩필드"],["hamilton lane","해밀턴레인","해밀턴 레인"],["stepstone","스텝스톤"],["neuberger","누버거","뉴버거"],["golub","골럽","골룹"],
+  ["oaktree","오크트리"],["bain","베인"],["partners group","파트너스그룹","파트너스 그룹"],["ardian","아디안","아르디안"],["macquarie","맥쿼리"],["goldman","골드만"],
+  ["morgan stanley","모건스탠리","모건 스탠리"],["pimco","핌코"],["sixth street","식스스트리트"],["tpg","티피지"],["permira","퍼미라"],["warburg","워버그"],
+  ["silver point","실버포인트"],["centerbridge","센터브릿지"],["crescent","크레센트"],["sculptor","스컬프터","스컵터"],["eurazeo","유라제오"],["digital bridge","디지털브릿지","digitalbridge"],
+  ["farallon","패럴론","파랄론"],["benefit street","bsp"],["lexington","렉싱턴"],["wellington","웰링턴"],["jefferies","제프리스"],["oak hill","오크힐","oha"],
+  ["private debt","pd","사모대출","사모 대출"],["private credit","프라이빗 크레딧","사모신용"],["direct lending","dl","직접대출"],["secondary","세컨더리","세컨"],
+  ["buyout","바이아웃"],["co-invest","코인베","공동투자","co-investment"],["infra","인프라","infrastructure"],["real estate","부동산"],["re-up","리업"],
+  ["blind","블라인드","블펀"],["capital call","캐피탈콜","캐피털콜","캐콜"],["hedge fund","헤지펀드","헤지 펀드"],["aircraft","항공기"],["gp financing","gp 파이낸싱","gp파이낸싱"],
+  ["evergreen","에버그린"],["open-end","오픈엔드","오픈 엔드"],["bdc","비디씨"],["clo","씨엘오"],["sma","에스엠에이"]];
+let ORGKEY=new Map(),HAY=new Map(),hlCache={q:null,re:null};
+function indexSearch(){ORGKEY=new Map();O.forEach(o=>[o.name,...(o.aliases||[])].forEach(k=>{if(k)ORGKEY.set(k.toLowerCase(),o)}));HAY=new Map();hlCache={q:null,re:null}}
+function expand(t){const alts=new Set([t]);SYN.forEach(g=>{if(g.includes(t))g.forEach(x=>alts.add(x))});
+  const o=ORGKEY.get(t);if(o)[o.name,...(o.aliases||[])].forEach(x=>alts.add(x.toLowerCase()));return [...alts]}
+function terms(q){let s=(q||"").trim().toLowerCase();if(!s)return [];const T=[];
+  SYN.flat().filter(x=>x.includes(" ")).sort((a,b)=>b.length-a.length).forEach(ph=>{if(s.includes(ph)){T.push(expand(ph));s=s.split(ph).join(" ")}});  // 띄어쓴 이름은 한 단어로
+  s.split(/\s+/).filter(Boolean).forEach(t=>T.push(expand(t)));return T}
+const hits=(hay,T)=>T.every(alts=>alts.some(a=>hay.includes(a)));
+function hayM(r){let h=HAY.get(r.id);if(h)return h;const o=orgOf(r.org);
+  h=[r.org,...(o?[o.name,...(o.aliases||[])]:[]),r.dept,r.attendees,r.body,r.nextAction,r.kbAttendees,(r.tags||[]).join(" "),(r.assets||[]).join(" "),r.category,r.orgType].join(" ").toLowerCase();HAY.set(r.id,h);return h}
+
 // ═════ 미팅노트 ═════
 function authorsRefresh(){const el=$("#mAuthor"),cur=el.value;const set=[...new Set(M.map(m=>(m.kbAttendees||"").split(/[,·\/]/)[0].trim()).filter(Boolean))].sort();
   el.innerHTML=`<option value="">작성자 전체</option>`+set.map(a=>`<option${a===cur?" selected":""}>${esc(a)}</option>`).join("")}
-function mFiltered(){const q=$("#mq").value.trim().toLowerCase(),c=$("#mCat").value,t=$("#mType").value,a=$("#mAsset").value,au=$("#mAuthor").value,f=$("#mFlag").value;
+function mFiltered(){const T=terms($("#mq").value),c=$("#mCat").value,t=$("#mType").value,a=$("#mAsset").value,au=$("#mAuthor").value,f=$("#mFlag").value;
   return M.filter(r=>(!c||(r.category||"LP")===c)&&(!t||r.orgType===t)&&(!a||(r.assets||[]).includes(a))&&(!au||(r.kbAttendees||"").includes(au))&&(!cutOnly||r.truncated)&&(!newOnly||NEWS.has(r.id)||UPDS.has(r.id))&&
-    (!f||(f==="원문 잘림"?r.truncated:(r.flags||[]).some(x=>f==="확인"?/확인/.test(x):x.startsWith(f))))&&
-    (!q||[r.org,r.dept,r.attendees,r.body,r.nextAction,(r.tags||[]).join(" "),(r.assets||[]).join(" ")].join(" ").toLowerCase().includes(q)))}
+    (!f||(f==="원문 잘림"?r.truncated:f==="다음 액션"?!!r.nextAction:(r.flags||[]).some(x=>f==="확인"?/확인/.test(x):x.startsWith(f))))&&
+    (!T.length||hits(hayM(r),T)))}
 // ── 읽기 도우미: 검색어 강조·금액 강조·미리보기 ──
 const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-function hl(html,q){if(!q)return html;  // 이미 이스케이프된 html 의 글자 부분에서만 검색어를 <mark>
-  return html.replace(new RegExp(`(<[^>]+>|&(?:amp|lt|gt|quot);)|(${reEsc(esc(q))})`,"gi"),(m,keep,hit)=>keep||`<mark>${hit}</mark>`)}
+function hlRe(q){if(hlCache.q===q)return hlCache.re;const alts=[...new Set(terms(q).flat())].sort((a,b)=>b.length-a.length);
+  hlCache={q,re:alts.length?new RegExp(`(<[^>]+>|&(?:amp|lt|gt|quot);)|(${alts.map(a=>reEsc(esc(a))).join("|")})`,"gi"):null};return hlCache.re}
+function hl(html,q){const re=q&&hlRe(q);if(!re)return html;  // 이미 이스케이프된 html 의 글자 부분에서만 검색어를 <mark>
+  return html.replace(re,(m,keep,hit)=>keep||`<mark>${hit}</mark>`)}
 const NUM=/(?:USD|EUR|GBP|JPY|KRW|AUD|US\$|\$|€|£)\s?\d[\d,.]*\s?(?:bn|mn|m|b|k|조|억|만)?|\d[\d,.]*\s?(?:조|억|천만|백만|만)\s?(?:원|달러|불)?|\d[\d,.]*\s?(?:%|bp|bps|x|배)(?![A-Za-z가-힣])|\d[\d,.]*\s?(?:bn|mn)(?![A-Za-z])/gi;
 function rich(t,q){return hl(esc(t).replace(NUM,m=>`<b class="num">${m}</b>`),q)}  // 본문 한 줄: 금액·비율 굵게 + 검색어
-function snippet(line,q){const i=line.toLowerCase().indexOf(q);if(i<0)return esc(line);
-  const a=Math.max(0,i-24),b=Math.min(line.length,i+q.length+60);return (a?"…":"")+hl(esc(line.slice(a,b)),q)+(b<line.length?"…":"")}
+function firstHit(line,q){const l=line.toLowerCase();let best=null;terms(q).flat().forEach(a=>{const i=l.indexOf(a);if(i>=0&&(!best||i<best.i))best={i,n:a.length}});return best}
+function snippet(line,q){const h=firstHit(line,q);if(!h)return esc(line);
+  const a=Math.max(0,h.i-24),b=Math.min(line.length,h.i+h.n+60);return (a?"…":"")+hl(esc(line.slice(a,b)),q)+(b<line.length?"…":"")}
 function preview(r,q){const {secs,take}=parseBody(r.body),lines=secs.flatMap(s=>s.b);
-  if(q){const hit=[...take,...lines,r.nextAction||"",...parseAtt(r.attendees).map(a=>a.who+" "+a.note),(r.tags||[]).join(" ")].find(l=>l.toLowerCase().includes(q));if(hit)return snippet(hit,q)}
+  if(q){const hit=[...take,...lines,r.nextAction||"",...parseAtt(r.attendees).map(a=>a.who+" "+a.note),(r.tags||[]).join(" ")].find(l=>firstHit(l,q));if(hit)return snippet(hit,q)}
   return take[0]?`<span class="arrow">→</span> ${esc(take[0])}`:esc(lines[0]||"")}
-let seenAt="",newOnly=false;const NEWS=new Set(),UPDS=new Set();
+let seenAt="",newOnly=false,ASOF="";const NEWS=new Set(),UPDS=new Set();
 const CAT_CLS={"GP":"gp","시장정보":"intel","내부":"inner"};
 function renderMList(){const f=mFiltered(),L=$("#mList"),q=$("#mq").value.trim().toLowerCase();
-  $("#mCnt").textContent=`${f.length}건 / 전체 ${M.length}건`;
+  $("#mCnt").textContent=`${f.length}건 / 전체 ${M.length}건${ASOF?` · ${ASOF} 업데이트`:""}`;
   const cat=$("#mCat").value;document.querySelectorAll("#mQuick [data-cat]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.cat===cat?"true":"false"));
   const nb=$("#mNewOnly");nb.hidden=!NEWS.size&&!UPDS.size;nb.querySelector("span").textContent=NEWS.size+UPDS.size;nb.setAttribute("aria-pressed",newOnly?"true":"false");
   const nf=["mType","mAsset","mAuthor","mFlag"].filter(i=>$("#"+i).value).length;$("#mFt").textContent=nf?`필터 ${nf}`:"필터";$("#mFt").setAttribute("aria-pressed",nf?"true":"false");
@@ -165,8 +192,8 @@ $("#mNew").onclick=$("#fab").onclick=()=>{if(!canWrite)return toast("이 링크�
 
 // ═════ 기관 ═════
 function lastMeet(o){const ms=meetingsOf(o);return ms.length?ms.reduce((a,b)=>a.date>b.date?a:b).date:""}
-function oFiltered(){const q=$("#oq").value.trim().toLowerCase(),t=$("#oType").value;
-  return O.filter(o=>(!t||o.type===t)&&(!q||[o.name,...(o.aliases||[]),o.summary].join(" ").toLowerCase().includes(q)))
+function oFiltered(){const T=terms($("#oq").value),t=$("#oType").value;
+  return O.filter(o=>(!t||o.type===t)&&(!T.length||hits([o.name,...(o.aliases||[]),o.summary,o.prefs,o.hr,Object.keys(o.signals||{}).join(" ")].join(" ").toLowerCase(),T)))
    .map(o=>({o,last:lastMeet(o),n:meetingsOf(o).length})).sort((a,b)=>(b.last||"").localeCompare(a.last||"")||a.o.name.localeCompare(b.o.name))}
 function renderOList(){const f=oFiltered(),L=$("#oList");$("#oCnt").textContent=`${f.length}곳 / 전체 ${O.length}곳`;
   if(!f.length){L.innerHTML=`<div class="empty">조건에 맞는 기관이 없습니다.</div>`;return}
@@ -251,13 +278,15 @@ function renderDemand(){const s=$("#dStrat").value,t=$("#dType").value,q=$("#dq"
 // ═════ 인물·조직도 ═════
 function orgSelRefresh(){const el=$("#pOrg"),cur=el.value||pOrg;const cnt={};P.forEach(p=>cnt[p.org]=(cnt[p.org]||0)+1);
   el.innerHTML=`<option value="">기관 전체</option>`+Object.keys(cnt).sort().map(n=>`<option value="${esc(n)}"${n===cur?" selected":""}>${esc(n)} (${cnt[n]})</option>`).join("")}
-function pFiltered(){const q=$("#pq").value.trim().toLowerCase(),org=$("#pOrg").value;
-  return P.filter(p=>(!org||p.org===org)&&(!q||[p.name,p.org,p.dept,p.team,p.title,p.note].join(" ").toLowerCase().includes(q)))
-    .sort((a,b)=>a.org.localeCompare(b.org)||(a.dept||"").localeCompare(b.dept||"")||(a.team||"").localeCompare(b.team||"")||a.name.localeCompare(b.name))}
+function pFiltered(){const T=terms($("#pq").value),org=$("#pOrg").value;
+  return P.filter(p=>{const o=orgOf(p.org);return (!org||p.org===org)&&(!T.length||hits([p.name,p.org,...(o?[o.name,...(o.aliases||[])]:[]),p.dept,p.team,p.title,p.note].join(" ").toLowerCase(),T))})
+    .sort((a,b)=>a.org.localeCompare(b.org,"ko")||(a.dept||"").localeCompare(b.dept||"")||(a.team||"").localeCompare(b.team||"")||a.name.localeCompare(b.name))}
 function renderPList(){pOrg=$("#pOrg").value;const f=pFiltered(),L=$("#pList");$("#pCnt").textContent=`${f.length}명 / 전체 ${P.length}명`;
   if(!f.length){L.innerHTML=`<div class="empty">조건에 맞는 인물이 없습니다.</div>`;return}
-  L.innerHTML=f.slice(0,400).map(p=>`<button type="button" class="item noDate${p.id===pSel?" on":""}" data-id="${esc(p.id)}"><div style="min-width:0"><div class="ttl">${esc(p.name)} <span class="sub2" style="display:inline">${esc(p.title||"")}</span></div>
-    <div class="sub2">${esc(p.org)}${p.dept?" · "+esc(p.dept):""}${p.team?" · "+esc(p.team):""}</div></div></button>`).join("")+(f.length>400?`<div class="empty">상위 400명만 표시 — 검색으로 좁혀 보세요.</div>`:"")}
+  const q=$("#pq").value,per={};f.forEach(p=>per[p.org]=(per[p.org]||0)+1);let last="";
+  L.innerHTML=f.slice(0,400).map(p=>{const head=p.org!==last?`<div class="mhead">${hl(esc(p.org),q)}<span>${per[p.org]}명</span></div>`:"";last=p.org;
+    return head+`<button type="button" class="item noDate${p.id===pSel?" on":""}" data-id="${esc(p.id)}"><div style="min-width:0"><div class="ttl">${hl(esc(p.name),q)} <span class="sub2" style="display:inline">${esc(p.title||"")}</span></div>
+    <div class="sub2">${hl(esc([p.dept,p.team].filter(Boolean).join(" · ")||p.note||""),q)}</div></div></button>`}).join("")+(f.length>400?`<div class="empty">상위 400명만 표시 — 검색으로 좁혀 보세요.</div>`:"")}
 function chartHtml(org){const ps=P.filter(p=>p.org===org);if(!ps.length)return"";const depts={};
   ps.forEach(p=>{const d=p.dept||"부서 미상",t=p.team||"";(depts[d]=depts[d]||{head:[],teams:{}});if(p.role==="부서장"&&!t)depts[d].head.push(p);else (depts[d].teams[t||"—"]=depts[d].teams[t||"—"]||[]).push(p)});
   const mem=p=>`<button type="button" class="mem${p.role==="팀장"?" lead":""}" data-pid="${esc(p.id)}"><span>${esc(p.name)} ${esc(p.title&&p.title!=="팀장"?p.title:(p.role==="팀장"?"팀장":""))}${p.mobile||p.email?` <span class="has" title="연락처 있음">●</span>`:""}</span><small>${esc(p.ext||"")}</small></button>`;
@@ -330,8 +359,13 @@ function markNew(){let seen="";try{seen=localStorage.getItem("kbnote-seen")||""}
   if(seen)M.forEach(r=>{if((r.createdAt||"")>seen)NEWS.add(r.id);else if((r.updatedAt||"")>seen)UPDS.add(r.id)});
   try{if(latest)localStorage.setItem("kbnote-seen",latest)}catch(e){}  // 다음에 열 때는 이번 것 이후만 새 소식
   if(NEWS.size||UPDS.size)toast(`지난번 이후 새 미팅 ${NEWS.size}건${UPDS.size?` · 수정 ${UPDS.size}건`:""}`)}
-function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];markNew();
+function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];indexSearch();markNew();
   mSel=M.length?M[0].id:null;oSel=null;pSel=null;
   authorsRefresh();orgSelRefresh();stats();renderTab();
-  $("#asof").textContent=j.generatedAt?`${j.generatedAt} 업데이트`:"";document.body.classList.add("ready")}
-Vault.boot(load);
+  $("#asof").textContent=j.generatedAt?`${j.generatedAt} 업데이트`:"";ASOF=(j.generatedAt||"").slice(5).replace("-","/");renderMList();document.body.classList.add("ready")}
+// 인터넷이 끊기면 알림(서비스워커가 마지막으로 받은 사본을 보여준다)
+addEventListener("keydown",e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"");
+  if(e.key==="/"&&!typing&&$("#gate").hidden){/* 비밀번호 화면이 아닐 때만 */const box={meetings:"#mq",orgs:"#oq",demand:"#dq",people:"#pq"}[tab];if(box){e.preventDefault();$(box).focus();$(box).select()}}
+  else if(e.key==="Escape"&&typing&&document.activeElement.type==="search"&&document.activeElement.value){document.activeElement.value="";document.activeElement.dispatchEvent(new Event("input"))}});
+addEventListener("offline",()=>toast("오프라인 — 마지막으로 받은 사본을 보여줍니다"));addEventListener("online",()=>toast("다시 연결됐습니다"));
+Vault.boot(j=>{load(j);if(!navigator.onLine)setTimeout(()=>toast("오프라인 — 마지막으로 받은 사본입니다"),2600)});

@@ -60,7 +60,7 @@
         <select id="mType" class="opt"><option value="">업권 전체</option></select>
         <select id="mAsset" class="opt"><option value="">전략 전체</option></select>
         <select id="mAuthor" class="opt"><option value="">작성자 전체</option></select>
-        <select id="mFlag" class="opt"><option value="">표시 전체</option><option value="원문 잘림">원문 잘림(보완 필요)</option><option value="내부용">내부용</option><option value="확인">이름·날짜 확인 필요</option></select>
+        <select id="mFlag" class="opt"><option value="">표시 전체</option><option value="원문 잘림">원문 잘림(보완 필요)</option><option value="내부용">내부용</option><option value="확인">이름·날짜 확인 필요</option><option value="다음 액션">다음 액션 있음</option></select>
       </div>
       <div class="quick" id="mQuick" role="group" aria-label="구분">
         <button class="qbtn" type="button" data-cat="">전체</button><button class="qbtn" type="button" data-cat="LP">LP</button><button class="qbtn" type="button" data-cat="GP">GP</button><button class="qbtn" type="button" data-cat="시장정보">시장정보</button><button class="qbtn" type="button" data-cat="내부">내부</button>
@@ -117,7 +117,7 @@
     <div class="sub">글로벌상품영업부</div>
     <h2>KB GIS Meeting Note</h2>
     <p>암호화된 미팅노트 DB입니다. 비밀번호를 넣으면 이 기기에서만 풀어서 보여줍니다.</p>
-    <input type="password" id="pw" name="password" autocomplete="current-password" placeholder="비밀번호" aria-label="비밀번호" required>
+    <div class="pwrow"><input type="password" id="pw" name="password" autocomplete="current-password" placeholder="비밀번호" aria-label="비밀번호" required><button type="button" class="pwshow" id="pwShow" aria-label="비밀번호 보기" aria-pressed="false">보기</button></div>
     <label class="remember"><input type="checkbox" id="remember" checked> 이 기기에서 기억하기</label>
     <button class="btn primary" id="unlock" type="submit">열기</button>
     <p class="gate-msg" id="gateMsg" role="alert" aria-live="polite"></p>

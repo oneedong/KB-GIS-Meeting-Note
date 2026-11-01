@@ -49,6 +49,8 @@ const Vault = (() => {
     msg.textContent = note || "";
     if (!env) { form.querySelectorAll("input,button").forEach((x) => x.disabled = true); return; }
     setTimeout(() => pw.focus(), 50);
+    const show = el("#pwShow");
+    show.onclick = () => { const on = pw.type === "password"; pw.type = on ? "text" : "password"; show.textContent = on ? "숨기기" : "보기"; show.setAttribute("aria-pressed", String(on)); pw.focus(); };
     form.onsubmit = async (e) => {
       e.preventDefault();
       if (!pw.value) return;
@@ -58,7 +60,7 @@ const Vault = (() => {
         const data = await decrypt(key, env);
         if (el("#remember").checked) await putKey({ key, salt: env.salt, iter: env.iter });
         else await delKey();
-        pw.value = ""; msg.textContent = ""; gate.hidden = true;
+        pw.value = ""; pw.type = "password"; msg.textContent = ""; gate.hidden = true;
         onData(data);
       } catch (err) {
         msg.textContent = err && err.name === "OperationError" ? "비밀번호가 맞지 않습니다." : "열지 못했습니다. " + ((err && err.message) || "");

@@ -48,6 +48,9 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('비밀번호 화면이 뜬다', await page.locator('#gate').isVisible());
   ok('잠금 상태에서는 데이터가 없다', (await page.locator('#mList .item').count()) === 0);
 
+  await page.click('#pwShow');
+  ok('비밀번호 보기', (await page.getAttribute('#pw', 'type')) === 'text');
+  await page.click('#pwShow');
   await page.fill('#pw', 'wrong-password');
   await page.click('#unlock');
   await page.locator('#gateMsg', { hasText: '맞지 않습니다' }).waitFor();
@@ -95,6 +98,16 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator('#mQuick [data-cat=""]').click();
   ok('미리보기에 시사점', (await page.locator('#mList .pv').first().textContent()).includes('하반기 재접촉'));
   ok('월 구분 머리', (await page.locator('#mList .mhead').first().textContent()).includes('2026년 1월'));
+  const cnt = async (q) => { await page.fill('#mq', q); return (await page.textContent('#mCnt')).split('건')[0]; };
+  ok('약칭으로 검색(샘공→샘플공제회)', (await cnt('샘공')) === '1');
+  ok('여러 단어 검색(모두 포함)', (await cnt('샘공 PD')) === '1' && (await cnt('샘공 Buyout')) === '0');
+  ok('한·영 표기 검색(바이아웃→Buyout)', (await cnt('바이아웃')) === '1');
+  ok('업데이트 시각 표시', (await page.textContent('#mCnt')).includes('01/01 09:00 업데이트'));
+  if (vp.width >= 760) {
+    await page.fill('#mq', ''); await page.locator('body').click({ position: { x: 5, y: 300 } });
+    await page.keyboard.press('/');
+    ok("PC '/' 키로 검색창", await page.evaluate(() => document.activeElement.id === 'mq'));
+  }
   await page.fill('#mq', 'PD 2건');
   ok('검색어 강조(목록)', (await page.locator('#mList mark').count()) > 0);
   await page.locator('#mList .item').first().click();

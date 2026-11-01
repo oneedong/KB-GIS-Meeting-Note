@@ -27,6 +27,8 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 - 읽기 기능: 목록은 월 구분 + 미리보기(시사점 → 첫 줄, 검색 중엔 검색어가 든 문장), 상세는 핵심(`-->`)·다음 액션을 맨 위에,
   금액·비율 굵게(`NUM`), 검색어 `<mark>`, 이전/다음 미팅. 휴대폰 상세는 `history.pushState` 로 안드로이드 뒤로가기가 목록으로.
   글자 크기 `kbnote-fs`(m·l·xl, `.page` zoom), 새 소식 `kbnote-seen`(지난번 본 뒤 createdAt/updatedAt 이 더 새 것).
+- 검색(`terms`/`hits`): 여러 단어는 모두 포함, 각 단어는 기관 aliases(교공→한국교직원공제회)와 `SYN` 한·영 묶음으로 넓힘.
+  `SYN`은 공개 코드라 일반 GP명·업계 용어만(고객·인물 이름 금지). 새 약칭은 DB의 orgs.aliases 에 넣으면 검색에 바로 반영.
 - 화면 파일을 바꾸면 `sw.js`의 `CACHE` 버전을 올린다.
 - 아이콘: `node scripts/gen-icons.mjs note icons` (Market 아이콘은 `market`).
 - 점검: `node tests/smoke.mjs` (Playwright, 가상 데이터).
