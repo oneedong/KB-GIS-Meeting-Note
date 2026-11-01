@@ -2,7 +2,7 @@
 // 실제 data.enc.json·비밀번호는 쓰지 않는다.   node tests/smoke.mjs
 import { createRequire } from 'module';
 import { createServer } from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, extname, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +30,17 @@ const URL_ = `http://localhost:${server.address().port}/`;
 
 let fail = 0;
 const ok = (name, cond) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}`); if (!cond) fail++; };
+
+// 원문 보존 검사: body 가 raw 에 글자 그대로면 통과, 다듬으면 저장 거부
+{
+  const tmp = (n, o) => { const f = join(ROOT, 'tests', `_${n}.json`); writeFileSync(f, JSON.stringify(o)); return f; };
+  const raw = '[가상] 2/1 미팅\n홍길동 TJ 왈 올해 PD는 2건 정도\n--> 하반기 재접촉';
+  const base = { id: '20260201-x', date: '2026-02-01', org: '샘플공제회', orgType: '공제회', dept: '', category: 'LP', attendees: '', kbAttendees: '', assets: [], nextAction: '', tags: [], flags: [], source: '테스트', raw };
+  const db = tmp('upsert-db', JSON.parse(readFileSync(join(ROOT, 'tests/fixture.json'), 'utf8')));
+  const run = (patch) => { try { execFileSync(process.execPath, [join(ROOT, 'scripts/upsert.mjs'), db, tmp('upsert-patch', patch), '--dry-run'], { stdio: 'pipe' }); return true; } catch { return false; } };
+  ok('원문 그대로인 본문은 저장', run({ meetings: [{ ...base, body: '- 홍길동 TJ 왈 올해 PD는 2건 정도\n--> 하반기 재접촉' }] }));
+  ok('다듬은 본문은 저장 거부', !run({ meetings: [{ ...base, body: '- 올해 PD 2건 투자 예정임\n--> 하반기 재접촉' }] }));
+}
 
 const browser = await chromium.launch();
 for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', width: 1280, height: 860 }]) {
@@ -111,9 +122,12 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.fill('#mq', 'PD 2건');
   ok('검색어 강조(목록)', (await page.locator('#mList mark').count()) > 0);
   await page.locator('#mList .item').first().click();
-  ok('핵심 상자가 맨 위', (await page.locator('#mMain .body > :first-child').getAttribute('class')) === 'key');
+  ok('시사점은 적힌 자리(본문 끝)에', (await page.locator('#mMain .memo .sec:last-child > :last-child').getAttribute('class')) === 'take');
   ok('검색어 강조(상세)', (await page.locator('#mMain mark').count()) > 0);
-  ok('금액·비율 굵게', (await page.locator('#mMain b.num', { hasText: 'USD 30mn' }).count()) === 1);
+  ok('본문 문장 그대로(덧붙인 강조 없음)', (await page.locator('#mMain .memo li', { hasText: '올해 PD 2건 검토 중 (건당 USD 30mn)' }).count()) === 1 && (await page.locator('#mMain .memo b').count()) === 0);
+  await page.locator('#mMain [data-view="raw"]').click();
+  ok('원문 보기', await page.locator('#mMain pre.raw').isVisible() && (await page.textContent('#mMain pre.raw')).startsWith('[가상] 1/15') && !(await page.locator('#mMain .memo').isVisible()));
+  await page.locator('#mMain [data-view="memo"]').click();
   if (vp.width < 760) await page.locator('#mMain [data-back]').click();
   await page.fill('#mq', '');
   await page.locator('#mList .item').first().click();

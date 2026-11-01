@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 // 평문 DB(data.json)에 새 미팅·인물·기관 레코드를 넣거나 고친다. 규칙은 docs/CONVERT.md.
 //
-//   node scripts/upsert.mjs <평문 data.json> <patch.json> [--dry-run]
+//   node scripts/upsert.mjs <평문 data.json> <patch.json> [--dry-run] [--allow-edits]
+//
+// 원문 보존: 미팅에 raw(원문 메시지 그대로)가 있으면 body 의 각 줄이 raw 에 글자 그대로 있는지 확인한다.
+// (줄 앞 - · • · -->, 소제목 *줄, "(○○ 보충)" 머리, 원문 잘림 안내 줄은 형식 표시라 빼고 비교. 띄어쓰기·줄바꿈 차이는 무시)
+// 원문에 없는 문장이 있으면 오류 — 사용자가 고쳐 달라고 한 경우에만 --allow-edits 로 넘긴다.
 //
 // patch.json 형식 (셋 다 선택):
 //   { "meetings": [ {id, date, org, …전체 필드} ],          id 같으면 덮어쓰기(준 필드만), 없으면 추가
@@ -19,13 +23,23 @@ const CATS = ["LP","GP","시장정보","내부"];
 const STATES = ["약정","진행","관심","보류","불가"];
 const M_FIELDS = ["id","date","org","orgType","dept","category","attendees","kbAttendees","assets","body","nextAction","tags","flags","source"];
 
-const [dataPath, patchPath, flag] = process.argv.slice(2);
+const [dataPath, patchPath] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const DRY = process.argv.includes('--dry-run'), ALLOW_EDITS = process.argv.includes('--allow-edits');
 if (!dataPath || !patchPath) { console.error('사용법: node scripts/upsert.mjs <평문 data.json> <patch.json> [--dry-run]'); process.exit(2); }
 const db = JSON.parse(readFileSync(resolve(dataPath), 'utf8'));
 const patch = JSON.parse(readFileSync(resolve(patchPath), 'utf8'));
 const now = new Date().toISOString();
 const errors = [], warns = [], log = [];
 const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
+const squash = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+// body 줄 중 raw 에 글자 그대로 없는 것
+function notInRaw(m) {
+  if (!m.raw) return [];
+  const raw = squash(m.raw);
+  return String(m.body || '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('*'))
+    .map((l) => l.replace(/^-->\s*/, '').replace(/^[-•·]\s*/, '').replace(/^\([^)]{1,30}보충\)\s*/, ''))
+    .filter((l) => l && !/^\(원문 잘림/.test(l) && !raw.includes(squash(l)));
+}
 
 // ── 삭제 ──
 for (const col of ['meetings', 'people', 'orgs']) {
@@ -80,6 +94,9 @@ for (const p of patch.meetings || []) {
   const canon = known.get(m.org);
   if (canon && canon.name !== m.org) { warns.push(`미팅 ${m.id}: 기관 "${m.org}" → 표준명 "${canon.name}"`); m.org = canon.name; }
   if (m.category !== '내부' && !canon) warns.push(`미팅 ${m.id}: 기관 "${m.org}" 프로필 없음 → orgs 에 추가하거나 aliases 에 넣기`);
+  const off = notInRaw(m);
+  if (off.length) (ALLOW_EDITS ? warns : errors).push(`미팅 ${m.id}: 원문(raw)에 글자 그대로 없는 줄 ${off.length}개 — ${off.slice(0, 3).map((l) => `"${l.slice(0, 40)}"`).join(', ')}`);
+  else if (!m.raw && patch.meetings && p.body) warns.push(`미팅 ${m.id}: raw(원문) 없음 — 원문 메시지를 raw 에 그대로 넣어 두면 앱에서 "원문"으로 볼 수 있다`);
   const dup = db.meetings.filter((x) => x !== m && x.date === m.date && x.org === m.org);
   if (dup.length) warns.push(`미팅 ${m.id}: 같은 날·같은 기관 기존 레코드 ${dup.map((x) => x.id).join(',')} — 중복인지 확인`);
 }
@@ -108,5 +125,5 @@ log.forEach((l) => console.log('  ' + l));
 warns.forEach((w) => console.log('경고  ' + w));
 if (errors.length) { errors.forEach((e) => console.error('오류  ' + e)); console.error('오류가 있어 저장하지 않았습니다.'); process.exit(1); }
 console.log(`미팅 ${db.meetings.length} · 기관 ${db.orgs.length} · 인물 ${db.people.length} (${db.generatedAt})`);
-if (flag === '--dry-run') console.log('(dry-run — 저장 안 함)');
+if (DRY) console.log('(dry-run — 저장 안 함)');
 else writeFileSync(resolve(dataPath), JSON.stringify(db, null, 1) + '\n');

@@ -99,8 +99,16 @@ function hlRe(q){if(hlCache.q===q)return hlCache.re;const alts=[...new Set(terms
   hlCache={q,re:alts.length?new RegExp(`(<[^>]+>|&(?:amp|lt|gt|quot);)|(${alts.map(a=>reEsc(esc(a))).join("|")})`,"gi"):null};return hlCache.re}
 function hl(html,q){const re=q&&hlRe(q);if(!re)return html;  // 이미 이스케이프된 html 의 글자 부분에서만 검색어를 <mark>
   return html.replace(re,(m,keep,hit)=>keep||`<mark>${hit}</mark>`)}
-const NUM=/(?:USD|EUR|GBP|JPY|KRW|AUD|US\$|\$|€|£)\s?\d[\d,.]*\s?(?:bn|mn|m|b|k|조|억|만)?|\d[\d,.]*\s?(?:조|억|천만|백만|만)\s?(?:원|달러|불)?|\d[\d,.]*\s?(?:%|bp|bps|x|배)(?![A-Za-z가-힣])|\d[\d,.]*\s?(?:bn|mn)(?![A-Za-z])/gi;
-function rich(t,q){return hl(esc(t).replace(NUM,m=>`<b class="num">${m}</b>`),q)}  // 본문 한 줄: 금액·비율 굵게 + 검색어
+// 본문은 적힌 순서·문장 그대로 보여준다: *소제목 → 소제목, --> 줄 → 제자리에 시사점 표시, 나머지 → 불릿(앞의 -·•만 뗌)
+function bodyHtml(r,q){const out=[];let sec=null,ul=null;
+  (r.body||"").split(/\r?\n/).forEach(raw=>{const l=raw.trim();if(!l)return;
+    if(l.startsWith("*")){sec={h:l.replace(/^\*\s*/,""),parts:[]};out.push(sec);ul=null;return}
+    if(!sec){sec={h:"",parts:[]};out.push(sec)}
+    if(l.startsWith("-->")){sec.parts.push({take:l.replace(/^-->\s*/,"")});ul=null;return}
+    if(!ul){ul={li:[]};sec.parts.push(ul)}ul.li.push(l.replace(/^[-•·]\s*/,""))});
+  const cutHere=`<p class="cutline" style="margin-top:6px">✂ 여기서 원문이 잘렸습니다</p>`;
+  return out.map(s=>`<div class="sec">${s.h?`<h3>${hl(esc(s.h),q)}</h3>`:""}${s.parts.map(p=>p.take!=null?`<div class="take"><p>→ ${hl(esc(p.take),q)}</p></div>`
+    :`<ul>${p.li.map(b=>`<li>${hl(esc(b),q)}${r.truncated&&b===r.truncAt?cutHere:""}</li>`).join("")}</ul>`).join("")}</div>`).join("")}
 function firstHit(line,q){const l=line.toLowerCase();let best=null;terms(q).flat().forEach(a=>{const i=l.indexOf(a);if(i>=0&&(!best||i<best.i))best={i,n:a.length}});return best}
 function snippet(line,q){const h=firstHit(line,q);if(!h)return esc(line);
   const a=Math.max(0,h.i-24),b=Math.min(line.length,h.i+h.n+60);return (a?"…":"")+hl(esc(line.slice(a,b)),q)+(b<line.length?"…":"")}
@@ -128,7 +136,7 @@ function renderMList(){const f=mFiltered(),L=$("#mList"),q=$("#mq").value.trim()
 function ago(d){const n=Math.round((Date.parse(today())-Date.parse(d))/864e5);return n<=0?"오늘":n===1?"어제":n<7?`${n}일 전`:n<35?`${Math.round(n/7)}주 전`:n<365?`${Math.round(n/30)}개월 전`:""}
 function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm();
   const r=M.find(x=>x.id===mSel);if(!r){W.innerHTML=`<div class="empty">왼쪽에서 미팅을 선택하세요.</div>`;return}
-  const {y,m,d}=md(r.date),att=parseAtt(r.attendees),{secs,take}=parseBody(r.body),o=orgOf(r.org),q=$("#mq").value.trim().toLowerCase();
+  const {y,m,d}=md(r.date),att=parseAtt(r.attendees),{secs}=parseBody(r.body),o=orgOf(r.org),q=$("#mq").value.trim().toLowerCase();
   const inner=(r.flags||[]).some(x=>x.startsWith("내부용")),checks=(r.flags||[]).filter(x=>!x.startsWith("내부용")&&x!=="원문 잘림");
   const list=mFiltered(),i=list.findIndex(x=>x.id===r.id),newer=i>0?list[i-1]:null,older=i>=0&&i<list.length-1?list[i+1]:null;
   const cut=r.truncated?`<div class="trunc"><div style="flex:1;min-width:0"><b>✂ 원문 잘림 — 보완 필요</b><div>카톡 내보내기에서 긴 메시지 뒷부분이 잘렸습니다. 카톡 '전체보기'에서 확인한 내용을 Claude에 주면 보완합니다.</div>${r.truncAt?`<q>${esc(r.truncAt)}</q>`:""}</div></div>`:"";
@@ -140,9 +148,11 @@ function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm(
     <div class="chips">${inner?`<span class="chip flag">내부용 · 외부 공유 금지</span>`:""}${(r.assets||[]).map(t=>`<span class="chip asset">${esc(t)}</span>`).join("")}</div></div>
     <div class="actions"><button class="btn" id="mCopy" type="button">메모 복사</button>${canWrite?`<button class="btn" id="mEdit" type="button">수정</button>`:""}</div></div>
   <div class="body">
-    ${take.length||r.nextAction?`<div class="key">${take.length?`<div class="key-h">핵심</div><ul>${take.map(t=>`<li>${rich(t,q)}</li>`).join("")}</ul>`:""}${r.nextAction?`<div class="key-next"><span>다음 액션</span>${rich(r.nextAction,q)}</div>`:""}</div>`:""}
+    ${r.raw?`<div class="seg" role="group" aria-label="보기"><button type="button" data-view="memo" aria-pressed="true">정리</button><button type="button" data-view="raw" aria-pressed="false">원문</button></div>`:""}
+    ${r.nextAction?`<div class="next"><span>다음 액션</span>${hl(esc(r.nextAction),q)}</div>`:""}
     ${att.length?`<div class="attendees">${att.map(a=>`<div class="att"><b>${hl(esc(a.who),q)}</b><div>${a.note?hl(esc(a.note),q):"<span class='ro'>소개 없음</span>"}</div></div>`).join("")}</div>`:""}
-    ${secs.map(s=>`<div class="sec">${s.h?`<h3>${esc(s.h)}</h3>`:""}<ul>${s.b.map(b=>`<li>${rich(b,q)}${r.truncated&&b===r.truncAt?`<p class="cutline" style="margin-top:6px">✂ 여기서 원문이 잘렸습니다</p>`:""}</li>`).join("")}</ul></div>`).join("")}
+    <div class="memo">${bodyHtml(r,q)}</div>
+    ${r.raw?`<pre class="raw" hidden>${hl(esc(r.raw),q)}</pre>`:""}
     ${r.truncated&&!secs.some(s=>s.b.includes(r.truncAt))?`<p class="cutline">✂ 원문이 잘린 노트입니다</p>`:""}
     ${cut}
     ${checks.length?`<div class="warnbox">${checks.map(esc).join(" · ")}</div>`:""}
@@ -150,7 +160,9 @@ function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm(
       ${(r.tags||[]).length?`<div class="tags"><span>태그</span>${(r.tags||[]).map(t=>`<button type="button" class="chip tag" data-tag="${esc(t)}">#${esc(t)}</button>`).join("")}</div>`:""}</div>
     ${newer||older?`<div class="pn">${nav(newer,"newer")}${nav(older,"older")}</div>`:""}
   </div>`;
-  $("#mCopy").onclick=$("#mCopyM").onclick=()=>copy(memoText(r));const e=$("#mEdit");if(e)e.onclick=()=>{mMode="edit";confirmDel=false;renderMMain()};
+  $("#mCopy").onclick=$("#mCopyM").onclick=()=>copy(memoText(r));
+  W.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{const raw=b.dataset.view==="raw";W.querySelector(".memo").hidden=raw;W.querySelector(".raw").hidden=!raw;
+    W.querySelectorAll("[data-view]").forEach(x=>x.setAttribute("aria-pressed",String(x===b)))});const e=$("#mEdit");if(e)e.onclick=()=>{mMode="edit";confirmDel=false;renderMMain()};
   W.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{mSel=b.dataset.nav;renderMList();renderMMain();if(isMob())scrollTo({top:0});else{W.scrollIntoView({block:"nearest"});const el=document.querySelector(`#mList [data-id="${CSS.escape(mSel)}"]`);if(el)el.scrollIntoView({block:"nearest"})}});
   W.querySelectorAll("[data-tag]").forEach(b=>b.onclick=()=>{$("#mq").value=b.dataset.tag;renderMList();if(isMob())closeDetail();else renderMMain()});
   const mo=$("#mOrg");if(mo)mo.onclick=()=>gotoOrg(r.org)}
