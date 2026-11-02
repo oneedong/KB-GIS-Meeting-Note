@@ -34,7 +34,7 @@ const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
 const squash = (t) => String(t || '').replace(/\s+/g, ' ').trim();
 // body 줄 중 raw 에 글자 그대로 없는 것
 function notInRaw(m) {
-  if (!m.raw) return [];
+  if (!m.raw || m.legacyBody) return [];   // legacyBody: 2026-10 이전 변환본(다듬어짐) — 원문은 raw 로만 보존
   const raw = squash(m.raw);
   return String(m.body || '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('*'))
     .map((l) => l.replace(/^-->\s*/, '').replace(/^[-•·]\s*/, '').replace(/^\([^)]{1,30}보충\)\s*/, ''))
@@ -85,19 +85,23 @@ for (const p of patch.meetings || []) {
     m = { truncated: false, truncAt: '', createdAt: now };
     db.meetings.push(m); log.push(`미팅 추가 ${p.id}`);
   } else log.push(`미팅 수정 ${p.id}`);
-  Object.assign(m, p, { updatedAt: now });
+  // 원문·표시용 필드만 바뀌면(raw 붙이기 등) 수정 시각을 그대로 둔다 → 앱에 '수정' 표시가 뜨지 않게
+  const META = new Set(['id', 'raw', 'rawShared', 'legacyBody']);
+  const changed = Object.keys(p).some((k) => !META.has(k) && JSON.stringify(m[k]) !== JSON.stringify(p[k]));
+  Object.assign(m, p, changed || !m.updatedAt ? { updatedAt: now } : {});
   if (!isDate(m.date)) errors.push(`미팅 ${m.id}: date "${m.date}"`);
   if (!CATS.includes(m.category)) errors.push(`미팅 ${m.id}: category "${m.category}"`);
   if (!TYPES.includes(m.orgType)) errors.push(`미팅 ${m.id}: orgType "${m.orgType}"`);
   const bad = (m.assets || []).filter((a) => !STRATS.includes(a));
   if (bad.length) errors.push(`미팅 ${m.id}: 전략 키 ${bad.join(',')}`);
-  const canon = known.get(m.org);
-  if (canon && canon.name !== m.org) { warns.push(`미팅 ${m.id}: 기관 "${m.org}" → 표준명 "${canon.name}"`); m.org = canon.name; }
-  if (m.category !== '내부' && !canon) warns.push(`미팅 ${m.id}: 기관 "${m.org}" 프로필 없음 → orgs 에 추가하거나 aliases 에 넣기`);
+  // 기관명 정리·중복 확인은 이번 patch 가 기관명·날짜를 준 미팅만(원문만 붙일 때 기존 레코드를 바꾸지 않게)
+  const touchesOrg = 'org' in p || 'date' in p, canon = known.get(m.org);
+  if (touchesOrg && canon && canon.name !== m.org) { warns.push(`미팅 ${m.id}: 기관 "${m.org}" → 표준명 "${canon.name}"`); m.org = canon.name; }
+  if (touchesOrg && m.category !== '내부' && !canon) warns.push(`미팅 ${m.id}: 기관 "${m.org}" 프로필 없음 → orgs 에 추가하거나 aliases 에 넣기`);
   const off = notInRaw(m);
   if (off.length) (ALLOW_EDITS ? warns : errors).push(`미팅 ${m.id}: 원문(raw)에 글자 그대로 없는 줄 ${off.length}개 — ${off.slice(0, 3).map((l) => `"${l.slice(0, 40)}"`).join(', ')}`);
   else if (!m.raw && patch.meetings && p.body) warns.push(`미팅 ${m.id}: raw(원문) 없음 — 원문 메시지를 raw 에 그대로 넣어 두면 앱에서 "원문"으로 볼 수 있다`);
-  const dup = db.meetings.filter((x) => x !== m && x.date === m.date && x.org === m.org);
+  const dup = touchesOrg ? db.meetings.filter((x) => x !== m && x.date === m.date && x.org === m.org) : [];
   if (dup.length) warns.push(`미팅 ${m.id}: 같은 날·같은 기관 기존 레코드 ${dup.map((x) => x.id).join(',')} — 중복인지 확인`);
 }
 db.meetings.sort((a, b) => (b.date || '').localeCompare(a.date || ''));

@@ -2,6 +2,8 @@
 
 KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개 저장소 + GitHub Pages(main 브랜치 루트, 빌드 없음).
 **데이터 원본은 이 저장소의 암호문 `data.enc.json`** 이다(2026-10-30 claude.ai 아티팩트 DB에서 옮겨 온 뒤로 아티팩트는 쓰지 않음).
+2026-11-02 카톡 원문(2025-11-28~2026-10-27)을 반영: 기존 미팅 223건에 `raw`(원문)를 붙이고(정리본은 그대로, `legacyBody`),
+원문에만 있던 2025-12 미팅 27건을 원문 그대로 추가. 아티팩트에서 직접 입력한 4건(10/20·21·28·29)은 카톡 원문이 없다.
 자매 앱: KB GIS Market(`oneedong/KB-GIS-App`).
 
 ## 절대 규칙
@@ -17,6 +19,8 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 1. `node scripts/vault.mjs decrypt data.enc.json <SP>/data.json` (`<SP>` = 스크래치패드)
 2. `docs/CONVERT.md`를 읽는다. `<SP>/data.json`의 `ref.convertSpec`은 기관 약칭표·게시자 표기·이름 충돌만 참고한다
    (그 안의 문체 규칙 — 개조식 음슴체·문장 다듬기·약칭 풀기 — 은 따르지 않는다. 원문 보존이 우선).
+   카톡 내보내기(txt)면 먼저 `node scripts/kakao.mjs <txt> <SP>/data.json <SP>/posts.json` — 게시물로 묶고 이미 DB 원문에 있는 것은
+   `in-db`로 표시한다. `new-note?`만 검토(대화·행정·파일은 뺀다). 이어 보낸 메시지는 이미 한 게시물로 묶여 있다.
 3. 텍스트를 레코드로 바꿔 `<SP>/patch.json` 작성(`meetings`·`people`·`orgs`, 고칠 땐 기존 id 그대로). 미팅마다 `raw`에 원문 그대로.
    이미 DB에 있는 미팅(같은 날·같은 기관)인지 먼저 확인 — 카톡 내보내기는 이전 내용과 겹치는 경우가 많다.
 4. `node scripts/upsert.mjs <SP>/data.json <SP>/patch.json --dry-run` → 오류·경고 확인 → `--dry-run` 빼고 실행
@@ -29,7 +33,7 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 - `app.js`/`app.css`는 아티팩트 페이지(lp_meeting_db.html) 원본에서 저장 기능·약어 사전을 뺀 것. KB 노랑·회색 토큰.
 - 화면 모드: 기본 라이트, 헤더 버튼으로 다크(`localStorage` `kbnote-theme`, `<html data-theme>`). 색을 바꾸면 두 모드 다 확인.
 - 읽기 기능: 목록은 월 구분 + 미리보기(시사점 → 첫 줄, 검색 중엔 검색어가 든 문장). 상세 본문은 `bodyHtml`로 적힌 순서·문장 그대로
-  (`-->` 줄도 제자리), raw가 있으면 정리/원문 전환, 다음 액션(별도 필드)은 위에, 검색어 `<mark>`, 이전/다음 미팅. 휴대폰 상세는 `history.pushState` 로 안드로이드 뒤로가기가 목록으로.
+  (`-->` 줄도 제자리), raw가 있으면 원문/정리 전환(이 미팅만의 원문이면 원문을 먼저, 여러 미팅이 나눠 쓰는 원문(`rawShared`)이면 정리를 먼저), 다음 액션(별도 필드)은 위에, 검색어 `<mark>`, 이전/다음 미팅. 휴대폰 상세는 `history.pushState` 로 안드로이드 뒤로가기가 목록으로.
   글자 크기 `kbnote-fs`(m·l·xl, `.page` zoom), 새 소식 `kbnote-seen`(지난번 본 뒤 createdAt/updatedAt 이 더 새 것).
 - 검색(`terms`/`hits`): 여러 단어는 모두 포함, 각 단어는 기관 aliases(교공→한국교직원공제회)와 `SYN` 한·영 묶음으로 넓힘.
   `SYN`은 공개 코드라 일반 GP명·업계 용어만(고객·인물 이름 금지). 새 약칭은 DB의 orgs.aliases 에 넣으면 검색에 바로 반영.

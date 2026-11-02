@@ -60,7 +60,8 @@ git add data.enc.json && git commit -m "data: 미팅노트 갱신" && git push
 | `install.html` | 설치 안내(기기별 안내·QR·안드로이드 설치 버튼) |
 | `android/` | 안드로이드 앱(WebView) 소스·아이콘·`build.sh`(SDK build-tools로 빌드) |
 | `scripts/vault.mjs` | 암호화·복호화·확인 |
-| `scripts/upsert.mjs` | 새 미팅·인물·기관 레코드 넣기/고치기(검증 포함) |
+| `scripts/upsert.mjs` | 새 미팅·인물·기관 레코드 넣기/고치기(원문 대조 검사 포함) |
+| `scripts/kakao.mjs` | 카톡 대화 내보내기 → 게시물(이어 보낸 메시지 묶음), 이미 DB에 있는 원문 표시 |
 | `docs/CONVERT.md` | 미팅노트 텍스트 → 레코드 변환 규칙 |
 | `scripts/gen-icons.mjs` | 앱 아이콘(KB GIS Market / Meeting Note 한 쌍) 생성 |
 | `tests/smoke.mjs` | 가상 데이터(`tests/fixture.json`)로 브라우저 점검 — 실제 데이터·비밀번호는 쓰지 않음 |

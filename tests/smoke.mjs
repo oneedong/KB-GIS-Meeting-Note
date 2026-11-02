@@ -125,9 +125,10 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('시사점은 적힌 자리(본문 끝)에', (await page.locator('#mMain .memo .sec:last-child > :last-child').getAttribute('class')) === 'take');
   ok('검색어 강조(상세)', (await page.locator('#mMain mark').count()) > 0);
   ok('본문 문장 그대로(덧붙인 강조 없음)', (await page.locator('#mMain .memo li', { hasText: '올해 PD 2건 검토 중 (건당 USD 30mn)' }).count()) === 1 && (await page.locator('#mMain .memo b').count()) === 0);
-  await page.locator('#mMain [data-view="raw"]').click();
-  ok('원문 보기', await page.locator('#mMain pre.raw').isVisible() && (await page.textContent('#mMain pre.raw')).startsWith('[가상] 1/15') && !(await page.locator('#mMain .memo').isVisible()));
+  ok('원문이 먼저 보임(쓴 그대로)', await page.locator('#mMain pre.raw').isVisible() && (await page.textContent('#mMain pre.raw')).includes('1/15(목) 샘플공제회 대체투자팀 홍길동TJ') && !(await page.locator('#mMain .memo').isVisible()));
   await page.locator('#mMain [data-view="memo"]').click();
+  ok('정리 보기로 전환', await page.locator('#mMain .memo').isVisible() && !(await page.locator('#mMain pre.raw').isVisible()));
+  await page.locator('#mMain [data-view="raw"]').click();
   if (vp.width < 760) await page.locator('#mMain [data-back]').click();
   await page.fill('#mq', '');
   await page.locator('#mList .item').first().click();
