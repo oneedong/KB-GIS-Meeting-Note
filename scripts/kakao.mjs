@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // 카톡 대화 내보내기(txt) → 게시물 목록. 이미 DB 에 원문(raw)으로 들어간 게시물은 표시해 새 것만 고르기 쉽게 한다.
 //
-//   node scripts/kakao.mjs <카톡.txt> <평문 data.json> <출력 posts.json>
+//   node scripts/kakao.mjs <카톡.txt> <평문 data.json> <출력 posts.json> [--from 2026-01-01]
+//   --from: 이 날짜 전에 올린 게시물은 후보에서 뺀다(DB는 2026년 미팅만 담는다 — 사용자 요청)
 //
 // - 메시지: "2026년 4월 16일 오후 4:47, 김현지 차장님 : …" 줄로 시작, 다음 머리 줄 전까지 이어지는 줄 포함(글자 그대로)
 // - 게시물: 같은 사람이 10분 안에 이어 보낸 메시지 중, 첫 줄에 날짜·[머리]·'A <> B'·@언급이 없고 -·•·2.·3) 처럼 이어지는 것을 합친다
@@ -10,7 +11,8 @@
 // 출력 파일은 평문이므로 저장소 밖(스크래치패드)에 둔다.
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const [src, dbPath, out] = process.argv.slice(2);
+const args = process.argv.slice(2), fi = args.indexOf('--from'), FROM = fi >= 0 ? args.splice(fi, 2)[1] : '';
+const [src, dbPath, out] = args;
 if (!src || !dbPath || !out) { console.error('사용법: node scripts/kakao.mjs <카톡.txt> <평문 data.json> <출력 posts.json>'); process.exit(2); }
 
 const text = readFileSync(src, 'utf8').replace(/^﻿/, '').replace(/\r\n?/g, '\n');
@@ -57,11 +59,11 @@ const isNote = (p) => !/^파일:|^사진$|^동영상$|^이모티콘$/.test(p.tex
 for (const p of posts) {
   delete p.last;
   p.inDb = raws.filter((r) => r.raw.includes(p.raw)).map((r) => r.id);
-  p.kind = p.inDb.length ? 'in-db' : isNote(p) ? 'new-note?' : 'chat/file';
+  p.kind = p.inDb.length ? 'in-db' : FROM && p.date < FROM ? 'before-from' : isNote(p) ? 'new-note?' : 'chat/file';
 }
 writeFileSync(out, JSON.stringify(posts, null, 1));
 const c = (k) => posts.filter((p) => p.kind === k).length;
 console.log(`메시지 ${msgs.length} → 게시물 ${posts.length} (${posts[0]?.ts} ~ ${posts[posts.length - 1]?.ts})`);
-console.log(`  이미 DB에 있음 ${c('in-db')} · 새 미팅노트 후보 ${c('new-note?')} · 대화·파일 ${c('chat/file')}`);
+console.log(`  이미 DB에 있음 ${c('in-db')} · 새 미팅노트 후보 ${c('new-note?')} · 대화·파일 ${c('chat/file')}${FROM ? ` · ${FROM} 전 ${c('before-from')}` : ''}`);
 for (const p of posts.filter((x) => x.kind === 'new-note?'))
   console.log(`  후보 ${p.ts} ${p.who}${p.cut ? ' ✂' : ''} | ${p.text.split('\n', 1)[0].slice(0, 60)}`);

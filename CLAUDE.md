@@ -2,8 +2,9 @@
 
 KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개 저장소 + GitHub Pages(main 브랜치 루트, 빌드 없음).
 **데이터 원본은 이 저장소의 암호문 `data.enc.json`** 이다(2026-10-30 claude.ai 아티팩트 DB에서 옮겨 온 뒤로 아티팩트는 쓰지 않음).
-2026-11-02 카톡 원문(2025-11-28~2026-10-27)을 반영: 기존 미팅 223건에 `raw`(원문)를 붙이고(정리본은 그대로, `legacyBody`),
-원문에만 있던 2025-12 미팅 27건을 원문 그대로 추가. 아티팩트에서 직접 입력한 4건(10/20·21·28·29)은 카톡 원문이 없다.
+**DB는 2026년 미팅만 담는다(사용자 요청).** 2026-11-02 카톡 원문(2025-11-28~2026-10-27)으로 기존 미팅 223건에 `raw`(원문)를
+붙였다(정리본은 그대로, `legacyBody`). 2025-12 원문은 넣지 않는다. 아티팩트에서 직접 입력한 4건(10/20·21·28·29)은 카톡 원문이 없다.
+카톡 직급 약어: TJ=팀장, BJ=부장, CJ=차장, GJ=과장(검색 `SYN`에도 있음).
 자매 앱: KB GIS Market(`oneedong/KB-GIS-App`).
 
 ## 절대 규칙
@@ -19,7 +20,7 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 1. `node scripts/vault.mjs decrypt data.enc.json <SP>/data.json` (`<SP>` = 스크래치패드)
 2. `docs/CONVERT.md`를 읽는다. `<SP>/data.json`의 `ref.convertSpec`은 기관 약칭표·게시자 표기·이름 충돌만 참고한다
    (그 안의 문체 규칙 — 개조식 음슴체·문장 다듬기·약칭 풀기 — 은 따르지 않는다. 원문 보존이 우선).
-   카톡 내보내기(txt)면 먼저 `node scripts/kakao.mjs <txt> <SP>/data.json <SP>/posts.json` — 게시물로 묶고 이미 DB 원문에 있는 것은
+   카톡 내보내기(txt)면 먼저 `node scripts/kakao.mjs <txt> <SP>/data.json <SP>/posts.json --from 2026-01-01` — 게시물로 묶고 이미 DB 원문에 있는 것은
    `in-db`로 표시한다. `new-note?`만 검토(대화·행정·파일은 뺀다). 이어 보낸 메시지는 이미 한 게시물로 묶여 있다.
 3. 텍스트를 레코드로 바꿔 `<SP>/patch.json` 작성(`meetings`·`people`·`orgs`, 고칠 땐 기존 id 그대로). 미팅마다 `raw`에 원문 그대로.
    이미 DB에 있는 미팅(같은 날·같은 기관)인지 먼저 확인 — 카톡 내보내기는 이전 내용과 겹치는 경우가 많다.

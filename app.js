@@ -74,7 +74,9 @@ const SYN=[["blue owl","블루아울","블루 아울"],["apollo","아폴로"],["
   ["private debt","pd","사모대출","사모 대출"],["private credit","프라이빗 크레딧","사모신용"],["direct lending","dl","직접대출"],["secondary","세컨더리","세컨"],
   ["buyout","바이아웃"],["co-invest","코인베","공동투자","co-investment"],["infra","인프라","infrastructure"],["real estate","부동산"],["re-up","리업"],
   ["blind","블라인드","블펀"],["capital call","캐피탈콜","캐피털콜","캐콜"],["hedge fund","헤지펀드","헤지 펀드"],["aircraft","항공기"],["gp financing","gp 파이낸싱","gp파이낸싱"],
-  ["evergreen","에버그린"],["open-end","오픈엔드","오픈 엔드"],["bdc","비디씨"],["clo","씨엘오"],["sma","에스엠에이"]];
+  ["evergreen","에버그린"],["open-end","오픈엔드","오픈 엔드"],["bdc","비디씨"],["clo","씨엘오"],["sma","에스엠에이"],
+  // 카톡 직급 약어(원문엔 TJ·GJ로 적혀 있음). DL=대리는 Direct Lending 과 겹쳐서 넣지 않음
+  ["팀장","tj"],["부장","bj"],["차장","cj"],["과장","gj"]];
 let ORGKEY=new Map(),HAY=new Map(),hlCache={q:null,re:null};
 function indexSearch(){ORGKEY=new Map();O.forEach(o=>[o.name,...(o.aliases||[])].forEach(k=>{if(k)ORGKEY.set(k.toLowerCase(),o)}));HAY=new Map();hlCache={q:null,re:null}}
 function expand(t){const alts=new Set([t]);SYN.forEach(g=>{if(g.includes(t))g.forEach(x=>alts.add(x))});

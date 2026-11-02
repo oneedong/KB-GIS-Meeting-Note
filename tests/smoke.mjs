@@ -113,6 +113,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('약칭으로 검색(샘공→샘플공제회)', (await cnt('샘공')) === '1');
   ok('여러 단어 검색(모두 포함)', (await cnt('샘공 PD')) === '1' && (await cnt('샘공 Buyout')) === '0');
   ok('한·영 표기 검색(바이아웃→Buyout)', (await cnt('바이아웃')) === '1');
+  ok('직급 약어 검색(팀장↔TJ)', await page.evaluate(() => terms('팀장')[0].includes('tj') && terms('TJ')[0].includes('팀장')));
   ok('업데이트 시각 표시', (await page.textContent('#mCnt')).includes('01/01 09:00 업데이트'));
   if (vp.width >= 760) {
     await page.fill('#mq', ''); await page.locator('body').click({ position: { x: 5, y: 300 } });
