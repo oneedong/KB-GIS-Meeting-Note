@@ -117,9 +117,8 @@ function snippet(line,q){const h=firstHit(line,q);if(!h)return esc(line);
 // 원문(raw) 줄: 카톡 머리(날짜, 이름 : )를 떼고, 첫 메시지의 첫 줄(미팅 머리: 날짜·기관·참석자)은 목록 제목과 겹치므로 뺀다
 const KHEAD=/^\d{4}년 \d{1,2}월 \d{1,2}일 (오전|오후) \d{1,2}:\d{2}, .+? : /;
 function rawLines(r){const L=(r.raw||"").split("\n").map(l=>l.replace(KHEAD,"").trim()).filter(l=>l&&!/^-{3,}/.test(l));return L.length>1?L.slice(1):L}
-const ownRaw=r=>!!r.raw&&!r.rawShared;   // 이 미팅만의 원문이면 원문을 먼저 보여준다
-function preview(r,q){const own=ownRaw(r),rl=own?rawLines(r):[],{secs,take:t0}=parseBody(r.body);
-  const take=own?rl.filter(l=>/^(-->|→)/.test(l)).map(l=>l.replace(/^(-->|→)\s*/,"")):t0,lines=own?rl.filter(l=>!/^(-->|→)/.test(l)).map(l=>l.replace(/^[-•·*]\s*/,"")):secs.flatMap(s=>s.b);
+// 미리보기는 요약정리(body) 기준. 검색어가 원문에만 있으면 원문 줄에서 찾아 보여준다
+function preview(r,q){const {secs,take}=parseBody(r.body),lines=[...secs.flatMap(s=>s.b),...(q?rawLines(r).map(l=>l.replace(/^[-•·*]\s*/,"")):[])];
   if(q){const hit=[...take,...lines,r.nextAction||"",...parseAtt(r.attendees).map(a=>a.who+" "+a.note),(r.tags||[]).join(" ")].find(l=>firstHit(l,q));if(hit)return snippet(hit,q)}
   return take[0]?`<span class="arrow">→</span> ${esc(take[0])}`:esc(lines[0]||"")}
 let seenAt="",newOnly=false,ASOF="";const NEWS=new Set(),UPDS=new Set();
@@ -155,11 +154,11 @@ function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm(
     <div class="chips">${inner?`<span class="chip flag">내부용 · 외부 공유 금지</span>`:""}${(r.assets||[]).map(t=>`<span class="chip asset">${esc(t)}</span>`).join("")}</div></div>
     <div class="actions"><button class="btn" id="mCopy" type="button">메모 복사</button>${canWrite?`<button class="btn" id="mEdit" type="button">수정</button>`:""}</div></div>
   <div class="body">
-    ${r.raw?`<div class="seg" role="group" aria-label="보기"><button type="button" data-view="raw" aria-pressed="${ownRaw(r)}">원문</button><button type="button" data-view="memo" aria-pressed="${!ownRaw(r)}">정리</button></div>`:""}
+    ${r.raw?`<div class="seg" role="group" aria-label="보기"><button type="button" data-view="memo" aria-pressed="true">요약정리</button><button type="button" data-view="raw" aria-pressed="false">원문</button></div>`:""}
     ${r.nextAction?`<div class="next"><span>다음 액션</span>${hl(esc(r.nextAction),q)}</div>`:""}
     ${att.length?`<div class="attendees">${att.map(a=>`<div class="att"><b>${hl(esc(a.who),q)}</b><div>${a.note?hl(esc(a.note),q):"<span class='ro'>소개 없음</span>"}</div></div>`).join("")}</div>`:""}
-    <div class="memo"${ownRaw(r)?" hidden":""}>${r.legacyBody&&r.raw?`<p class="legacy">이전에 카톡에서 옮기며 문장을 다듬은 정리본입니다. 쓴 그대로는 '원문'에서 보세요.</p>`:""}${bodyHtml(r,q)}</div>
-    ${r.raw?`<pre class="raw"${ownRaw(r)?"":" hidden"}>${r.rawShared?`<span class="legacy">여러 미팅을 한 메시지로 올린 원문입니다.</span>\n`:""}${hl(esc(r.raw),q)}</pre>`:""}
+    <div class="memo">${bodyHtml(r,q)}</div>
+    ${r.raw?`<pre class="raw" hidden>${r.rawShared?`<span class="legacy">여러 미팅을 한 메시지로 올린 원문입니다.</span>\n`:""}${hl(esc(r.raw),q)}</pre>`:""}
     ${r.truncated&&!secs.some(s=>s.b.includes(r.truncAt))?`<p class="cutline">✂ 원문이 잘린 노트입니다</p>`:""}
     ${cut}
     ${checks.length?`<div class="warnbox">${checks.map(esc).join(" · ")}</div>`:""}
