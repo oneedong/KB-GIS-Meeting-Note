@@ -50,12 +50,12 @@ function memoText(r){const {m,d}=md(r.date),att=parseAtt(r.attendees);
 
 // ── 탭 ──
 function setTab(t,push=true){tab=t;document.querySelectorAll(".tab,.bnav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t?"true":"false"));
-  ["meetings","orgs","demand","people"].forEach(k=>$("#p-"+k).hidden=k!==t);
+  ["meetings","orgs","demand","people","dash"].forEach(k=>$("#p-"+k).hidden=k!==t);document.body.classList.toggle("dashmode",t==="dash");
   if(push){try{history.replaceState(null,"","#"+t)}catch(e){}}
   renderTab();window.scrollTo({top:0});fabSync()}
 document.querySelectorAll(".tab,.bnav button").forEach(b=>b.onclick=()=>{if(b.dataset.tab===tab&&isMob()){closeDetail();return}setTab(b.dataset.tab)});
 mq.addEventListener?.("change",()=>{if(!isMob())document.querySelectorAll(".split.detail").forEach(s=>s.classList.remove("detail"));if(tab==="demand")renderDemand();fabSync()});
-function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,people:()=>{renderPList();renderPMain()}})[tab]()}
+function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,people:()=>{renderPList();renderPMain()},dash:()=>Dash.render()})[tab]()}
 function gotoOrg(name){const o=orgOf(name);if(!o){toast("기관 프로필이 아직 없습니다. 기관 탭에서 추가하세요.");return}oSel=o.id;oMode="view";setTab("orgs");openDetail()}
 function gotoMeeting(id){mSel=id;mMode="view";setTab("meetings");if(isMob()){openDetail();return}setTimeout(()=>{const el=document.querySelector(`#mList [data-id="${CSS.escape(id)}"]`);if(el)el.scrollIntoView({block:"nearest"})},30)}
 function gotoPerson(id){const p=P.find(x=>x.id===id);if(!p)return;pSel=id;pMode="view";setTab("people");openDetail()}
@@ -357,7 +357,7 @@ async function copy(t){try{await navigator.clipboard.writeText(t);toast("메모 
 // ── 초기화 ──
 const h=(location.hash||"").replace("#","");if(["meetings","orgs","demand","people"].includes(h))setTab(h,false);else renderTab();
 fabSync();
-addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");if(t!==tab&&["meetings","orgs","demand","people"].includes(t))setTab(t,false)});
+addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");if(t!==tab&&["meetings","orgs","demand","people","dash"].includes(t))setTab(t,false)});
 // 암호화된 DB(data.enc.json)를 풀어서 읽기 전용으로 보여준다. 미팅 추가·수정은 Claude에 미팅노트 텍스트를 주면
 // data.enc.json 을 갱신해 다시 배포한다(CLAUDE.md).
 ["#mNew","#oNew","#pNew"].forEach(s=>$(s).hidden=true);fabSync();
@@ -383,7 +383,7 @@ function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.dat
   $("#asof").textContent=j.generatedAt?`${j.generatedAt} 업데이트`:"";ASOF=(j.generatedAt||"").slice(5).replace("-","/");renderMList();document.body.classList.add("ready")}
 // 인터넷이 끊기면 알림(서비스워커가 마지막으로 받은 사본을 보여준다)
 addEventListener("keydown",e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"");
-  if(e.key==="/"&&!typing&&$("#gate").hidden){/* 비밀번호 화면이 아닐 때만 */const box={meetings:"#mq",orgs:"#oq",demand:"#dq",people:"#pq"}[tab];if(box){e.preventDefault();$(box).focus();$(box).select()}}
+  if(e.key==="/"&&!typing&&$("#gate").hidden){/* 비밀번호 화면이 아닐 때만 */const box={meetings:"#mq",orgs:"#oq",demand:"#dq",people:"#pq"}[tab];if(tab==="dash"){if(Dash.focusFind())e.preventDefault()}else if(box){e.preventDefault();$(box).focus();$(box).select()}}
   else if(e.key==="Escape"&&typing&&document.activeElement.type==="search"&&document.activeElement.value){document.activeElement.value="";document.activeElement.dispatchEvent(new Event("input"))}});
 addEventListener("offline",()=>toast("오프라인 — 마지막으로 받은 사본을 보여줍니다"));addEventListener("online",()=>toast("다시 연결됐습니다"));
 Vault.boot(j=>{load(j);if(!navigator.onLine)setTimeout(()=>toast("오프라인 — 마지막으로 받은 사본입니다"),2600)});

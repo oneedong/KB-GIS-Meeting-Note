@@ -1,5 +1,6 @@
 # 평문 데이터는 절대 올리지 않는다 — 암호문 data.enc.json 만 커밋
 data.json
+dash.json
 *.plain.json
 live/
 export/

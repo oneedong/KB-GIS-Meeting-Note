@@ -1,5 +1,5 @@
 /* KB GIS Meeting Note service worker — 오프라인 앱 셸 + 새 배포 자동 반영 */
-const CACHE = 'kbnote-v8';
+const CACHE = 'kbnote-v9';
 
 // 설치 때 미리 받아 두는 파일. data.enc.json 은 암호문이라 캐시에 둬도 된다.
 const SHELL = [
@@ -8,6 +8,8 @@ const SHELL = [
   './app.css',
   './vault.js',
   './app.js',
+  './dash.css',
+  './dash.js',
   './data.enc.json',
   './manifest.webmanifest',
   './icons/icon-192.png',
@@ -15,10 +17,14 @@ const SHELL = [
   './icons/maskable-512.png',
   './icons/apple-touch-icon.png',
 ];
+// 없어도 설치는 되는 파일(대시보드 암호문 — 아직 안 올라왔을 수 있음)
+const OPTIONAL = ['./dash.enc.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then((cache) => cache.addAll(SHELL).then(() => Promise.all(OPTIONAL.map((f) => cache.add(f).catch(() => {})))))
+      .then(() => self.skipWaiting())
   );
 });
 

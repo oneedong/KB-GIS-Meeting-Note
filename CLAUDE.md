@@ -5,14 +5,15 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 **DB는 2026년 미팅만 담는다(사용자 요청).** 2026-11-02 카톡 원문(2025-11-28~2026-10-27)으로 기존 미팅 223건에 `raw`(원문)를
 붙였다(정리본은 그대로, `legacyBody`). 2025-12 원문은 넣지 않는다. 아티팩트에서 직접 입력한 4건(10/20·21·28·29)은 카톡 원문이 없다.
 카톡 직급 약어: TJ=팀장, BJ=부장, CJ=차장, GJ=과장(검색 `SYN`에도 있음).
+앱 탭: 미팅노트·기관·전략 수요판·인물·대시보드(엑셀 대시보드, `dash.enc.json`).
 자매 앱: KB GIS Market(`oneedong/KB-GIS-App`).
 
 ## 절대 규칙
 - 평문 데이터(복호화한 data.json, patch.json, 사용자가 준 미팅노트 원문 txt 등)는 저장소 밖(스크래치패드)에만 두고 커밋하지 않는다.
-  저장소에 들어가는 데이터는 `data.enc.json` 하나뿐. 커밋 전 `git status`로 확인.
+  저장소에 들어가는 데이터는 암호문 `data.enc.json`·`dash.enc.json` 둘뿐. 커밋 전 `git status`로 확인.
 - 비밀번호를 파일·커밋·코드·로그·커밋 메시지에 남기지 않는다. 환경변수 `MEETING_DB_PASSWORD`로만 넘긴다
   (환경 설정에 있으면 그대로, 없으면 사용자에게 묻는다).
-- `tests/fixture.json`은 가상 데이터만.
+- `tests/fixture.json`·`tests/dash-fixture.json`은 가상 데이터만.
 - **원문은 그대로, 앞에는 요약정리(사용자 요청).** 원문 메시지는 `raw`에 한 글자도 고치지 않고(앱 '원문' 탭).
   `body`는 먼저 보이는 요약정리 — 기존 미팅처럼 섹션으로 나눈 요약(2026-11-05부터 새 미팅도). 원문에 없는 사실·숫자·해석 금지,
   숫자·고유명사·영문 용어는 원문 그대로. 화면은 요약정리를 섹션 순서대로 보여주고 강조를 덧붙이지 않는다.
@@ -31,6 +32,18 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 5. `node scripts/vault.mjs encrypt <SP>/data.json data.enc.json` (같은 비밀번호면 salt 유지 → 휴대폰 재입력 없음)
 6. `git add data.enc.json` → 커밋(`data: 미팅노트 N건 추가 (MM/DD 기관…)`, 내용 요약에 민감정보 쓰지 말 것) → push
 7. 사용자에게 추가·수정 목록과 flags(이름 확인·날짜 확인·원문 잘림)를 알려준다. 평문 파일 삭제.
+
+## "대시보드 업데이트" (대시보드 엑셀 xlsm 을 고칠 때마다 같이)
+앱 '대시보드' 탭 = 엑셀의 보이는 시트 전부(요약 카드·차트 + 시트별 표). 데이터는 암호문 `dash.enc.json` 하나.
+1. 엑셀은 최신 결과물(사용자가 고친 파일 포함)을 기준으로 고친다. 고친 xlsm 이 확정되면
+   `python3 scripts/dash_extract.py <xlsm> <SP>/dash.json` (LibreOffice·openpyxl 필요. 출력의 시트 수·검증 n/n·머리글 행 확인)
+2. `node scripts/vault.mjs encrypt <SP>/dash.json dash.enc.json --salt-from data.enc.json`
+   (반드시 `--salt-from` — 미팅노트와 같은 비밀번호·salt 여야 앱이 기억된 키로 연다. 비밀번호가 다르면 스크립트가 멈춘다)
+3. `git status`로 dash.enc.json 만 올라가는지 확인 → 커밋(`dash: 대시보드 MM/DD 기준`, 숫자·기관명 쓰지 말 것) → push. 평문 dash.json 삭제.
+- 새 시트가 생기면 `dash_extract.py`의 `GROUPS`·`SHORT`에 넣는다(없으면 '기타'로 들어감). 머리글 고정이 어색한 화면 배치 시트는 `NOFREEZE`.
+- 요약 카드·차트 숫자는 `summary`(대시보드(Demo) 카드, 현금기준 'N월 부서별 수익', KPI 실적 요약, 연도별 CF '연합계(KRW', 검증, 시딩)에서 읽는다.
+  엑셀 행 구성이 바뀌어 값이 비면 추출 함수만 고친다.
+- 점검용 가상 대시보드는 `tests/dash-fixture.json`(가상 데이터만).
 
 ## 화면 수정
 - `app.js`/`app.css`는 아티팩트 페이지(lp_meeting_db.html) 원본에서 저장 기능·약어 사전을 뺀 것. KB 노랑·회색 토큰.

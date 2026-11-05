@@ -7,6 +7,7 @@
 const Vault = (() => {
   const DATA = "data.enc.json", IDB = "kb-gis-meeting-note", STORE = "keys", SLOT = "data";
   const el = (s) => document.querySelector(s);
+  let cur = null;   // 지금 열린 DB의 키(메모리에만) — 같은 비밀번호로 잠근 추가 파일(대시보드)을 여는 데 쓴다
   const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
   function idb(mode, fn) {
@@ -58,6 +59,7 @@ const Vault = (() => {
       try {
         const key = await derive(pw.value, env);
         const data = await decrypt(key, env);
+        cur = { key, salt: env.salt, iter: env.iter };
         if (el("#remember").checked) await putKey({ key, salt: env.salt, iter: env.iter });
         else await delKey();
         pw.value = ""; pw.type = "password"; msg.textContent = ""; gate.hidden = true;
@@ -82,11 +84,26 @@ const Vault = (() => {
     }
     const saved = await getKey();
     if (saved && saved.key && saved.salt === env.salt && saved.iter === env.iter) {
-      try { onData(await decrypt(saved.key, env)); return; }
+      try { const data = await decrypt(saved.key, env); cur = { key: saved.key, salt: env.salt, iter: env.iter }; onData(data); return; }
       catch (e) { await delKey(); }   // 비밀번호가 바뀐 사본 → 다시 입력
     }
     showGate(env, onData);
   }
 
-  return { boot };
+  // 같은 비밀번호·salt 로 잠근 추가 파일 열기(대시보드). 파일 없음/비밀번호 다름은 구분해서 돌려준다.
+  async function openExtra(file) {
+    if (!cur) return { error: "locked" };
+    let env;
+    try {
+      const r = await fetch(file, { cache: "no-store" });
+      if (r.status === 404) return { error: "missing" };
+      if (!r.ok) throw new Error(String(r.status));
+      env = await r.json();
+    } catch (e) { return { error: "network" }; }
+    if (env.salt !== cur.salt || env.iter !== cur.iter) return { error: "mismatch", env };
+    try { return { data: await decrypt(cur.key, env), env }; }
+    catch (e) { return { error: e && e.name === "OperationError" ? "mismatch" : "broken", env }; }
+  }
+
+  return { boot, openExtra };
 })();

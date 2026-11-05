@@ -16,12 +16,16 @@ const PW = 'smoke-test-password';
 const ENC = join(ROOT, 'tests', '_fixture.enc.json');
 execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', join(ROOT, 'tests/fixture.json'), ENC],
   { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
+// 가상 대시보드(tests/dash-fixture.json)도 같은 비밀번호·salt 로 — 앱은 미팅노트를 연 키로 대시보드를 연다
+const DENC = join(ROOT, 'tests', '_dash.enc.json');
+execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', join(ROOT, 'tests/dash-fixture.json'), DENC, '--salt-from', ENC],
+  { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const server = createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p.endsWith('/')) p += 'index.html';
-  const file = p === '/data.enc.json' ? ENC : join(ROOT, p);
+  const file = p === '/data.enc.json' ? ENC : p === '/dash.enc.json' ? DENC : join(ROOT, p);
   if (!file.startsWith(ROOT) || !existsSync(file)) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
   res.end(readFileSync(file));
@@ -93,6 +97,27 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   }
   await page.locator(`${tabSel}[data-tab="demand"]`).click();
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-demand.png`) });
+
+  // 대시보드 탭: 같은 키로 열림 → 요약 카드·차트 → 시트 표(머리글 고정·찾기·셀 누르면 전체 글자)
+  await page.locator(`${tabSel}[data-tab="dash"]`).click();
+  await page.locator('#dzMain .kc').first().waitFor();
+  ok('대시보드 요약 카드', (await page.locator('#dzMain .kc').count()) === 2 && (await page.textContent('#dzMain')).includes('12.3'));
+  ok('대시보드 월별 차트(음수 막대 포함)', (await page.locator('#dzMain svg.ch rect.neg').count()) === 1);
+  ok('검증 배지', (await page.textContent('#dzMain .ck')).includes('3/3'));
+  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-dash.png`), fullPage: vp.width < 760 });
+  await page.locator('.dz-item[data-s="샘플 수익표"]').click();
+  await page.locator('#xs td').first().waitFor();
+  ok('시트 표', (await page.locator('#xs tr').count()) >= 40);
+  ok('머리글 행 고정', (await page.locator('#xs tr.fz').count()) === 1 && (await page.locator('#xs tr.fz').textContent()).includes('운용사'));
+  await page.fill('#shq', 'Demo Partners'); await page.waitForTimeout(350);
+  ok('시트 안 찾기', /^1\/\d+$/.test((await page.textContent('#shn')).trim()) && (await page.locator('#xs td.cur').count()) === 1);
+  await page.locator('#xs td.nt').first().click();
+  ok('셀 누르면 전체 글자·메모', await page.locator('#cellbar').isVisible() && (await page.textContent('#cellbar')).includes('가상 메모'));
+  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-dash-sheet.png`) });
+  await page.locator('.dz-item[data-s="샘플 대시보드"]').click();
+  await page.locator('#xs td').first().waitFor();
+  ok('화면 배치 시트는 머리글 고정 없음', (await page.locator('#xs tr.fz').count()) === 0);
+  await page.locator('.dz-item[data-s="__sum"]').click();
 
   // 기억하기 → 새로고침해도 바로 열림
   await page.reload();

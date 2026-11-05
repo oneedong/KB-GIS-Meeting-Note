@@ -5,6 +5,8 @@
 //   node scripts/vault.mjs decrypt [data.enc.json] <평문 출력.json>   암호문 → 평문(저장소 밖에 둘 것)
 //   node scripts/vault.mjs encrypt <평문.json> [data.enc.json]       평문 → 암호문
 //   node scripts/vault.mjs check   [data.enc.json]                  풀어서 건수만 확인
+//   node scripts/vault.mjs encrypt <SP>/dash.json dash.enc.json --salt-from data.enc.json
+//        대시보드(kind:"dashboard")는 미팅노트 DB와 같은 salt 로 잠가야 앱이 기억된 키로 바로 연다.
 //
 // 비밀번호: 환경변수 MEETING_DB_PASSWORD, 없으면 터미널에서 입력받는다(화면에 안 보임).
 // 같은 비밀번호로 다시 암호화하면 기존 salt 를 그대로 써서, 휴대폰에 기억된 키가 계속 맞는다.
@@ -54,7 +56,7 @@ async function openFile(file, pw) {
   catch (e) { if (e && e.name === 'OperationError') { console.error('비밀번호가 맞지 않습니다.'); process.exit(1); } throw e; }
 }
 
-const counts = (j) => `미팅 ${j.meetings?.length ?? 0} · 기관 ${j.orgs?.length ?? 0} · 인물 ${j.people?.length ?? 0} (${j.generatedAt || '기준시각 없음'})`;
+const counts = (j) => j.kind === 'dashboard' ? `대시보드 시트 ${j.sheets?.length ?? 0}개 · 기준일 ${j.asof || '-'} (${j.generatedAt || ''})` : `미팅 ${j.meetings?.length ?? 0} · 기관 ${j.orgs?.length ?? 0} · 인물 ${j.people?.length ?? 0} (${j.generatedAt || '기준시각 없음'})`;
 const usage = () => { console.error('사용법: node scripts/vault.mjs decrypt|encrypt|check … (파일 머리 주석 참고)'); process.exit(2); };
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -69,16 +71,23 @@ if (cmd === 'check') {
   writeFileSync(resolve(out), JSON.stringify(data, null, 1) + '\n');
   console.log(`복호화 → ${out}  ${counts(data)}`);
 } else if (cmd === 'encrypt') {
+  const fi = args.indexOf('--salt-from'); const saltFrom = fi >= 0 ? resolve(args[fi + 1]) : null;
+  if (fi >= 0) args.splice(fi, 2);
   if (!args[0]) usage();
   const out = resolve(args[1] || 'data.enc.json');
   const data = JSON.parse(readFileSync(resolve(args[0]), 'utf8'));
-  for (const k of ['meetings', 'orgs', 'people']) if (!Array.isArray(data[k])) throw new Error(`${k} 배열이 없습니다`);
+  if (data.kind === 'dashboard') { if (!Array.isArray(data.sheets)) throw new Error('sheets 배열이 없습니다'); }
+  else for (const k of ['meetings', 'orgs', 'people']) if (!Array.isArray(data[k])) throw new Error(`${k} 배열이 없습니다`);
   const pw = await askPassword('비밀번호: ');
   if (pw.length < 8) { console.error('비밀번호는 8자 이상으로 해 주세요.'); process.exit(1); }
 
   // 기존 암호문과 같은 비밀번호면 salt 유지
   let salt = null, iter = ITER, reused = false;
-  if (existsSync(out)) {
+  if (saltFrom) {
+    const prev = JSON.parse(readFileSync(saltFrom, 'utf8'));
+    try { await open(prev, pw); } catch { console.error(`비밀번호가 ${saltFrom} 와 다릅니다 — 앱에서 열 수 없게 됩니다.`); process.exit(1); }
+    salt = unb64(prev.salt); iter = prev.iter; reused = true;
+  } else if (existsSync(out)) {
     try {
       const prev = JSON.parse(readFileSync(out, 'utf8'));
       await open(prev, pw);

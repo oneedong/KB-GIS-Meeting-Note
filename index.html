@@ -23,6 +23,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <link rel="stylesheet" href="./app.css">
+<link rel="stylesheet" href="./dash.css">
 <script>
   // 화면 모드: 라이트(기본)·다크. 헤더 버튼으로 바꾸고 이 기기에 기억한다(설치 안내 페이지와 같은 값).
   // 그리기 전에 정해야 깜빡이지 않는다.
@@ -47,6 +48,7 @@
     <button class="tab" role="tab" data-tab="orgs" aria-selected="false">기관</button>
     <button class="tab" role="tab" data-tab="demand" aria-selected="false">전략 수요판</button>
     <button class="tab" role="tab" data-tab="people" aria-selected="false">인물·조직도</button>
+    <button class="tab" role="tab" data-tab="dash" aria-selected="false">대시보드</button>
   </nav>
 </div></header>
 
@@ -110,6 +112,14 @@
     <main class="main" id="pMain"><div class="empty">기관을 고르면 조직도가, 인물을 고르면 상세가 보입니다.</div></main>
   </section>
 
+  <!-- 대시보드 (엑셀 시트 전체) -->
+  <section id="p-dash" hidden>
+    <div class="dz">
+      <nav class="dz-nav" id="dzNav" aria-label="대시보드 시트"></nav>
+      <div class="dz-main" id="dzMain"><div class="empty">대시보드를 여는 중…</div></div>
+    </div>
+  </section>
+
 </div>
 <div class="gate" id="gate" hidden>
   <form class="gate-card" id="gateForm" autocomplete="off">
@@ -130,10 +140,12 @@
   <button type="button" data-tab="orgs" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14M9 21v-5h6v5M8 10h.01M12 10h.01M16 10h.01"/></svg>기관</button>
   <button type="button" data-tab="demand" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>수요판</button>
   <button type="button" data-tab="people" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>인물</button>
+  <button type="button" data-tab="dash" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>대시보드</button>
 </nav>
 <div class="toast" id="toast" hidden></div>
 
 <script src="./vault.js"></script>
+<script src="./dash.js"></script>
 <script src="./app.js"></script>
 <script>
   // 서비스워커: 오프라인에서도 열리고(마지막으로 받은 암호화 DB), 새 배포는 다음 실행 때 자동 반영.
