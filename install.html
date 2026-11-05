@@ -150,7 +150,8 @@ ol li::before{content:counter(s);width:26px;height:26px;border-radius:50%;backgr
 (function () {
   var $ = function (s) { return document.querySelector(s); };
   var ua = navigator.userAgent;
-  var isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var forceIOS = /[?&#]ios\b/i.test(location.href);   // install.html?ios — 아이폰 안내를 바로 보여주는 공유용 링크
+  var isIOS = forceIOS || /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var isAndroid = /Android/i.test(ua);
   var inKakao = /KAKAOTALK/i.test(ua);
   var inApp = inKakao || /NAVER\(inapp|; ?Line\/|Instagram|FBAN|FBAV|DaumApps|BAND\/|everytimeApp|; ?wv\)/i.test(ua);
@@ -166,7 +167,7 @@ ol li::before{content:counter(s);width:26px;height:26px;border-radius:50%;backgr
     };
   });
 
-  if (inApp) {
+  if (inApp && !(forceIOS && !/iPhone|iPad|iPod/.test(ua))) {
     $('#s-inapp').hidden = false;
     var ext;
     if (inKakao) ext = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(here);
@@ -180,7 +181,7 @@ ol li::before{content:counter(s);width:26px;height:26px;border-radius:50%;backgr
     else $('#openExternal').hidden = true;
   } else if (isIOS) {
     $('#s-ios').hidden = false;
-    if (!/Safari\//.test(ua) || /CriOS|FxiOS|EdgiOS|Whale/.test(ua)) $('#iosOther').hidden = false;
+    if (/iPhone|iPad|iPod/.test(ua) && (!/Safari\//.test(ua) || /CriOS|FxiOS|EdgiOS|Whale/.test(ua))) $('#iosOther').hidden = false;
   } else if (isAndroid) {
     $('#s-android').hidden = false;
   } else {
