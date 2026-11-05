@@ -1201,6 +1201,15 @@ def v_seed(s, ctx):
         if F.get("ap"): c_["apc"], c_["ap"] = s.v(r, F["ap"]), s.n(r, F["ap"] + 1)
         if F.get("ct"): c_["ctc"], c_["ctv"] = s.v(r, F["ct"]), s.n(r, F["ct"] + 1)
         c_["cfx"] = f"{(c_.get('fxc') or '').strip()} {c_['cf']:,.0f}".strip() if c_.get("cf") else None
+        # 외화로 관리하는 펀드(심사 승인 통화 USD·EUR): 시트의 인출·분배 금액이 외화 → 억원 열은 대시보드 환율로 환산, 외화 금액은 따로 보관
+        cur = str(c_.get("apc") or "KRW").strip().upper()
+        rate = (ctx.get("fx") or {}).get(cur) if cur != "KRW" else None
+        # 시트 소진율(인출 ÷ 심사 승인금액)이 외화 금액끼리 맞아떨어질 때만 외화 펀드로 본다(원화로 적은 펀드는 그대로)
+        if rate and not (c_.get("dr") and c_.get("ap") and c_.get("bu") is not None and abs(c_["dr"] / c_["ap"] - c_["bu"]) < 0.005): rate = None
+        if rate:
+            for k in ("dr", "td", "cd", "ud"):
+                if c_.get(k) is not None: c_[k + "_fx"] = c_[k]; c_[k] = c_[k] * rate
+            c_["drfx"] = f"{cur} {c_['dr_fx']:,.2f}" if c_.get("dr_fx") is not None else None
         if isinstance(c_.get("tg"), str): c_["tg1"] = c_["tg"].split("\n")[0]
         def series(cs, label):
             out = []
@@ -1218,9 +1227,14 @@ def v_seed(s, ctx):
         fxlab = "외화" if fx_row else None
         for lab, arr in (("캐피탈콜", cl), ("원본상환", rp), ("이익분배", ds)):
             if not arr: continue
-            cols = [col("k", "차수"), col("d", "일자", "date"), col("a", "금액(원)", "won")]
+            if rate:
+                cols = [col("k", "차수"), col("d", "일자", "date"), col("a", f"금액({cur})", "n2")]
+                head = f"{lab} {len(arr)}회 · {cur} {sum(a['a'] for a in arr):,.2f}"
+            else:
+                cols = [col("k", "차수"), col("d", "일자", "date"), col("a", "금액(원)", "won")]
+                head = f"{lab} {len(arr)}회 · {sum(a['a'] for a in arr):,.0f}원"
             if any(a.get("fx") for a in arr): cols.append(col("fx", "외화", "n2"))
-            x.append({"h": f"{lab} {len(arr)}회 · {sum(a['a'] for a in arr):,.0f}원", "cols": cols, "rows": [{k: v for k, v in a.items() if v is not None} for a in arr]})
+            x.append({"h": head, "cols": cols, "rows": [{k: v for k, v in a.items() if v is not None} for a in arr]})
         memo = [t for t in (g("memo"), g("aud"), g("fss")) if t]
         if memo: x.append({"h": "메모", "text": "\n\n".join(str(t) for t in memo)})
         rows.append({"c": {k: v for k, v in c_.items() if v not in (None, "")}, "x": x})
@@ -1239,7 +1253,7 @@ def v_seed(s, ctx):
         kp.append(kpi("2026년 누적수익", (s.n(r, c + 2) or 0) / 1e8, "n2", "억원", f"{s.v(r, c + 1)} 기준", tone="ok"))
     blocks.append({"t": "kpis", "id": "k", "items": kp})
     cols = [col("no", "No", "n0"), col("fd", "펀드명"), col("ac", "자산군", "tag"), col("sr", "세부전략", d=1), col("tg1", "투자대상"),
-            col("ck", "약정(억원)", "wk", sum=1), col("cfx", "약정(외화)", d=1), col("dr", "누적 인출(억원)", "wk", sum=1), col("bu", "소진율", "bar"),
+            col("ck", "약정(억원)", "wk", sum=1), col("cfx", "약정(외화)", d=1), col("dr", "누적 인출(억원)", "wk", sum=1), col("drfx", "누적 인출(외화)", d=1), col("bu", "소진율", "bar"),
             col("ncall", "콜 횟수", "n0", d=1), col("td", "총 분배(억원)", "wk", sum=1), col("nav", "NAV(억원)", "wk", sum=1), col("irr", "XIRR", "pct"),
             col("moic", "MOIC", "x2"), col("dpi", "DPI", "x2"), col("mul", "Multiple", "x2", d=1), col("last", "최근 거래일", "date", d=1),
             col("ud", "미인출(부외부채)", "n0", d=1)]

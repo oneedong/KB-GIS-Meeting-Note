@@ -276,7 +276,7 @@ if "해외대체 시딩 관리판_금액, 수익률" in wb.sheetnames:
 # ── 3) 시트별 읽기 화면(정리 화면) — scripts/dash_views.py
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dash_views
-views, vwarn = dash_views.build_views(wb, [s["name"] for s in out_sheets], {"asof": asof, "wb": wb, "kpi": kpi})
+views, vwarn = dash_views.build_views(wb, [s["name"] for s in out_sheets], {"asof": asof, "wb": wb, "kpi": kpi, "fx": {"USD": num(cfg.get("환율(원/USD)")), "EUR": num(cfg.get("환율(원/EUR)"))}})
 for s in out_sheets:
     if s["name"] in views: s["view"] = views[s["name"]]
 for w in vwarn: print("경고 — 정리 화면을 만들지 못해 원본 격자만 보임:", w, file=sys.stderr)
