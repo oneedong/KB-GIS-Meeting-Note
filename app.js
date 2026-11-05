@@ -86,7 +86,7 @@ function terms(q){let s=(q||"").trim().toLowerCase();if(!s)return [];const T=[];
   s.split(/\s+/).filter(Boolean).forEach(t=>T.push(expand(t)));return T}
 const hits=(hay,T)=>T.every(alts=>alts.some(a=>hay.includes(a)));
 function hayM(r){let h=HAY.get(r.id);if(h)return h;const o=orgOf(r.org);
-  h=[r.org,...(o?[o.name,...(o.aliases||[])]:[]),r.dept,r.attendees,r.body,r.raw,r.nextAction,r.kbAttendees,(r.tags||[]).join(" "),(r.assets||[]).join(" "),r.category,r.orgType].join(" ").toLowerCase();HAY.set(r.id,h);return h}
+  h=[r.org,...(o?[o.name,...(o.aliases||[])]:[]),r.dept,r.attendees,r.body,r.raw?rawText(r):"",r.nextAction,r.kbAttendees,(r.tags||[]).join(" "),(r.assets||[]).join(" "),r.category,r.orgType].join(" ").toLowerCase();HAY.set(r.id,h);return h}
 
 // ═════ 미팅노트 ═════
 function authorsRefresh(){const el=$("#mAuthor"),cur=el.value;const set=[...new Set(M.map(m=>(m.kbAttendees||"").split(/[,·\/]/)[0].trim()).filter(Boolean))].sort();
@@ -115,7 +115,21 @@ function firstHit(line,q){const l=line.toLowerCase();let best=null;terms(q).flat
 function snippet(line,q){const h=firstHit(line,q);if(!h)return esc(line);
   const a=Math.max(0,h.i-24),b=Math.min(line.length,h.i+h.n+60);return (a?"…":"")+hl(esc(line.slice(a,b)),q)+(b<line.length?"…":"")}
 // 원문(raw) 줄: 카톡 머리(날짜, 이름 : )를 떼고, 첫 메시지의 첫 줄(미팅 머리: 날짜·기관·참석자)은 목록 제목과 겹치므로 뺀다
-const KHEAD=/^\d{4}년 \d{1,2}월 \d{1,2}일 (오전|오후) \d{1,2}:\d{2}, .+? : /;
+const KHEAD=/^\d{4}년 \d{1,2}월 \d{1,2}일 (오전|오후) \d{1,2}:\d{2}, (.+?) : /;
+// 원문 탭: 카톡 내보내기 머리(날짜·시각·"이름 : ")는 떼고 올린 사람 이름만 보여준다(사용자 요청). 저장된 raw 는 그대로.
+// 카톡 표시 이름("[KB] 홍길동 과장님") → DB 표기("홍길동 과장")는 미팅 기록의 source(… 게시 · 게시자)에서 맞춘다(코드에 이름을 두지 않음)
+let POSTER=new Map();
+function indexPosters(){POSTER=new Map();const cnt={};
+  M.forEach(r=>{const h=KHEAD.exec(r.raw||""),s=/게시 · ([^·(]+?)\s*(?:\(|·|$)/.exec(r.source||"");if(h&&s){const k=h[2]+"\u0000"+s[1].trim();cnt[k]=(cnt[k]||0)+1}});
+  Object.entries(cnt).sort((a,b)=>b[1]-a[1]).forEach(([k])=>{const [raw,name]=k.split("\u0000");if(!POSTER.has(raw))POSTER.set(raw,name)})}
+const posterName=n=>POSTER.get(n)||n.replace(/^\[[^\]]*\]\s*/,"").replace(/님$/,"").trim();
+function rawParts(r){const parts=[];let cur=null;   // [{who, text}] — 같은 사람이 이어 올린 메시지는 한 덩어리로
+  (r.raw||"").split("\n").forEach(l=>{const h=KHEAD.exec(l);
+    if(h){const who=posterName(h[2]),t=l.slice(h[0].length);if(cur&&cur.who===who)cur.lines.push("",t);else{cur={who,lines:[t]};parts.push(cur)}}
+    else{if(!cur){cur={who:"",lines:[]};parts.push(cur)}cur.lines.push(l)}});
+  return parts.map(p=>({who:p.who,text:p.lines.join("\n").replace(/\n{3,}/g,"\n\n").trim()})).filter(p=>p.text)}
+const rawText=r=>rawParts(r).map(p=>(p.who?p.who+"\n":"")+p.text).join("\n\n");
+const rawHtml=(r,q)=>rawParts(r).map(p=>`<div class="rawpart">${p.who?`<div class="rawwho">${esc(p.who)}</div>`:""}<div class="rawtext">${hl(esc(p.text),q)}</div></div>`).join("");
 function rawLines(r){const L=(r.raw||"").split("\n").map(l=>l.replace(KHEAD,"").trim()).filter(l=>l&&!/^-{3,}/.test(l));return L.length>1?L.slice(1):L}
 // 미리보기는 요약정리(body) 기준. 검색어가 원문에만 있으면 원문 줄에서 찾아 보여준다
 function preview(r,q){const {secs,take}=parseBody(r.body),lines=[...secs.flatMap(s=>s.b),...(q?rawLines(r).map(l=>l.replace(/^[-•·*]\s*/,"")):[])];
@@ -158,7 +172,7 @@ function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm(
     ${r.nextAction?`<div class="next"><span>다음 액션</span>${hl(esc(r.nextAction),q)}</div>`:""}
     ${att.length?`<div class="attendees">${att.map(a=>`<div class="att"><b>${hl(esc(a.who),q)}</b><div>${a.note?hl(esc(a.note),q):"<span class='ro'>소개 없음</span>"}</div></div>`).join("")}</div>`:""}
     <div class="memo">${bodyHtml(r,q)}</div>
-    ${r.raw?`<pre class="raw" hidden>${r.rawShared?`<span class="legacy">여러 미팅을 한 메시지로 올린 원문입니다.</span>\n`:""}${hl(esc(r.raw),q)}</pre>`:""}
+    ${r.raw?`<div class="raw" hidden>${r.rawShared?`<p class="legacy">여러 미팅을 한 메시지로 올린 원문입니다.</p>`:""}${rawHtml(r,q)}</div>`:""}
     ${r.truncated&&!secs.some(s=>s.b.includes(r.truncAt))?`<p class="cutline">✂ 원문이 잘린 노트입니다</p>`:""}
     ${cut}
     ${checks.length?`<div class="warnbox">${checks.map(esc).join(" · ")}</div>`:""}
@@ -166,7 +180,7 @@ function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm(
       ${(r.tags||[]).length?`<div class="tags"><span>태그</span>${(r.tags||[]).map(t=>`<button type="button" class="chip tag" data-tag="${esc(t)}">#${esc(t)}</button>`).join("")}</div>`:""}</div>
     ${newer||older?`<div class="pn">${nav(newer,"newer")}${nav(older,"older")}</div>`:""}
   </div>`;
-  $("#mCopy").onclick=$("#mCopyM").onclick=()=>{const rv=W.querySelector("pre.raw");copy(rv&&!rv.hidden?r.raw:memoText(r))};
+  $("#mCopy").onclick=$("#mCopyM").onclick=()=>{const rv=W.querySelector(".raw");copy(rv&&!rv.hidden?rawText(r):memoText(r))};
   W.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{const raw=b.dataset.view==="raw";W.querySelector(".memo").hidden=raw;W.querySelector(".raw").hidden=!raw;
     W.querySelectorAll("[data-view]").forEach(x=>x.setAttribute("aria-pressed",String(x===b)))});const e=$("#mEdit");if(e)e.onclick=()=>{mMode="edit";confirmDel=false;renderMMain()};
   W.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{mSel=b.dataset.nav;renderMList();renderMMain();if(isMob())scrollTo({top:0});else{W.scrollIntoView({block:"nearest"});const el=document.querySelector(`#mList [data-id="${CSS.escape(mSel)}"]`);if(el)el.scrollIntoView({block:"nearest"})}});
@@ -377,7 +391,7 @@ function markNew(){let seen="";try{seen=localStorage.getItem("kbnote-seen")||""}
   if(seen)M.forEach(r=>{if((r.createdAt||"")>seen)NEWS.add(r.id);else if((r.updatedAt||"")>seen)UPDS.add(r.id)});
   try{if(latest)localStorage.setItem("kbnote-seen",latest)}catch(e){}  // 다음에 열 때는 이번 것 이후만 새 소식
   if(NEWS.size||UPDS.size)toast(`지난번 이후 새 미팅 ${NEWS.size}건${UPDS.size?` · 수정 ${UPDS.size}건`:""}`)}
-function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];indexSearch();markNew();
+function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];indexPosters();indexSearch();markNew();
   mSel=M.length?M[0].id:null;oSel=null;pSel=null;
   authorsRefresh();orgSelRefresh();stats();renderTab();
   $("#asof").textContent=j.generatedAt?`${j.generatedAt} 업데이트`:"";ASOF=(j.generatedAt||"").slice(5).replace("-","/");renderMList();document.body.classList.add("ready")}
