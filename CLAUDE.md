@@ -13,19 +13,21 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 - 비밀번호를 파일·커밋·코드·로그·커밋 메시지에 남기지 않는다. 환경변수 `MEETING_DB_PASSWORD`로만 넘긴다
   (환경 설정에 있으면 그대로, 없으면 사용자에게 묻는다).
 - `tests/fixture.json`은 가상 데이터만.
-- **미팅노트 원문 보존(사용자 요청).** 본문(body)은 사용자가 쓴 문장을 글자 그대로 — 다듬기·요약·문체 변환·약칭 풀기·순서 바꾸기 금지.
-  원문 메시지는 `raw`에 그대로. 화면도 적힌 순서·문장 그대로 보여준다(강조·재배치로 원문을 바꿔 보이게 하지 않는다).
+- **원문은 그대로, 앞에는 요약정리(사용자 요청).** 원문 메시지는 `raw`에 한 글자도 고치지 않고(앱 '원문' 탭).
+  `body`는 먼저 보이는 요약정리 — 기존 미팅처럼 섹션으로 나눈 요약(2026-11-05부터 새 미팅도). 원문에 없는 사실·숫자·해석 금지,
+  숫자·고유명사·영문 용어는 원문 그대로. 화면은 요약정리를 섹션 순서대로 보여주고 강조를 덧붙이지 않는다.
 
 ## "미팅노트 업데이트해줘" (사용자가 txt 파일·텍스트를 줌)
 1. `node scripts/vault.mjs decrypt data.enc.json <SP>/data.json` (`<SP>` = 스크래치패드)
-2. `docs/CONVERT.md`를 읽는다. `<SP>/data.json`의 `ref.convertSpec`은 기관 약칭표·게시자 표기·이름 충돌만 참고한다
-   (그 안의 문체 규칙 — 개조식 음슴체·문장 다듬기·약칭 풀기 — 은 따르지 않는다. 원문 보존이 우선).
+2. `docs/CONVERT.md`를 읽는다. `<SP>/data.json`의 `ref.convertSpec`은 기관 약칭표·게시자 표기·이름 충돌 참고용
+   (요약정리 형식은 CONVERT.md 가 우선).
    카톡 내보내기(txt)면 먼저 `node scripts/kakao.mjs <txt> <SP>/data.json <SP>/posts.json --from 2026-01-01` — 게시물로 묶고 이미 DB 원문에 있는 것은
    `in-db`로 표시한다. `new-note?`만 검토(대화·행정·파일은 뺀다). 이어 보낸 메시지는 이미 한 게시물로 묶여 있다.
-3. 텍스트를 레코드로 바꿔 `<SP>/patch.json` 작성(`meetings`·`people`·`orgs`, 고칠 땐 기존 id 그대로). 미팅마다 `raw`에 원문 그대로.
+3. 텍스트를 레코드로 바꿔 `<SP>/patch.json` 작성(`meetings`·`people`·`orgs`, 고칠 땐 기존 id 그대로). 미팅마다 `raw`에 원문 그대로,
+   `body`는 섹션 요약정리. 여러 메시지로 나눠 올린 한 미팅(1/4~4/4)은 한 레코드로.
    이미 DB에 있는 미팅(같은 날·같은 기관)인지 먼저 확인 — 카톡 내보내기는 이전 내용과 겹치는 경우가 많다.
 4. `node scripts/upsert.mjs <SP>/data.json <SP>/patch.json --dry-run` → 오류·경고 확인 → `--dry-run` 빼고 실행
-   ("원문(raw)에 글자 그대로 없는 줄" 오류는 body를 원문대로 고쳐서 해결. `--allow-edits`는 사용자가 직접 고쳐 달라고 한 때만)
+   ("요약정리에 원문에 없는 숫자" 오류는 숫자를 원문대로 고쳐서 해결. `--allow-edits`는 사용자가 직접 고쳐 달라고 한 때만)
 5. `node scripts/vault.mjs encrypt <SP>/data.json data.enc.json` (같은 비밀번호면 salt 유지 → 휴대폰 재입력 없음)
 6. `git add data.enc.json` → 커밋(`data: 미팅노트 N건 추가 (MM/DD 기관…)`, 내용 요약에 민감정보 쓰지 말 것) → push
 7. 사용자에게 추가·수정 목록과 flags(이름 확인·날짜 확인·원문 잘림)를 알려준다. 평문 파일 삭제.
@@ -33,7 +35,7 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 ## 화면 수정
 - `app.js`/`app.css`는 아티팩트 페이지(lp_meeting_db.html) 원본에서 저장 기능·약어 사전을 뺀 것. KB 노랑·회색 토큰.
 - 화면 모드: 기본 라이트, 헤더 버튼으로 다크(`localStorage` `kbnote-theme`, `<html data-theme>`). 색을 바꾸면 두 모드 다 확인.
-- 읽기 기능: 목록은 월 구분 + 미리보기(시사점 → 첫 줄, 검색 중엔 검색어가 든 문장). 상세 본문은 `bodyHtml`로 적힌 순서·문장 그대로
+- 읽기 기능: 목록은 월 구분 + 미리보기(시사점 → 첫 줄, 검색 중엔 검색어가 든 문장). 상세 요약정리는 `bodyHtml`로 섹션·줄 순서 그대로
   (`-->` 줄도 제자리), raw가 있으면 '요약정리 | 원문' 탭(항상 요약정리 먼저 — 사용자 요청, 목록 미리보기도 요약정리 기준), 다음 액션(별도 필드)은 위에, 검색어 `<mark>`, 이전/다음 미팅. 휴대폰 상세는 `history.pushState` 로 안드로이드 뒤로가기가 목록으로.
   글자 크기 `kbnote-fs`(m·l·xl, `.page` zoom), 새 소식 `kbnote-seen`(지난번 본 뒤 createdAt/updatedAt 이 더 새 것).
 - 검색(`terms`/`hits`): 여러 단어는 모두 포함, 각 단어는 기관 aliases(교공→한국교직원공제회)와 `SYN` 한·영 묶음으로 넓힘.

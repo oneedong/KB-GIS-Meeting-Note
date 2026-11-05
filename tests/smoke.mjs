@@ -38,8 +38,8 @@ const ok = (name, cond) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}`); 
   const base = { id: '20260201-x', date: '2026-02-01', org: '샘플공제회', orgType: '공제회', dept: '', category: 'LP', attendees: '', kbAttendees: '', assets: [], nextAction: '', tags: [], flags: [], source: '테스트', raw };
   const db = tmp('upsert-db', JSON.parse(readFileSync(join(ROOT, 'tests/fixture.json'), 'utf8')));
   const run = (patch) => { try { execFileSync(process.execPath, [join(ROOT, 'scripts/upsert.mjs'), db, tmp('upsert-patch', patch), '--dry-run'], { stdio: 'pipe' }); return true; } catch { return false; } };
-  ok('원문 그대로인 본문은 저장', run({ meetings: [{ ...base, body: '- 홍길동 TJ 왈 올해 PD는 2건 정도\n--> 하반기 재접촉' }] }));
-  ok('다듬은 본문은 저장 거부', !run({ meetings: [{ ...base, body: '- 올해 PD 2건 투자 예정임\n--> 하반기 재접촉' }] }));
+  ok('숫자가 원문에 있는 요약정리는 저장', run({ meetings: [{ ...base, body: '*최근 투자현황/계획\n- 올해 PD 2건 정도 검토\n--> 하반기 재접촉' }] }));
+  ok('원문에 없는 숫자가 든 요약정리는 저장 거부', !run({ meetings: [{ ...base, body: '*최근 투자현황/계획\n- 올해 PD 3건, USD 50mn 투자 예정\n--> 하반기 재접촉' }] }));
 }
 
 const browser = await chromium.launch();

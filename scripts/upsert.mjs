@@ -3,9 +3,9 @@
 //
 //   node scripts/upsert.mjs <평문 data.json> <patch.json> [--dry-run] [--allow-edits]
 //
-// 원문 보존: 미팅에 raw(원문 메시지 그대로)가 있으면 body 의 각 줄이 raw 에 글자 그대로 있는지 확인한다.
-// (줄 앞 - · • · -->, 소제목 *줄, "(○○ 보충)" 머리, 원문 잘림 안내 줄은 형식 표시라 빼고 비교. 띄어쓰기·줄바꿈 차이는 무시)
-// 원문에 없는 문장이 있으면 오류 — 사용자가 고쳐 달라고 한 경우에만 --allow-edits 로 넘긴다.
+// 근거 검사: 이번 patch 가 body(요약정리)를 준 미팅에 raw(원문)가 있으면
+//   - body 의 숫자가 모두 raw 에 있는지 → 없으면 오류(요약에 숫자를 지어내지 않게). 사용자가 직접 고쳐 달라고 한 때만 --allow-edits
+//   - body 의 영문 단어(3자 이상)가 raw 에 있는지 → 없으면 경고(GP명·용어를 잘못 옮겼는지 확인)
 //
 // patch.json 형식 (셋 다 선택):
 //   { "meetings": [ {id, date, org, …전체 필드} ],          id 같으면 덮어쓰기(준 필드만), 없으면 추가
@@ -31,14 +31,14 @@ const patch = JSON.parse(readFileSync(resolve(patchPath), 'utf8'));
 const now = new Date().toISOString();
 const errors = [], warns = [], log = [];
 const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
-const squash = (t) => String(t || '').replace(/\s+/g, ' ').trim();
-// body 줄 중 raw 에 글자 그대로 없는 것
-function notInRaw(m) {
-  if (!m.raw || m.legacyBody) return [];   // legacyBody: 2026-10 이전 변환본(다듬어짐) — 원문은 raw 로만 보존
-  const raw = squash(m.raw);
-  return String(m.body || '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('*'))
-    .map((l) => l.replace(/^-->\s*/, '').replace(/^[-•·]\s*/, '').replace(/^\([^)]{1,30}보충\)\s*/, ''))
-    .filter((l) => l && !/^\(원문 잘림/.test(l) && !raw.includes(squash(l)));
+// body 에서 raw 에 없는 숫자·영문 단어
+function unsupported(m) {
+  if (!m.raw) return { nums: [], words: [] };
+  const raw = m.raw.replace(/,/g, '').toLowerCase();
+  const body = String(m.body || '').split(/\r?\n/).filter((l) => !/^\s*[-•·]?\s*\(원문 잘림/.test(l)).join('\n');
+  const nums = [...new Set((body.replace(/,/g, '').match(/\d+(?:\.\d+)?/g) || []))].filter((n) => !raw.includes(n));
+  const words = [...new Set(body.match(/[A-Za-z][A-Za-z'’-]{2,}/g) || [])].filter((w) => !raw.includes(w.toLowerCase()));
+  return { nums, words };
 }
 
 // ── 삭제 ──
@@ -98,9 +98,10 @@ for (const p of patch.meetings || []) {
   const touchesOrg = 'org' in p || 'date' in p, canon = known.get(m.org);
   if (touchesOrg && canon && canon.name !== m.org) { warns.push(`미팅 ${m.id}: 기관 "${m.org}" → 표준명 "${canon.name}"`); m.org = canon.name; }
   if (touchesOrg && m.category !== '내부' && !canon) warns.push(`미팅 ${m.id}: 기관 "${m.org}" 프로필 없음 → orgs 에 추가하거나 aliases 에 넣기`);
-  const off = notInRaw(m);
-  if (off.length) (ALLOW_EDITS ? warns : errors).push(`미팅 ${m.id}: 원문(raw)에 글자 그대로 없는 줄 ${off.length}개 — ${off.slice(0, 3).map((l) => `"${l.slice(0, 40)}"`).join(', ')}`);
-  else if (!m.raw && patch.meetings && p.body) warns.push(`미팅 ${m.id}: raw(원문) 없음 — 원문 메시지를 raw 에 그대로 넣어 두면 앱에서 "원문"으로 볼 수 있다`);
+  const { nums, words } = 'body' in p ? unsupported(m) : { nums: [], words: [] };
+  if (nums.length) (ALLOW_EDITS ? warns : errors).push(`미팅 ${m.id}: 요약정리에 원문(raw)에 없는 숫자 ${nums.join(', ')}`);
+  if (words.length) warns.push(`미팅 ${m.id}: 요약정리에 원문에 없는 영문 ${words.slice(0, 8).join(', ')} — 표기 확인`);
+  if (!m.raw && 'body' in p) warns.push(`미팅 ${m.id}: raw(원문) 없음 — 원문 메시지를 raw 에 그대로 넣어 두면 앱에서 "원문"으로 볼 수 있다`);
   const dup = touchesOrg ? db.meetings.filter((x) => x !== m && x.date === m.date && x.org === m.org) : [];
   if (dup.length) warns.push(`미팅 ${m.id}: 같은 날·같은 기관 기존 레코드 ${dup.map((x) => x.id).join(',')} — 중복인지 확인`);
 }
