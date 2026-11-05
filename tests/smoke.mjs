@@ -98,26 +98,45 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator(`${tabSel}[data-tab="demand"]`).click();
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-demand.png`) });
 
-  // 대시보드 탭: 같은 키로 열림 → 요약 카드·차트 → 시트 표(머리글 고정·찾기·셀 누르면 전체 글자)
+  // 대시보드 탭: 같은 키로 열림 → 요약(지표 카드·차트·순위) → 전체 찾기 → 시트 정리 화면(필터·합계·펼침) → 엑셀 원본(머리글 고정·셀 메모)
   await page.locator(`${tabSel}[data-tab="dash"]`).click();
   await page.locator('#dzMain .kc').first().waitFor();
-  ok('대시보드 요약 카드', (await page.locator('#dzMain .kc').count()) === 2 && (await page.textContent('#dzMain')).includes('12.3'));
-  ok('대시보드 월별 차트(음수 막대 포함)', (await page.locator('#dzMain svg.ch rect.neg').count()) === 1);
+  ok('대시보드 요약 카드', (await page.locator('#dzMain .kc').count()) === 2 && (await page.textContent('#dzMain')).includes('12.30'));
+  ok('대시보드 차트(2계열 범례)', (await page.locator('#dzBody svg.ch path').count()) >= 5 && (await page.locator('#dzBody .lg span').count()) === 2);
+  ok('순위 막대', (await page.locator('#dzBody .hb-r').count()) === 3);
   ok('검증 배지', (await page.textContent('#dzMain .ck')).includes('3/3'));
+  ok('요약에 시트 바로가기', (await page.locator('#dzBody .qk').count()) === 1);
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-dash.png`), fullPage: vp.width < 760 });
-  await page.locator('.dz-item[data-s="샘플 수익표"]').click();
+  await page.fill('#gq', 'Demo Partners'); await page.waitForTimeout(400);
+  ok('전체 찾기', (await page.locator('#dzBody .gres li').count()) >= 6 && (await page.textContent('#dzBody .gres')).includes('샘플 수익표'));
+  await page.locator('#dzBody [data-go]').first().click();
+  await page.locator('#dzBody .tb-q').waitFor();
+  ok('찾은 시트로 이동·검색어 유지', (await page.inputValue('#dzBody .tb-q')) === 'Demo Partners' && (await page.textContent('#dzBody .tb-n')).startsWith('13건'));
+  await page.locator('#dzBody .tb-x').click();
+  ok('조건 지우기', (await page.textContent('#dzBody .tb-n')).startsWith('40건'));
+  const item = vp.width < 760 ? '#dzBody article.cd' : '#dzBody tr.r';
+  ok(vp.width < 760 ? '휴대폰은 카드 목록' : 'PC는 표', (await page.locator(item).count()) === 40);
+  ok('묶음 머리·묶음 합계', (await page.locator(vp.width < 760 ? '#dzBody .sec-h' : '#dzBody tr.sec').count()) === 2 && (await page.textContent('#dzBody')).includes('상반기 합계'));
+  await page.locator('#dzBody .fchip[data-f="st"][data-v="미수금"]').click();
+  ok('필터 칩 → 선택 합계', (await page.textContent('#dzBody .tb-n')).startsWith('10건') && (await page.textContent('#dzBody')).includes('선택한 10건 합계'));
+  await page.locator('#dzBody .tb-x').click();
+  await page.locator(item).first().click();
+  ok('펼치면 세부 내역', (await page.locator('#dzBody .xd .dt.mini tr').count()) === 3);
+  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-dash-sheet.png`) });
+  await page.locator('.dz-seg button[data-m="g"]').click();
   await page.locator('#xs td').first().waitFor();
-  ok('시트 표', (await page.locator('#xs tr').count()) >= 40);
-  ok('머리글 행 고정', (await page.locator('#xs tr.fz').count()) === 1 && (await page.locator('#xs tr.fz').textContent()).includes('운용사'));
+  ok('엑셀 원본 표', (await page.locator('#xs tr').count()) >= 40);
+  ok('원본 머리글 행 고정', (await page.locator('#xs tr.fz').count()) === 1 && (await page.locator('#xs tr.fz').textContent()).includes('운용사'));
   await page.fill('#shq', 'Demo Partners'); await page.waitForTimeout(350);
-  ok('시트 안 찾기', /^1\/\d+$/.test((await page.textContent('#shn')).trim()) && (await page.locator('#xs td.cur').count()) === 1);
+  ok('원본 안 찾기', /^1\/\d+$/.test((await page.textContent('#shn')).trim()) && (await page.locator('#xs td.cur').count()) === 1);
   await page.locator('#xs td.nt').first().click();
   ok('셀 누르면 전체 글자·메모', await page.locator('#cellbar').isVisible() && (await page.textContent('#cellbar')).includes('가상 메모'));
-  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-dash-sheet.png`) });
-  await page.locator('.dz-item[data-s="샘플 대시보드"]').click();
-  await page.locator('#xs td').first().waitFor();
-  ok('화면 배치 시트는 머리글 고정 없음', (await page.locator('#xs tr.fz').count()) === 0);
+  await page.locator('.dz-seg button[data-m="v"]').click();
   await page.locator('.dz-item[data-s="__sum"]').click();
+  await page.locator('.dz-seg button[data-m="g"]').click();
+  await page.locator('#xs td').first().waitFor();
+  ok('요약의 원본(화면 배치 시트)은 머리글 고정 없음', (await page.locator('#xs tr.fz').count()) === 0);
+  await page.locator('.dz-seg button[data-m="v"]').click();
 
   // 기억하기 → 새로고침해도 바로 열림
   await page.reload();

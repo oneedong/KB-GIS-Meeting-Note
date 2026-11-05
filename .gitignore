@@ -11,3 +11,4 @@ tests/_*.png
 tests/_*.enc.json
 android/build/
 tests/_*.json
+__pycache__/

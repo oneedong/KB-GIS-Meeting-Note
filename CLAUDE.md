@@ -34,15 +34,17 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 7. 사용자에게 추가·수정 목록과 flags(이름 확인·날짜 확인·원문 잘림)를 알려준다. 평문 파일 삭제.
 
 ## "대시보드 업데이트" (대시보드 엑셀 xlsm 을 고칠 때마다 같이)
-앱 '대시보드' 탭 = 엑셀의 보이는 시트 전부(요약 카드·차트 + 시트별 표). 데이터는 암호문 `dash.enc.json` 하나.
+앱 '대시보드' 탭 = 엑셀의 보이는 시트 전부. 시트마다 '정리 화면'(지표 카드·차트·표/카드 목록, 사용자 요청: 엑셀 디자인 그대로가 아니라
+읽기 좋게)과 '엑셀 원본'(서식 그대로 격자)을 오간다. '요약' = 대시보드(Demo) 시트의 정리 화면. 데이터는 암호문 `dash.enc.json` 하나.
 1. 엑셀은 최신 결과물(사용자가 고친 파일 포함)을 기준으로 고친다. 고친 xlsm 이 확정되면
-   `python3 scripts/dash_extract.py <xlsm> <SP>/dash.json` (LibreOffice·openpyxl 필요. 출력의 시트 수·검증 n/n·머리글 행 확인)
+   `python3 scripts/dash_extract.py <xlsm> <SP>/dash.json` (LibreOffice·openpyxl 필요. 출력의 시트 수·검증 n/n·'정리 화면 블록 N개' 확인.
+   '경고 — 정리 화면을 만들지 못해…'가 나오면 그 시트 구조가 바뀐 것 → `scripts/dash_views.py`의 해당 `v_…` 함수를 고친다)
 2. `node scripts/vault.mjs encrypt <SP>/dash.json dash.enc.json --salt-from data.enc.json`
    (반드시 `--salt-from` — 미팅노트와 같은 비밀번호·salt 여야 앱이 기억된 키로 연다. 비밀번호가 다르면 스크립트가 멈춘다)
 3. `git status`로 dash.enc.json 만 올라가는지 확인 → 커밋(`dash: 대시보드 MM/DD 기준`, 숫자·기관명 쓰지 말 것) → push. 평문 dash.json 삭제.
-- 새 시트가 생기면 `dash_extract.py`의 `GROUPS`·`SHORT`에 넣는다(없으면 '기타'로 들어감). 머리글 고정이 어색한 화면 배치 시트는 `NOFREEZE`.
-- 요약 카드·차트 숫자는 `summary`(대시보드(Demo) 카드, 현금기준 'N월 부서별 수익', KPI 실적 요약, 연도별 CF '연합계(KRW', 검증, 시딩)에서 읽는다.
-  엑셀 행 구성이 바뀌어 값이 비면 추출 함수만 고친다.
+- 새 시트가 생기면 `dash_extract.py`의 `GROUPS`·`SHORT`에 넣고(없으면 '기타'), `dash_views.py`에 `v_…` 함수를 만들어 `BUILDERS`에 등록
+  (없으면 원본 격자만). 블록 형식(kpis·col·bars·table·notes·row, 표시 형식 f)은 `dash_views.py` 머리 주석. 머리글 고정이 어색한 화면 배치 시트는 `NOFREEZE`.
+- 요약의 월별 수익(Cash·발생)은 엑셀 대시보드 시트 표가 아니라 원본 시트(현금기준 'N월 부서별 수익' K, 월별 실적 C='N월' K 합)에서 1월~기준월로 다시 계산한다.
 - 점검용 가상 대시보드는 `tests/dash-fixture.json`(가상 데이터만).
 
 ## 화면 수정

@@ -5,7 +5,8 @@
 
 - 보이는 시트 전부를 LibreOffice HTML 내보내기로 읽어 '표시 형식이 적용된 글자'(1,068,088,784 · 82.38% · 2026-11-05)와
   병합·배경색·글자색·굵게·정렬을 셀 단위로 옮긴다. 수식 결과는 엑셀에 저장된 값 그대로.
-- 맨 앞 '요약'(카드·월별 수익·KPI 연도별·Fee 예상·검증)은 openpyxl 로 해당 셀을 읽는다.
+- 시트마다 '정리 화면'(지표 카드·차트·표/카드 목록)을 scripts/dash_views.py 로 만든다(openpyxl, 저장된 값).
+  한 시트의 변환이 실패하면 경고만 내고 그 시트는 원본 격자로만 보인다.
 - 평문 JSON은 저장소에 커밋하지 않는다. 암호화: node scripts/vault.mjs encrypt <SP>/dash.json dash.enc.json --salt-from data.enc.json
 필요: LibreOffice(soffice), openpyxl
 """
@@ -272,8 +273,16 @@ if "해외대체 시딩 관리판_금액, 수익률" in wb.sheetnames:
             dd = s.cell(r, 4).value
             seed["ytd"] = num(s.cell(r, 5).value); seed["ytdAsof"] = dd.strftime("%Y-%m-%d") if hasattr(dd, "strftime") else str(dd or "")
 
+# ── 3) 시트별 읽기 화면(정리 화면) — scripts/dash_views.py
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import dash_views
+views, vwarn = dash_views.build_views(wb, [s["name"] for s in out_sheets], {"asof": asof, "wb": wb, "kpi": kpi})
+for s in out_sheets:
+    if s["name"] in views: s["view"] = views[s["name"]]
+for w in vwarn: print("경고 — 정리 화면을 만들지 못해 원본 격자만 보임:", w, file=sys.stderr)
+
 data = {
-    "kind": "dashboard", "v": 1,
+    "kind": "dashboard", "v": 2,
     "generatedAt": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).strftime("%Y-%m-%d %H:%M"),
     "source": os.path.basename(SRC), "asof": asof,
     "fx": {"usd": num(cfg.get("환율(원/USD)")), "eur": num(cfg.get("환율(원/EUR)"))},
@@ -282,8 +291,13 @@ data = {
     "styles": styles,
     "sheets": out_sheets,
 }
-json.dump(data, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"), default=str)
+def _clean(o):
+    if isinstance(o, float): return round(o, 6)
+    if isinstance(o, dict): return {k: _clean(v) for k, v in o.items()}
+    if isinstance(o, list): return [_clean(v) for v in o]
+    return o
+json.dump(_clean(data), open(OUT, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"), default=str)
 shutil.rmtree(tmp, ignore_errors=True)
 print(f"dash.json → {OUT}  시트 {len(out_sheets)}개 · 셀 {sum(len(r) for s in out_sheets for r in s['rows']):,}개 · "
       f"{os.path.getsize(OUT)/1e6:.1f}MB · 검증 {chk['ok']}/{chk['n']} · 기준일 {asof}")
-for s in out_sheets: print(f"  [{s['group']}] {s['name']}: {len(s['rows'])}행 × {len(s['cols'])}열 (머리글 {s['hs']+1}~{s['hdr']}행)")
+for s in out_sheets: print(f"  [{s['group']}] {s['name']}: {len(s['rows'])}행 × {len(s['cols'])}열 · 정리 화면 {'블록 ' + str(len(s['view'])) + '개' if s.get('view') else '없음(원본만)'}")
