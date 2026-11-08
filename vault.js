@@ -2,7 +2,7 @@
  * 암호화된 미팅노트 사본(data.enc.json) 열기 — AES-256-GCM, 키는 PBKDF2-SHA256으로 비밀번호에서 만든다.
  * 비밀번호 자체는 어디에도 저장하지 않는다. "이 기기에서 기억하기"를 켜면 만들어진 키만
  * 내보낼 수 없는(non-extractable) 형태로 이 기기의 IndexedDB에 둔다. 잠그기를 누르면 지운다.
- * 파일 형식은 scripts/encrypt.mjs 와 같아야 한다.
+ * 파일 형식은 scripts/vault.mjs 와 같아야 한다.
  */
 const Vault = (() => {
   const DATA = "data.enc.json", IDB = "kb-gis-meeting-note", STORE = "keys", SLOT = "data";

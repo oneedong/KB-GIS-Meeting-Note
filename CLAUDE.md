@@ -11,6 +11,7 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 ## 절대 규칙
 - 평문 데이터(복호화한 data.json, patch.json, 사용자가 준 미팅노트 원문 txt 등)는 저장소 밖(스크래치패드)에만 두고 커밋하지 않는다.
   저장소에 들어가는 데이터는 암호문 `data.enc.json`·`dash.enc.json` 둘뿐. 커밋 전 `git status`로 확인.
+  (`.gitignore`·CI 가 data/dash/patch/posts .json·txt·eml·zip·엑셀·csv 를 막는다)
 - 비밀번호를 파일·커밋·코드·로그·커밋 메시지에 남기지 않는다. 환경변수 `MEETING_DB_PASSWORD`로만 넘긴다
   (환경 설정에 있으면 그대로, 없으면 사용자에게 묻는다).
 - `tests/fixture.json`·`tests/dash-fixture.json`은 가상 데이터만.
@@ -57,6 +58,9 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 - 검색(`terms`/`hits`): 여러 단어는 모두 포함, 각 단어는 기관 aliases(교공→한국교직원공제회)와 `SYN` 한·영 묶음으로 넓힘.
   `SYN`은 공개 코드라 일반 GP명·업계 용어만(고객·인물 이름 금지). 새 약칭은 DB의 orgs.aliases 에 넣으면 검색에 바로 반영.
 - 화면 파일을 바꾸면 `sw.js`의 `CACHE` 버전을 올린다.
+- `index.html`에 보안 정책(CSP): 스크립트는 사이트 파일+인라인 2개(해시), 통신은 같은 사이트로만(`connect-src 'self'` — 푼 데이터가 밖으로 못 나감).
+  인라인 `<script>`를 고치거나 외부 주소를 더하면 `node scripts/csp.mjs`(점검은 `--check`, smoke 에 포함).
+- 새 버전 배포는 앱을 내렸을 때(다른 앱·홈) 새로 연다 — 읽는 도중에 갑자기 다시 열리지 않게.
 - 아이콘: `node scripts/gen-icons.mjs note icons` (Market 아이콘은 `market`).
 - 점검: `node tests/smoke.mjs` (Playwright, 가상 데이터).
 

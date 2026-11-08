@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-IDM/IKX7kNXZXDeUXvE3KA6xe5668+DJWFoIWfrGdKY=' 'sha256-Vd+7v+TmGvOaxDR2b+u6liYYtJh4Z9KHMbZepneAvNM='; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>KB GIS Meeting Note</title>
 <meta name="description" content="글로벌상품영업부 LP·GP 미팅노트 DB (암호화)">
@@ -153,8 +154,10 @@
     var refreshing = false, hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (refreshing || !hadController) return;   // 첫 설치 때는 새로고침하지 않음(비밀번호 입력 중일 수 있음)
-      refreshing = true;
-      window.location.reload();
+      // 읽는 도중 화면이 갑자기 새로 열리지 않게, 앱을 내렸을 때(다른 앱·홈 화면·탭 전환) 새 버전으로 다시 연다
+      var go = function () { if (refreshing) return; refreshing = true; window.location.reload(); };
+      if (document.visibilityState === 'hidden') go();
+      else document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') go(); });
     });
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })

@@ -5,6 +5,14 @@ dash.json
 live/
 export/
 *.xlsx
+# 미팅노트 갱신 때 쓰는 평문(카톡 내보내기·patch·posts)과 엑셀 원본
+*.txt
+*.eml
+*.zip
+*.xlsm
+*.xls
+patch*.json
+posts*.json
 *.csv
 node_modules/
 tests/_*.png

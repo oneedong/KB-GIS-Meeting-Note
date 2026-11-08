@@ -46,6 +46,9 @@ const ok = (name, cond) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}`); 
   ok('원문에 없는 숫자가 든 요약정리는 저장 거부', !run({ meetings: [{ ...base, body: '*최근 투자현황/계획\n- 올해 PD 3건, USD 50mn 투자 예정\n--> 하반기 재접촉' }] }));
 }
 
+// 보안 정책(CSP): 인라인 스크립트 해시가 index.html 과 맞는지
+ok('CSP 해시 맞음', (() => { try { execFileSync(process.execPath, [join(ROOT, 'scripts/csp.mjs'), '--check'], { stdio: 'pipe' }); return true; } catch { return false; } })());
+
 const browser = await chromium.launch();
 for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', width: 1280, height: 860 }]) {
   console.log(`— ${vp.name} ${vp.width}×${vp.height}`);
