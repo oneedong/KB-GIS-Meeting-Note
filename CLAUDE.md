@@ -68,5 +68,7 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 - `android/`: 웹앱 주소를 전체 화면 WebView로 여는 앱(패키지 `io.github.oneedong.kbgis.meetingnote`). DB 갱신과 무관.
 - 이 세션 컨테이너에서는 Android SDK(dl.google.com)를 받을 수 없어 로컬 빌드 불가. `android/**`를 push하면
   GitHub Actions가 빌드해 Release `android`에 올린다. 실패 시 로그는 `gh release view android-build-log`의 본문.
+- `android.yml`은 아직 `ubuntu-latest`(2026-11 부터 26.04). 고치면 APK 가 새로 빌드돼(새 서명) 재설치가 필요하니, 다음에 앱 소스를 바꿀 때 같이 `ubuntu-24.04`로.
+  (`app-check.yml`은 Playwright 1.56 이 26.04 를 지원하지 않아 `ubuntu-24.04`로 고정)
 - 서명 키는 빌드마다 새로 생성(공개 저장소라 키를 두지 않음) → 새 APK는 기존 앱 삭제 후 설치. 앱 소스는 꼭 필요할 때만 바꾼다.
 - 아이콘: `node scripts/gen-icons.mjs note android/res --android`.
