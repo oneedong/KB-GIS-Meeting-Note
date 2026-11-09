@@ -31,6 +31,9 @@ SHORT = {"대시보드(Demo)": "대시보드 시트", "(총정리) 연도별 CF"
 
 NOFREEZE = {"대시보드(Demo)"}   # 표가 아니라 화면 배치인 시트는 머리글 고정 안 함
 
+# 엑셀에만 두고 앱에는 아직 올리지 않는 시트(사용자 요청 — 자료를 더 정리한 뒤 앱에 반영). 앱에 올릴 때 여기서 빼고 GROUPS 에 넣는다.
+EXCEL_ONLY = {"약정내역(2010~2021)", "약정 통계", "기관별 약정(2010~현재)"}
+
 # ── 1) LibreOffice HTML 내보내기
 tmp = tempfile.mkdtemp(prefix="dashx_")
 shutil.copy(SRC, os.path.join(tmp, "src.xlsm"))
@@ -186,6 +189,7 @@ def pack(sh):
 order = {n: (gi, i) for gi, (_, names) in enumerate(GROUPS) for i, n in enumerate(names)}
 out_sheets = []
 for sh in sheets:
+    if sh["name"] in EXCEL_ONLY: continue
     pk = pack(sh)
     if not pk["rows"]: continue
     gi, i = order.get(sh["name"], (len(GROUPS), 0))
