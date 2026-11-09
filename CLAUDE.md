@@ -43,6 +43,7 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 2. `node scripts/vault.mjs encrypt <SP>/dash.json dash.enc.json --salt-from data.enc.json`
    (반드시 `--salt-from` — 미팅노트와 같은 비밀번호·salt 여야 앱이 기억된 키로 연다. 비밀번호가 다르면 스크립트가 멈춘다)
 3. `git status`로 dash.enc.json 만 올라가는지 확인 → 커밋(`dash: 대시보드 MM/DD 기준`, 숫자·기관명 쓰지 말 것) → push. 평문 dash.json 삭제.
+- 2022년~ 약정 시트 이름은 '약정내역(2022~현재)'(2026-11-09, 예전 '약정내역&수수료' — 코드는 두 이름 다 받음). 약정 통계의 펀드 수·기관 수는 수식(13행 확인 칸).
 - 엑셀에만 두고 앱에는 아직 안 올리는 시트는 `dash_extract.py`의 `EXCEL_ONLY`(지금은 없음).
 - '약정 이력' 묶음(2026-11-09 추가): 약정 통계(`v_stats` — 절 번호로 찾음, 2단 머리글은 합계 열만 기본·시트별 값은 펼침, '#,##0.0,,' 칸은 USD M)·기관별 약정(`v_orgs` — 회색 요약 행 = 묶음 머리)·약정내역(2010~2021)(`v_hist` — 약정연도별 묶음, 상태·금감원 보고 필터).
 - 새 시트가 생기면 `dash_extract.py`의 `GROUPS`·`SHORT`에 넣고(없으면 '기타'), `dash_views.py`에 `v_…` 함수를 만들어 `BUILDERS`에 등록

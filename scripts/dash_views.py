@@ -696,7 +696,7 @@ def v_cf(s, ctx):
     return blocks
 
 
-# ── 약정내역&수수료 · KPI보고용 ─────────────────────────────────────────────
+# ── 약정내역(2022~현재) (예전 이름 약정내역&수수료) · KPI보고용 ─────────────────────────────────────────────
 
 def v_commit(s, ctx, kpi_sheet=False):
     h = s.find(lambda x: x.strip() == "운용사(GP)", 1, 30)
@@ -1542,7 +1542,7 @@ def v_stats(s, ctx):
             kpi("금감원 보고 중", tot.get("K"), "n0", "건", "보고 여부 O", tone="ok"),
             kpi("미보고", tot.get("L"), "n0", "건", "청산·양도·보고 생략 제외", tone="warn"),
         ]})
-    nt = [x for x in [intro, f"EUR→USD 환산율 {rate:.4f} (약정내역&수수료 시트 환율)" if rate else None] if x]
+    nt = [x for x in [intro, f"EUR→USD 환산율 {rate:.4f} (약정내역(2022~현재) 시트 환율)" if rate else None] if x]
     if nt: blocks.append({"t": "notes", "items": nt})
     # 2. 연도별 차트
     x2 = sec(2)
@@ -1668,7 +1668,8 @@ BUILDERS = {
     "2026 현금기준 수익": v_cash,
     "2026년 월별 실적": v_monthly,
     "(총정리) 연도별 CF": v_cf,
-    "약정내역&수수료": lambda s, c: v_commit(s, c, False),
+    "약정내역(2022~현재)": lambda s, c: v_commit(s, c, False),
+    "약정내역&수수료": lambda s, c: v_commit(s, c, False),   # 예전 이름(2026-11-09 전 파일)
     "KPI 실적 요약": v_kpi,
     "KPI보고용": lambda s, c: v_commit(s, c, True),
     "약정내역(2010~2021)": v_hist,
