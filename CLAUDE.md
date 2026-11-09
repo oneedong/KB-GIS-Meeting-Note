@@ -44,9 +44,12 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
    (반드시 `--salt-from` — 미팅노트와 같은 비밀번호·salt 여야 앱이 기억된 키로 연다. 비밀번호가 다르면 스크립트가 멈춘다)
 3. `git status`로 dash.enc.json 만 올라가는지 확인 → 커밋(`dash: 대시보드 MM/DD 기준`, 숫자·기관명 쓰지 말 것) → push. 평문 dash.json 삭제.
 - 새 시트가 생기면 `dash_extract.py`의 `GROUPS`·`SHORT`에 넣고(없으면 '기타'), `dash_views.py`에 `v_…` 함수를 만들어 `BUILDERS`에 등록
-  (없으면 원본 격자만). 블록 형식(kpis·col·bars·table·notes·row, 표시 형식 f)은 `dash_views.py` 머리 주석. 머리글 고정이 어색한 화면 배치 시트는 `NOFREEZE`.
+  (없으면 원본 격자만). 블록 형식(kpis·col·bars·table·notes·row·tabs, 표시 형식 f)은 `dash_views.py` 머리 주석. 머리글 고정이 어색한 화면 배치 시트는 `NOFREEZE`.
 - 요약의 월별 수익(Cash·발생)은 엑셀 대시보드 시트 표가 아니라 원본 시트(현금기준 'N월 부서별 수익' K, 월별 실적 C='N월' K 합)에서 1월~기준월로 다시 계산한다.
 - 점검용 가상 대시보드는 `tests/dash-fixture.json`(가상 데이터만).
+- 'KPI 실적 요약'은 연도별로 정리(사용자 요청, `dash_views.kpi_by_year`): 연도별 한눈에(차트·표) → 연도 단추(`tabs` 블록: 그 해 지표 카드·제출 근거·
+  그 해 PA·판매규모 목록) → 산출 기준. 표 제목의 'YYYY년'으로 연도를 나눈다. 절 번호(4.~11.)는 산출 기준 문장이 가리키므로 남긴다.
+  엑셀 구조가 달라 묶지 못하면 경고 후 예전처럼 절 순서대로.
 
 ## 화면 수정
 - `app.js`/`app.css`는 아티팩트 페이지(lp_meeting_db.html) 원본에서 저장 기능·약어 사전을 뺀 것. KB 노랑·회색 토큰.

@@ -3,7 +3,7 @@
 엑셀 격자를 그대로 옮기지 않고, 시트마다 내용에 맞는 블록으로 다시 묶는다.
   kpis   지표 카드          table  표(PC)·카드 목록(휴대폰) — 묶음(secs)·필터·정렬·찾기·펼침(x)
   bars   가로 막대(순위)    col    세로 막대(월별·연도별, 여러 계열·누적)    notes  안내 문장
-  row    블록 나란히(PC)
+  row    블록 나란히(PC)      tabs   단추로 하나씩 보기 {items:[{k, l, blocks}], sel} (연도별 등)
 값은 가공하지 않은 숫자로 두고 표시 형식(f)만 붙인다. 화면에서 형식을 입힌다.
   f: won(원) wk(원→억) eok(억) eok1 usd usd2 musd n0 n1 n2 pct pct0 pct2 x2 date text tag bar months amt(통화+금액)
 시트 구조가 바뀌어 한 시트의 변환이 실패하면 그 시트만 원본 격자로 보이고(경고 출력) 나머지는 그대로 만든다.
@@ -797,10 +797,117 @@ def v_commit(s, ctx, kpi_sheet=False):
 # ── KPI 실적 요약(문서형: 번호 붙은 절마다 표·문장) ───────────────────────────
 
 def v_kpi(s, ctx):
-    blocks = []
-    title = s.t(1, 1) or s.t(1, 2)
+    """연도별로 정리(사용자 요청): 연도별 한눈에(차트·표) → 연도 단추(지표 카드·제출 근거·그 해 PA·판매규모 목록) → 산출 기준.
+    엑셀 구조가 달라 연도별로 묶지 못하면 예전처럼 절 순서대로 보여준다."""
+    secs = kpi_sections(s)
     sub = s.t(2, 1) or s.t(2, 2)
-    if sub: blocks.append({"t": "notes", "items": [sub]})
+    try:
+        return kpi_by_year(secs, sub)
+    except Exception as e:  # noqa: BLE001
+        print(f"  경고 — KPI 실적 요약 연도별 정리 실패({e}) → 절 순서대로 표시")
+    blocks = [{"t": "notes", "items": [sub]}] if sub else []
+    for n, head, b in secs:
+        if b["t"] == "table" and n >= 4:
+            b["fold"] = True; b["sub"] = f"{len(b['rows'])}건"
+        blocks.append(b)
+    return blocks
+
+
+def kpi_by_year(secs, sub):
+    def ck(b, *keys):
+        for c in b["cols"]:
+            lab = c["l"].replace(" ", "")
+            if all(k in lab for k in keys): return c["k"]
+        return None
+    def need(b, *keys):
+        k = ck(b, *keys)
+        if not k: raise ValueError(f"'{b.get('title')}' 에 {'·'.join(keys)} 열 없음")
+        return k
+    tables = [(n, hd, b) for n, hd, b in secs if b["t"] == "table"]
+    s1 = next(b for n, hd, b in tables if ck(b, "연도") and ck(b, "판매규모", "목표"))
+    K = {"y": need(s1, "연도"), "tg": need(s1, "판매규모", "목표"), "ku": ck(s1, "KPI보고", "USD"), "kj": need(s1, "KPI보고", "조원"),
+         "kr": need(s1, "달성률", "KPI"), "cu": ck(s1, "약정실적", "USD"), "cj": need(s1, "약정실적", "조원"), "cr": ck(s1, "달성률", "약정실적"),
+         "pt": need(s1, "PA", "목표"), "pa": need(s1, "PA", "실적"), "pr": ck(s1, "PA", "달성률"), "nt": ck(s1, "비고")}
+    s2 = next((b for n, hd, b in tables if b is not s1 and ck(b, "연도") and ck(b, "수익", "실적")), None)
+    R = {"y": need(s2, "연도"), "tg": ck(s2, "수익", "목표"), "v": need(s2, "수익", "실적"), "r": ck(s2, "달성률"), "nt": ck(s2, "근거")} if s2 else {}
+    yrs = {}
+    for r in s1["rows"]:
+        y = r["c"].get(K["y"])
+        if isinstance(y, int): yrs[y] = {"k": r["c"]}
+    if not yrs: raise ValueError("연도 행 없음")
+    for r in (s2["rows"] if s2 else []):
+        y = r["c"].get(R["y"])
+        if y in yrs: yrs[y]["r"] = r["c"]
+    # 그 해 절(제목의 첫 'YYYY년')과 나머지(산출 기준 등)
+    per, common = {y: [] for y in yrs}, []
+    for n, hd, b in secs:
+        if b is s1 or b is s2: continue
+        m = re.search(r"(20\d\d)년", hd)
+        if m and int(m.group(1)) in per and b["t"] == "table":
+            # 절 번호는 남긴다(산출 기준 문장이 '아래 9번'처럼 가리킴). 연도는 단추에 있으니 제목에서 뺀다
+            b = dict(b, title=hd.replace(f"{m.group(1)}년 ", "", 1), fold=True, sub=f"{len(b['rows'])}건")
+            # 휴대폰 카드: 번호 대신 상대방·기관을 제목으로
+            t_ = ck(b, "계약상대방") or ck(b, "기관")
+            if t_:
+                b["card"] = {"title": t_, "sub": [k for k in (ck(b, "운용사"), ck(b, "관련펀드") or ck(b, "펀드")) if k],
+                             "meta": [k for k in (ck(b, "체결일") or ck(b, "약정월"), ck(b, "계약종류")) if k],
+                             **({"amt": ck(b, "USD환산") or ck(b, "약정금액")} if (ck(b, "USD환산") or ck(b, "약정금액")) else {})}
+            per[int(m.group(1))].append(b)
+        else:
+            common.append(b)
+
+    def f2(v): return f"{v:,.2f}" if isinstance(v, (int, float)) else str(v)
+    def pc(v): return f"{v * 100:.1f}%" if isinstance(v, (int, float)) else "-"
+    def tone(v): return None if not isinstance(v, (int, float)) else ("ok" if v >= 1 else "warn")
+    items = []
+    for y in sorted(yrs, reverse=True):
+        k, rv = yrs[y]["k"], yrs[y].get("r") or {}
+        g = lambda key: k.get(K[key]) if K.get(key) else None
+        cards = [kpi("판매규모 (KPI 보고)", g("kj"), "n2", "조원",
+                     s=" · ".join(x for x in [f"목표 {f2(g('tg'))}조원", f"달성률 {pc(g('kr'))}", f"USD {g('ku'):,.1f}M" if isinstance(g("ku"), (int, float)) else ""] if x),
+                     pct=g("kr"), tone=tone(g("kr"))),
+                 kpi("약정 실적", g("cj"), "n2", "조원",
+                     s=" · ".join(x for x in [f"USD {g('cu'):,.1f}M" if isinstance(g("cu"), (int, float)) else "", f"목표 대비 {pc(g('cr'))}" if g("cr") is not None else ""] if x) or None),
+                 kpi("신규 PA", g("pa"), "n0", "건", s=f"목표 {g('pt')}건 · 달성률 {pc(g('pr'))}", pct=g("pr"), tone=tone(g("pr")))]
+        if rv:
+            rt, rr = rv.get(R.get("tg")) if R.get("tg") else None, rv.get(R.get("r")) if R.get("r") else None
+            cards.append(kpi("수익 (현금기준)", rv.get(R["v"]), "n2", "억원",
+                             s=(f"목표 {f2(rt)}억원 · 달성률 {pc(rr)}" if isinstance(rt, (int, float)) else (f"목표 {rt}" if rt else None)),
+                             pct=rr if isinstance(rr, (int, float)) else None, tone=tone(rr)))
+        blocks = [{"t": "kpis", "id": f"k{y}", "items": cards}]
+        why = [x for x in [g("nt"), ("수익: " + str(rv.get(R["nt"]))) if rv and R.get("nt") and rv.get(R["nt"]) else None] if x]
+        if why: blocks.append({"t": "notes", "title": "제출 근거", "items": why})
+        blocks += per[y]
+        items.append({"k": str(y), "l": f"{y}년", "blocks": blocks})
+
+    ys = sorted(yrs)
+    gk = lambda y, key: yrs[y]["k"].get(K[key]) if K.get(key) else None
+    out = [{"t": "notes", "items": [sub]}] if sub else []
+    out.append({"t": "row", "blocks": [
+        {"t": "col", "id": "ysale", "title": "판매규모", "sub": "조원 · 목표 vs KPI 보고 vs 약정 실적", "cats": [str(y) for y in ys], "f": "n2",
+         "series": [{"n": "목표", "v": [gk(y, "tg") or 0 for y in ys]}, {"n": "KPI 보고", "v": [gk(y, "kj") or 0 for y in ys]},
+                    {"n": "약정 실적", "v": [gk(y, "cj") or 0 for y in ys]}]},
+        {"t": "col", "id": "ypa", "title": "신규 PA", "sub": "건 · 목표 vs 실적", "cats": [str(y) for y in ys], "f": "n0",
+         "series": [{"n": "목표", "v": [gk(y, "pt") or 0 for y in ys]}, {"n": "실적", "v": [gk(y, "pa") or 0 for y in ys]}]}]})
+    rows = []
+    for y in sorted(yrs, reverse=True):
+        c = {"y": y, "tg": gk(y, "tg"), "kj": gk(y, "kj"), "kr": gk(y, "kr"), "cj": gk(y, "cj"), "pt": gk(y, "pt"), "pa": gk(y, "pa"), "pr": gk(y, "pr")}
+        rv = yrs[y].get("r")
+        if rv and isinstance(rv.get(R["v"]), (int, float)): c["rv"] = rv[R["v"]]
+        rows.append({"c": {a: b for a, b in c.items() if b is not None}})
+    out.append({"t": "table", "id": "yall", "title": "연도별 한눈에", "sub": "판매규모 조원 · PA 건 · 수익 억원(현금기준)", "compact": True, "rows": rows,
+                "cols": [col("y", "연도", "int"), col("tg", "판매 목표", "n2"), col("kj", "KPI 보고", "n2"), col("kr", "달성률", "pct"),
+                         col("cj", "약정 실적", "n2"), col("pt", "PA 목표", "n0"), col("pa", "PA 실적", "n0"), col("pr", "PA 달성률", "pct"),
+                         col("rv", "수익", "n2")],
+                "card": {"title": "y", "meta": ["kj", "kr", "pa"]}})
+    out.append({"t": "tabs", "id": "yr", "title": "연도별 상세", "items": items, "sel": items[0]["k"]})
+    out += common
+    return out
+
+
+def kpi_sections(s):
+    """번호 붙은 절(1. 2. …)을 차례대로 [(번호, 제목, 블록)]."""
+    secs = []
     r = 3
     while r <= s.maxr:
         t = s.t(r, 1) or s.t(r, 2)
@@ -816,22 +923,20 @@ def v_kpi(s, ctx):
         while end + 1 <= s.maxr and not s.empty(end + 1, 1, 15) and not re.match(r"^\d+\.\s", (s.t(end + 1, 1) or s.t(end + 1, 2) or "").strip()):
             end += 1
         m = re.match(r"^(\d+)\.", head)
-        fold = int(m.group(1)) >= 4
         if len(filled) >= 3:
             c1 = max(c for c in range(1, 16) if any(s.v(x, c) is not None for x in range(nxt, end + 1)))
-            b = generic_table(s, nxt, nxt + 1, end, min(filled), c1, title=head, tid=f"s{m.group(1)}", fold=fold)
+            b = generic_table(s, nxt, nxt + 1, end, min(filled), c1, title=head, tid=f"s{m.group(1)}")
             # 표 아래 ※ 줄은 각주로
             notes = [row for row in b["rows"] if str(next(iter(row["c"].values()), "")).startswith("※")]
             if notes:
                 b["rows"] = [x for x in b["rows"] if x not in notes]
                 b["notes"] = [" ".join(str(v) for v in x["c"].values()) for x in notes]
-            if fold: b["sub"] = f"{len(b['rows'])}건"
-            blocks.append(b)
         else:
             items = [" ".join(str(s.v(x, c)) for c in range(1, 16) if s.v(x, c) is not None) for x in range(nxt, end + 1)]
-            blocks.append({"t": "notes", "title": head, "items": [i for i in items if i]})
+            b = {"t": "notes", "title": head, "items": [i for i in items if i]}
+        secs.append((int(m.group(1)), head, b))
         r = end + 1
-    return blocks
+    return secs
 
 
 # ── 2026년 계약서 ────────────────────────────────────────────────────────────

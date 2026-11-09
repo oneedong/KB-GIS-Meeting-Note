@@ -108,7 +108,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('대시보드 차트(2계열 범례)', (await page.locator('#dzBody svg.ch path').count()) >= 5 && (await page.locator('#dzBody .lg span').count()) === 2);
   ok('순위 막대', (await page.locator('#dzBody .hb-r').count()) === 3);
   ok('검증 배지', (await page.textContent('#dzMain .ck')).includes('3/3'));
-  ok('요약에 시트 바로가기', (await page.locator('#dzBody .qk').count()) === 1);
+  ok('요약에 시트 바로가기', (await page.locator('#dzBody .qk').count()) === 2);
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-dash.png`), fullPage: vp.width < 760 });
   await page.fill('#gq', 'Demo Partners'); await page.waitForTimeout(400);
   ok('전체 찾기', (await page.locator('#dzBody .gres li').count()) >= 6 && (await page.textContent('#dzBody .gres')).includes('샘플 수익표'));
@@ -141,6 +141,20 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator('#xs td').first().waitFor();
   ok('요약의 원본(화면 배치 시트)은 머리글 고정 없음', (await page.locator('#xs tr.fz').count()) === 0);
   await page.locator('.dz-seg button[data-m="v"]').click();
+
+  // 연도별 묶음(tabs, KPI 실적 요약): 처음엔 최근 연도, 단추로 그 해 카드·근거·목록으로 바뀐다
+  await page.locator('.dz-item[data-s="가상 연도별"]').click();
+  await page.locator('#dzBody .yseg button').first().waitFor();
+  const ypanel = () => page.textContent('#dzBody .ypanel');
+  ok('연도 단추·처음엔 최근 연도', (await page.locator('#dzBody .yseg button').count()) === 2
+    && (await page.getAttribute('#dzBody .yseg button[data-k="2026"]', 'aria-pressed')) === 'true' && (await ypanel()).includes('가상 근거 2026'));
+  await page.locator('#dzBody .yseg button[data-k="2025"]').click();
+  ok('연도 바꾸기', (await ypanel()).includes('가상 근거 2025') && !(await ypanel()).includes('가상 근거 2026')
+    && (await page.textContent('#dzBody .ypanel .fold summary')).includes('2건'));
+  await page.locator('#dzBody .ypanel .fold summary').click();
+  ok('그 해 목록 펼치기', (await page.textContent('#dzBody .ypanel .fold')).includes('가상 GP 2025-2'));
+  ok('연도 화면 가로 넘침 없음', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  await page.locator('.dz-item[data-s="__sum"]').click();
 
   // 기억하기 → 새로고침해도 바로 열림
   await page.reload();

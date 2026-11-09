@@ -29,6 +29,13 @@ body.dashmode .page{max-width:1680px}
 
 /* 블록 */
 .blk{min-width:0}
+/* 연도별 묶음(tabs): 단추 줄 + 고른 연도의 블록들 */
+.ytabs{display:flex;flex-direction:column;gap:12px}
+.ytabs>.bh{margin:0}
+.yseg{align-self:flex-start;max-width:100%;overflow-x:auto;scrollbar-width:none;flex:none}
+.yseg::-webkit-scrollbar{display:none}
+.yseg button{white-space:nowrap;padding:7px 16px;font-size:14px}
+.ypanel{display:flex;flex-direction:column;gap:14px;min-width:0}
 .pnl{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
 .bh{display:flex;gap:8px 12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 10px}
 .bh h3,.pnl>h3{margin:0;font:700 14.5px/1.35 var(--f-display)}
@@ -268,6 +275,7 @@ body.dashmode .page{max-width:1680px}
 /* 휴대폰 */
 @media (max-width:760px){
   .dz{gap:12px}
+  .yseg{align-self:stretch}.yseg button{flex:1;padding:8px 2px;font-size:13.5px}   /* 연도 단추 다섯 개가 한 줄에 다 보이게 */
   .dz-nav{margin:0 -16px;border-radius:0;border-left:0;border-right:0;padding:8px 16px}
   .dz-head{align-items:flex-start}
   .dz-head h2{font-size:19px}

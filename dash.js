@@ -36,7 +36,7 @@ const Dash = (() => {
       (b.secs || [{ rows: b.rows || [] }]).forEach((sec) => sec.rows.forEach((r) => { r._i = n++; }));
     }));
   }
-  function walk(blocks, fn) { blocks.forEach((b) => { if (b.t === "row") walk(b.blocks, fn); else fn(b); }); }
+  function walk(blocks, fn) { blocks.forEach((b) => { if (b.t === "row") walk(b.blocks, fn); else if (b.t === "tabs") b.items.forEach((x) => walk(x.blocks, fn)); else fn(b); }); }
   const sheetBy = (n) => D.sheets.find((s) => s.name === n);
   const hasView = (s) => s && Array.isArray(s.view) && s.view.length;
 
@@ -124,6 +124,11 @@ const Dash = (() => {
       const cls = b.ratio === "2:1" ? " r21" : "";
       return `<div class="brow${cls}" style="--n:${b.blocks.length}">${b.blocks.map((x, i) => blockHtml(x, `${key}.${x.id || i}`, mounts)).join("")}</div>`;
     }
+    if (b.t === "tabs") {
+      mounts.push(() => mountTabs(id, b, key));
+      const btns = b.items.map((x) => `<button type="button" data-k="${h(x.k)}" aria-pressed="false">${h(x.l)}</button>`).join("");
+      return `<section class="blk ytabs" id="${id}">${head(b)}<div class="seg yseg" role="group" aria-label="${h(b.title || "선택")}">${btns}</div><div class="ypanel"></div></section>`;
+    }
     if (b.t === "kpis") return kpisHtml(b);
     if (b.t === "notes") return `<section class="blk notes">${b.title ? `<h3>${h(b.title)}</h3>` : ""}<ul>${b.items.map((x) => `<li>${h(x)}</li>`).join("")}</ul></section>`;
     if (b.t === "links") return linksHtml();
@@ -132,6 +137,21 @@ const Dash = (() => {
     if (b.t === "bars") { mounts.push(() => mountBars(id, b, key)); return `<section class="blk pnl" id="${id}"></section>`; }
     if (b.t === "table") { mounts.push(() => mountTable(id, b, key)); return b.fold ? `<details class="blk fold" id="${id}"><summary>${h(b.title || "")}${b.sub ? ` <small>${h(b.sub)}</small>` : ""}</summary><div class="fold-in"></div></details>` : `<section class="blk pnl tbl${b.compact ? " compact" : ""}" id="${id}"></section>`; }
     return "";
+  }
+  // 연도 등으로 나눈 묶음(tabs): 단추로 하나씩 보여준다. 고른 것은 앱을 닫을 때까지 유지
+  const tabSel = {};
+  function mountTabs(id, b, key) {
+    const el = document.getElementById(id); if (!el || !b.items.length) return;
+    const paintTab = (k) => {
+      const it = b.items.find((x) => x.k === k) || b.items[0];
+      tabSel[key] = it.k;
+      $$(".yseg button", el).forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.k === it.k)));
+      const ms = [];
+      $(".ypanel", el).innerHTML = it.blocks.map((x, i) => blockHtml(x, `${key}.${it.k}.${x.id || i}`, ms)).join("");
+      ms.forEach((fn) => fn());
+    };
+    $$(".yseg button", el).forEach((x) => x.onclick = () => paintTab(x.dataset.k));
+    paintTab(tabSel[key] || b.sel || b.items[0].k);
   }
   const head = (b, extra = "") => (b.title || extra) ? `<div class="bh"><h3>${h(b.title || "")}${b.sub ? ` <small>${h(b.sub)}</small>` : ""}</h3>${extra}</div>` : "";
 
