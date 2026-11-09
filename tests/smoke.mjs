@@ -129,6 +129,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator('.dz-seg button[data-m="g"]').click();
   await page.locator('#xs td').first().waitFor();
   ok('엑셀 원본 표', (await page.locator('#xs tr').count()) >= 40);
+  await page.locator('#xs tr.fz').first().waitFor({ timeout: 3000 }).catch(() => {});   // 고정은 다음 화면 프레임에 붙는다
   ok('원본 머리글 행 고정', (await page.locator('#xs tr.fz').count()) === 1 && (await page.locator('#xs tr.fz').textContent()).includes('운용사'));
   await page.fill('#shq', 'Demo Partners'); await page.waitForTimeout(350);
   ok('원본 안 찾기', /^1\/\d+$/.test((await page.textContent('#shn')).trim()) && (await page.locator('#xs td.cur').count()) === 1);
