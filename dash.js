@@ -258,6 +258,7 @@ const Dash = (() => {
     const y = (v) => T + (hi - v) / (hi - lo || 1) * (H - T - B), z = y(0);
     const bw = (W - L - R) / n, gw = bw * (stack || S.length === 1 ? 0.56 : 0.74), sw = stack ? gw : gw / S.length;
     const d = b.f === "n0" ? 0 : 1;
+    const thin = bw < 20;   // 칸이 좁으면(연도 17개를 휴대폰에서 등) 막대 위 값은 빼고(눌러서 보기) 가로축 글자는 하나 걸러
     let g = tk.map((t) => `<line class="gl${t === 0 ? " z" : ""}" x1="${L}" x2="${W - R}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}"/><text class="yl" x="${L - 6}" y="${(y(t) + 3.5).toFixed(1)}">${num(t, Math.abs(t) < 10 && t % 1 ? 1 : 0)}</text>`).join("");
     for (let i = 0; i < n; i++) {
       const x0 = L + bw * i + (bw - gw) / 2;
@@ -270,13 +271,13 @@ const Dash = (() => {
         const last = stack ? S.slice(j + 1).every((t) => !(t.v[i]) || Math.sign(t.v[i]) !== Math.sign(v)) : true;
         const p = last ? barPath(x + 0.5, sw - 1, y(a), y(e), 3) : `M${x + 0.5},${y(a)}V${y(e)}H${x + sw - 0.5}V${y(a)}Z`;
         segs += `<path d="${p}" style="fill:${col[j]}" class="${stack ? "sg" : ""}"/>`;
-        if (!stack && S.length === 1) segs += `<text class="vl" x="${(x + sw / 2).toFixed(1)}" y="${(v < 0 ? y(e) + 12 : y(e) - 5).toFixed(1)}">${num(v, Math.abs(v) >= 10 ? 1 : (d ? 2 : 0))}</text>`;
+        if (!thin && !stack && S.length === 1) segs += `<text class="vl" x="${(x + sw / 2).toFixed(1)}" y="${(v < 0 ? y(e) + 12 : y(e) - 5).toFixed(1)}">${num(v, Math.abs(v) >= 10 ? 1 : (d ? 2 : 0))}</text>`;
       });
       if (stack && (b.tot || S.length > 1)) {
         const t = b.tot ? b.tot[i] : pos + neg;
-        if (t) segs += `<text class="vl" x="${(x0 + gw / 2).toFixed(1)}" y="${(y(pos) - 5).toFixed(1)}">${num(t, d)}</text>`;
+        if (t && !thin) segs += `<text class="vl" x="${(x0 + gw / 2).toFixed(1)}" y="${(y(pos) - 5).toFixed(1)}">${num(t, d)}</text>`;
       }
-      g += `<g class="cg" data-i="${i}">${segs}<rect class="hit" x="${L + bw * i}" y="${T}" width="${bw}" height="${H - T - B}"/><text class="xl" x="${(L + bw * i + bw / 2).toFixed(1)}" y="${H - 8}">${h(b.cats[i])}</text></g>`;
+      g += `<g class="cg" data-i="${i}">${segs}<rect class="hit" x="${L + bw * i}" y="${T}" width="${bw}" height="${H - T - B}"/>${!thin || i % 2 === 0 ? `<text class="xl" x="${(L + bw * i + bw / 2).toFixed(1)}" y="${H - 8}">${h(b.cats[i])}</text>` : ""}</g>`;
     }
     const lg = S.length > 1 ? `<div class="lg">${S.map((s, j) => `<span><i style="background:${col[j]}"></i>${h(s.n)}</span>`).join("")}</div>` : "";
     return `${lg}<div class="chw"><svg class="ch" viewBox="0 0 ${W} ${H}" role="img" aria-label="${h(b.title || "")}">${g}</svg><div class="tip" hidden></div></div>`;

@@ -43,7 +43,8 @@ KB GIS Meeting Note: 글로벌상품영업부 LP·GP 미팅노트 DB 앱. 공개
 2. `node scripts/vault.mjs encrypt <SP>/dash.json dash.enc.json --salt-from data.enc.json`
    (반드시 `--salt-from` — 미팅노트와 같은 비밀번호·salt 여야 앱이 기억된 키로 연다. 비밀번호가 다르면 스크립트가 멈춘다)
 3. `git status`로 dash.enc.json 만 올라가는지 확인 → 커밋(`dash: 대시보드 MM/DD 기준`, 숫자·기관명 쓰지 말 것) → push. 평문 dash.json 삭제.
-- 엑셀에만 두고 앱에는 아직 안 올리는 시트는 `dash_extract.py`의 `EXCEL_ONLY`(2026-11-09: 2010~2021 약정·약정 통계·기관별 약정 — 사용자가 자료를 더 정리한 뒤 앱 반영).
+- 엑셀에만 두고 앱에는 아직 안 올리는 시트는 `dash_extract.py`의 `EXCEL_ONLY`(지금은 없음).
+- '약정 이력' 묶음(2026-11-09 추가): 약정 통계(`v_stats` — 절 번호로 찾음, 2단 머리글은 합계 열만 기본·시트별 값은 펼침, '#,##0.0,,' 칸은 USD M)·기관별 약정(`v_orgs` — 회색 요약 행 = 묶음 머리)·약정내역(2010~2021)(`v_hist` — 약정연도별 묶음, 상태·금감원 보고 필터).
 - 새 시트가 생기면 `dash_extract.py`의 `GROUPS`·`SHORT`에 넣고(없으면 '기타'), `dash_views.py`에 `v_…` 함수를 만들어 `BUILDERS`에 등록
   (없으면 원본 격자만). 블록 형식(kpis·col·bars·table·notes·row·tabs, 표시 형식 f)은 `dash_views.py` 머리 주석. 머리글 고정이 어색한 화면 배치 시트는 `NOFREEZE`.
 - 요약의 월별 수익(Cash·발생)은 엑셀 대시보드 시트 표가 아니라 원본 시트(현금기준 'N월 부서별 수익' K, 월별 실적 C='N월' K 합)에서 1월~기준월로 다시 계산한다.

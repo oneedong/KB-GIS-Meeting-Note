@@ -1381,6 +1381,287 @@ def v_seed(s, ctx):
 
 # ── 등록 ────────────────────────────────────────────────────────────────────
 
+# ── 약정 이력: 2010~2021 약정 · 약정 통계 · 기관별 약정 ─────────────────────────
+
+ST_TONE = {"운용 중": "ok", "운용 중 추정": "info", "확인 필요": "warn", "청산 진행": "muted", "청산": "muted", "청산 추정": "muted", "양도": "muted"}
+FS_TONE = {"O": "ok", "X": "warn", "확인 필요": "info", "O(잔고 0·청산)": "muted", "X(청산)": "muted", "X(청산 진행)": "muted",
+           "X(양도)": "muted", "X(보고 생략)": "muted"}
+
+
+def v_hist(s, ctx):
+    """약정내역(2010~2021): 약정연도별 묶음 · 상태/금감원 보고 필터 · 펼치면 근거·보수 조건."""
+    h = s.find(lambda x: x.strip() == "운용사(GP)", 1, 20, 1, 4)
+    if not h: raise ValueError("머리글 '운용사(GP)' 없음")
+    hr, cB = h
+    H = {}
+    for c in range(cB, min(s.maxc, cB + 40) + 1):
+        for rr in (hr, hr + 1):
+            t = (s.t(rr, c) or "").replace("\n", "")
+            if t and t not in H and not t.startswith("참고"): H[t] = c
+    def hc(k):
+        return next((c for t, c in H.items() if t.startswith(k)), None)
+    spec = [("ab", "펀드명 약칭", "펀드(약칭)", "text", 0), ("lp", "기관명", "기관명", "text", 0), ("gp", "운용사(GP)", "운용사", "text", 0),
+            ("ac", "자산군", "자산군", "tag", 0), ("yr", "약정연도", "약정연도", "int", 0), ("cy", "약정통화", "통화", "tag", 1),
+            ("am", "총약정금액", "총약정금액", "amt", 0), ("st", "펀드 상태", "펀드 상태", "tag", 0), ("fs", "금감원 보고", "금감원 보고", "tag", 0),
+            ("fn", "펀드명/비상장", "펀드명(전체)", "text", 1), ("it", "투자유형", "투자유형", "text", 1), ("is", "투자전략", "투자전략", "text", 1),
+            ("cd", "금융투자협회", "협회 코드", "text", 1), ("ym", "약정연월", "약정연월", "text", 1), ("q", "약정 시기", "약정 시기(원문)", "text", 1),
+            ("vi", "국내재간접", "국내재간접 운용사", "text", 1), ("ow", "미배분 공동약정", "미배분 공동약정", "amt", 1),
+            ("sb", "상태 근거", "상태 근거", "text", 1), ("so", "근거 출처", "근거 출처", "text", 1), ("on", "원문 기관명", "원문 기관명", "text", 1),
+            ("vb", "금액 근거", "금액 근거", "text", 1), ("xc", "A·B 크로스체크", "A·B 크로스체크", "text", 1), ("fe", "보수 조건", "보수 조건", "text", 1),
+            ("fr", "잔여 보수", "잔여 보수", "text", 1), ("tm", "펀드 기간", "펀드 기간", "text", 1), ("mm", "메모", "메모", "text", 1)]
+    C = {k: hc(t) for k, t, *_ in spec}
+    if not C["lp"] or not C["am"]: raise ValueError("기관명·총약정금액 열 없음")
+    by = {}
+    for r in s.rows(hr + 2):
+        lp, gp = s.t(r, C["lp"]), s.t(r, C["gp"])
+        if not lp and not gp: continue
+        c_ = {k: s.v(r, cc) for k, cc in C.items() if cc and s.v(r, cc) is not None}
+        if isinstance(c_.get("ym"), str) and re.match(r"^\d{4}-\d{2}-\d{2}", c_["ym"]): c_["ym"] = c_["ym"][:7]
+        if not c_.get("ab") and c_.get("fn"): c_["ab"] = c_["fn"]
+        y = c_.get("yr")
+        by.setdefault(y, []).append({"c": c_})
+    rows = [r for v in by.values() for r in v]
+    secs = []
+    for y in sorted(by, key=lambda x: -(x if isinstance(x, int) else 0)):
+        rs = by[y]
+        usd = sum(r["c"].get("am") or 0 for r in rs if r["c"].get("cy") == "USD")
+        eur = sum(r["c"].get("am") or 0 for r in rs if r["c"].get("cy") == "EUR")
+        sub = f"{len(rs)}건 · USD {usd / 1e6:,.1f}M" + (f" · EUR {eur / 1e6:,.1f}M" if eur else "")
+        secs.append({"h": f"{y}년" if isinstance(y, int) else str(y or "연도 미기재"), "s": sub, "rows": rs})
+    cnt = lambda k, pred: len([r for r in rows if pred(r["c"].get(k))])
+    usd = sum(r["c"].get("am") or 0 for r in rows if r["c"].get("cy") == "USD")
+    eur = sum(r["c"].get("am") or 0 for r in rows if r["c"].get("cy") == "EUR")
+    nr = cnt("fs", lambda v: isinstance(v, str) and (v.startswith("X(") or v.startswith("O(")))
+    blocks = [{"t": "kpis", "id": "k", "items": [
+        kpi("약정 건수", len(rows), "n0", "건", f"{len({r['c'].get('ab') for r in rows})}개 펀드 · {len({r['c'].get('lp') for r in rows})}개 기관"),
+        kpi("USD 약정", usd / 1e6, "n1", "USD M", f"EUR {eur / 1e6:,.1f}M 별도"),
+        kpi("금감원 보고 중", cnt("fs", lambda v: v == "O"), "n0", "건", "보고 여부 O", tone="ok"),
+        kpi("미보고", cnt("fs", lambda v: v == "X"), "n0", "건", "보고 여부 X", tone="warn"),
+        kpi("보고 대상 아님", nr, "n0", "건", "청산·청산 진행·양도·보고 생략"),
+    ]}]
+    notes = [s.t(r, cB) for r in range(1, hr) if (s.t(r, cB) or "") and r > 3]
+    if notes: blocks.append({"t": "notes", "items": notes})
+    cols = []
+    for k, _, l, f, d in spec:
+        if not C.get(k): continue
+        kw = {}
+        if f == "amt": kw["ck"] = "cy"
+        if k == "st": kw["tone"] = ST_TONE
+        if k == "fs": kw["tone"] = FS_TONE
+        if d: kw["d"] = 1
+        cols.append(col(k, l, f, **kw))
+    blocks.append(drop_empty_cols({"t": "table", "id": "hi", "title": "기관별 약정내역 (2010~2021)", "sub": "약정연도별 · 눌러서 상태 근거·보수 조건",
+                                   "cols": cols, "secs": secs,
+                                   "card": {"title": "ab", "sub": ["lp", "gp"], "amt": "am", "meta": ["yr"], "chips": ["st", "fs", "ac"]},
+                                   "filters": ["st", "fs", "ac", "gp"]}))
+    return blocks
+
+
+def stat_table(s, h1, levels, r_end, title, tid, sub=None, c0=2, c1=None, fold=False):
+    """약정 통계 절 표. 2단 머리글(시트별 묶음 + 약정 건수·USD 환산)은 '합계'만 기본 열, 시트별 값은 펼침.
+    '#,##0.0,,' 형식(백만 단위 표시)은 값을 백만으로 나눠 USD M 으로."""
+    c1 = c1 or min(s.maxc, 16)
+    defs = []
+    for c in range(c0, c1 + 1):
+        if c in s.hc: continue
+        g = s.mv(h1, c); t = s.v(h1 + 1, c) if levels == 2 else None
+        g = str(g).replace("\n", " ").strip() if g is not None else ""
+        t = str(t).replace("\n", " ").strip() if t is not None else ""
+        if not g and not t: continue
+        if levels == 2 and g and t and (h1 + 1, c) not in s.anchor:
+            if g.startswith("2010~2021"): defs.append((c, f"2010~21 {t}", 1))
+            elif g.startswith("2022~"): defs.append((c, f"2022~ {t}", 1))
+            else: defs.append((c, t, 0))
+        elif levels == 2 and g and t:
+            defs.append((c, t if g.startswith("합계") else (g if g == t else t), 0))
+        else:
+            defs.append((c, g or t, 0))
+    rows, foot, fmt = [], [], {}
+    for r in range(h1 + levels, r_end + 1):
+        if r in s.hr: continue
+        vals = {}
+        for i, (c, lab, d) in enumerate(defs):
+            x = s.v(r, c)
+            if x is None: continue
+            nf = s.ws.cell(r, c).number_format or ""
+            if i == 0: x = str(x)
+            elif isinstance(x, (int, float)) and not isinstance(x, bool):
+                if ",," in nf: x = x / 1e6; fmt.setdefault(c, "n1")
+                elif "%" in nf: fmt.setdefault(c, "pct")
+                else: fmt.setdefault(c, nf2f(nf, x) or "n0")
+            vals[CL(c)] = x
+        if not vals:
+            if rows or foot: break
+            continue
+        first = str(vals.get(CL(defs[0][0]), ""))
+        (foot if first.startswith(("합계", "총계")) else rows).append({"c": vals})
+    cols = []
+    for i, (c, lab, d) in enumerate(defs):
+        f = fmt.get(c, "text")
+        nums = [r["c"][CL(c)] for r in rows + foot if isinstance(r["c"].get(CL(c)), (int, float))]
+        if i and nums and all(float(v).is_integer() and 1990 <= v <= 2100 for v in nums) and f in ("n0", "text"): f = "int"
+        cd = col(CL(c), lab, f)
+        if d: cd["d"] = 1
+        cols.append(cd)
+    b = {"t": "table", "id": tid, "title": title, "cols": cols, "rows": rows}
+    if foot: b["foot"] = foot
+    if sub: b["sub"] = sub
+    if fold: b["fold"] = True
+    if len(rows) <= 12 and len([c for c in cols if not c.get("d")]) <= 9: b["compact"] = True
+    return drop_empty_cols(b)
+
+
+def v_stats(s, ctx):
+    """약정 통계(2010~현재): 요약 카드 → 연도별 차트 → 기관·운용사 순위 → 절별 표."""
+    heads = [(r, s.t(r, 2)) for r in range(1, s.maxr + 1) if re.match(r"^\d+\. ", s.t(r, 2) or "")]
+    if len(heads) < 5: raise ValueError("번호 붙은 절(1. 2. …) 없음")
+    def sec(n):
+        for i, (r, t) in enumerate(heads):
+            if t.startswith(f"{n}. "):
+                end = heads[i + 1][0] - 1 if i + 1 < len(heads) else s.maxr
+                return r, t, end
+        return None
+    def hdr_row(r0, end, first):
+        return next((r for r in range(r0 + 1, end + 1) if (s.t(r, 2) or "").replace("\n", " ").strip() == first), None)
+    def note(r0): return s.t(r0 + 1, 2)
+    blocks = []
+    intro = s.t(3, 2)
+    rate = s.n(4, 3)
+    # 1. 요약
+    r0, t1, e1 = sec(1)
+    h = hdr_row(r0, e1, "구분")
+    t = stat_table(s, h, 1, e1, t1[3:], "s1", note(r0))
+    tot = (t.get("foot") or [{}])[0].get("c", {})
+    parts = {r["c"].get("B"): r["c"] for r in t["rows"]}
+    a, b_ = parts.get("2010~2021 시트", {}), parts.get("2022~현재 시트", {})
+    if tot:
+        blocks.append({"t": "kpis", "id": "k", "items": [
+            kpi("약정 건수", tot.get("C"), "n0", "건", f"2010~21 {a.get('C', 0):,.0f} · 2022~ {b_.get('C', 0):,.0f}"),
+            kpi("총 약정 (USD 환산)", tot.get("I"), "n1", "USD M", f"운용 중 USD {tot.get('J') or 0:,.1f}M"),
+            kpi("펀드 · 기관", tot.get("D"), "n0", "개 펀드", f"기관 {tot.get('E') or 0:,.0f}곳"),
+            kpi("금감원 보고 중", tot.get("K"), "n0", "건", "보고 여부 O", tone="ok"),
+            kpi("미보고", tot.get("L"), "n0", "건", "청산·양도·보고 생략 제외", tone="warn"),
+        ]})
+    nt = [x for x in [intro, f"EUR→USD 환산율 {rate:.4f} (약정내역&수수료 시트 환율)" if rate else None] if x]
+    if nt: blocks.append({"t": "notes", "items": nt})
+    # 2. 연도별 차트
+    x2 = sec(2)
+    if x2:
+        r0, tt, e = x2
+        h = hdr_row(r0, e, "약정연도")
+        t2 = stat_table(s, h, 2, e, tt[3:], "s2", note(r0))
+        yr = [r for r in t2["rows"] if re.match(r"^\d{4}$", r["c"].get("B", ""))]
+        if yr:
+            blocks.append({"t": "col", "id": "yc", "title": "연도별 약정", "sub": "USD M · 2010~2021 시트 + 2022~현재 시트", "cats": [r["c"]["B"] for r in yr],
+                           "series": [{"n": "2010~2021", "v": [r["c"].get("D") or 0 for r in yr]}, {"n": "2022~현재", "v": [r["c"].get("F") or 0 for r in yr]}],
+                           "stack": True, "f": "n1", "tot": [r["c"].get("H") or 0 for r in yr], "wide": True})
+        t2["sub"] = (t2.get("sub") or "") and "USD M · " + t2["sub"]
+        t2["fold"] = True
+        later = [t2]
+    else:
+        later = []
+    # 5·6. 기관별·운용사별 순위 + 표
+    tabs = []
+    for n, first, tid, lab in ((5, "기관명", "s5", "기관"), (6, "운용사(GP)", "s6", "운용사")):
+        x = sec(n)
+        if not x: continue
+        r0, tt, e = x
+        h = hdr_row(r0, e, first)
+        tb = stat_table(s, h, 2, e, tt[3:], tid, "USD M · " + (note(r0) or ""))
+        it = sorted([{"l": r["c"].get("B"), "v": r["c"].get("H") or 0} for r in tb["rows"]], key=lambda z: -z["v"])
+        tb.update({"sort": {"k": "H", "d": -1}, "card": {"title": "B", "amt": "H", "meta": ["G", "I"]}})
+        tb.pop("compact", None)
+        tabs.append((lab, {"t": "bars", "id": f"r{n}", "title": f"{lab}별 약정 Top 15", "sub": "USD M · 2010~현재 (USD 환산)", "f": "n1",
+                           "sets": {"전체": [z for z in it if z["v"] > 0][:15]}, "def": "전체", "rank": True}, tb))
+    if tabs:
+        blocks.append({"t": "row", "blocks": [x[1] for x in tabs]})
+    # 3·7·8 작은 표
+    small = []
+    for n, first, tid in ((3, "자산군", "s3"), (7, "펀드 상태", "s7"), (8, "금감원 보고 여부", "s8")):
+        x = sec(n)
+        if not x: continue
+        r0, tt, e = x
+        h = hdr_row(r0, e, first)
+        if h: small.append(stat_table(s, h, 2, e, tt[3:], tid, "USD M · " + (note(r0) or "")))
+    for i in range(0, len(small), 2):
+        blocks.append({"t": "row", "blocks": small[i:i + 2]} if len(small[i:i + 2]) > 1 else small[i])
+    blocks += [x[2] for x in tabs]
+    blocks += later
+    # 4. 자산군 × 투자전략
+    x = sec(4)
+    if x:
+        r0, tt, e = x
+        h = hdr_row(r0, e, "자산군")
+        if h: blocks.append(stat_table(s, h, 2, e, tt[3:], "s4", "USD M · " + (note(r0) or ""), fold=True))
+    # 9~12: 목록·확인 사항(펼쳐서 보기)
+    for n, first in ((9, "펀드명"), (10, "원문 표기(A·B)"), (11, "펀드명"), (12, "구분")):
+        x = sec(n)
+        if not x: continue
+        r0, tt, e = x
+        h = hdr_row(r0, e, first)
+        if not h: continue
+        rr = h + 1
+        while rr <= e and not s.empty(rr, 2, 14): rr += 1
+        b = generic_table(s, h, h + 1, rr - 1, 2, 14, title=tt[tt.index(" ") + 1:], tid=f"s{n}", sub=note(r0), fold=n != 12)
+        blocks.append(drop_empty_cols(b))
+    return blocks
+
+
+def v_orgs(s, ctx):
+    """기관별 약정(2010~현재): 기관마다 묶음(회색 요약 행 = 묶음 머리) · 기관 순위."""
+    h = s.find(lambda x: x.strip() == "기관명", 1, 15, 1, 4)
+    if not h: raise ValueError("머리글 '기관명' 없음")
+    hr, cB = h
+    H = {(s.t(hr, c) or "").replace("\n", ""): c for c in range(1, min(s.maxc, 20) + 1) if s.t(hr, c)}
+    def hc(k): return next((c for t, c in H.items() if t.startswith(k)), None)
+    C = {"no": hc("No"), "nm": hc("기관명"), "yr": hc("약정연도"), "gp": hc("운용사"), "fn": hc("펀드명/"), "ab": hc("펀드명 약칭"), "ac": hc("자산군"),
+         "is": hc("투자전략"), "cy": hc("약정통화"), "am": hc("총약정금액"), "us": hc("USD기준"), "st": hc("펀드 상태"), "fs": hc("금감원 보고"), "nt": hc("비고")}
+    if not C["nm"] or not C["us"]: raise ValueError("기관명·USD기준 환산 열 없음")
+    secs, foot, cur = [], [], None
+    for r in s.rows(hr + 1):
+        nm = s.t(r, C["nm"])
+        if nm is None: continue
+        no = s.v(r, C["no"]) if C["no"] else None
+        if nm.startswith(("합계", "미배분", "총계", "약정 통계")):
+            foot.append({"l": nm, "c": {"us": s.n(r, C["us"])}})
+            continue
+        if no is not None:
+            cur = {"h": f"{no}. {nm}", "nm": nm, "us": s.n(r, C["us"]) or 0, "rows": [],
+                   "s": " · ".join(x for x in [s.t(r, C["yr"]), f"USD {(s.n(r, C['us']) or 0) / 1e6:,.1f}M", s.t(r, C["nt"])] if x)}
+            secs.append(cur)
+            continue
+        if cur is None: continue
+        c_ = {k: s.v(r, cc) for k, cc in C.items() if cc and k != "no" and s.v(r, cc) is not None}
+        if c_.get("nm") == cur["nm"]: c_.pop("nm")
+        if c_.get("yr") is not None: c_["yr"] = str(c_["yr"])
+        cur["rows"].append({"c": c_})
+    if not secs: raise ValueError("기관 묶음 없음")
+    n_rows = sum(len(x["rows"]) for x in secs)
+    tot = next((f["c"]["us"] for f in foot if f["l"].startswith("총계")), None)
+    diff = next((f["c"]["us"] for f in foot if f["l"].startswith("약정 통계")), None)
+    blocks = [{"t": "kpis", "id": "k", "items": [x for x in [
+        kpi("기관 수", len(secs), "n0", "곳", "기관명 통일 기준"),
+        kpi("약정 건수", n_rows, "n0", "건", "약정 1건 1행"),
+        kpi("총계 (USD 환산)", (tot or 0) / 1e6, "n1", "USD M", "미배분 공동약정 포함") if tot is not None else None,
+        kpi("약정 통계와 차이", diff or 0, "n0", "USD", "0이면 일치", tone="ok" if not diff else "bad") if diff is not None else None,
+    ] if x]}]
+    nts = [s.t(r, cB) for r in range(2, hr) if s.t(r, cB) and r > 2]
+    if nts: blocks.append({"t": "notes", "items": nts})
+    it = sorted([{"l": x["nm"], "v": x["us"] / 1e6} for x in secs], key=lambda z: -z["v"])
+    blocks.append({"t": "bars", "id": "rk", "title": "기관별 약정 Top 15", "sub": "USD M · 2010~현재", "f": "n1", "sets": {"전체": it[:15]}, "def": "전체", "rank": True})
+    cols = [col("ab", "펀드(약칭)"), col("nm", "기관(표기)"), col("yr", "약정연도"), col("gp", "운용사"), col("ac", "자산군", "tag"),
+            col("cy", "통화", "tag", d=1), col("am", "총약정금액", "amt", ck="cy"), col("us", "USD 환산", "usd", sum=1),
+            col("st", "펀드 상태", "tag", tone=ST_TONE), col("fs", "금감원 보고", "tag", tone=FS_TONE),
+            col("fn", "펀드명(전체)", d=1), col("is", "투자전략", d=1), col("nt", "비고", d=1)]
+    for x in secs:
+        x.pop("nm"); x.pop("us")
+    blocks.append(drop_empty_cols({"t": "table", "id": "og", "title": "기관별 약정 목록", "sub": "기관마다 묶음 · 약정연도 순", "cols": cols, "secs": secs,
+                                   "foot": [f for f in foot if f["c"].get("us") is not None and not f["l"].startswith("약정 통계")],
+                                   "card": {"title": "ab", "sub": ["gp", "nm"], "amt": "us", "meta": ["yr"], "chips": ["st", "fs", "ac"]},
+                                   "filters": ["st", "fs", "ac"], "keep": ["us"]}))
+    return blocks
+
+
 BUILDERS = {
     "대시보드(Demo)": v_demo,
     "검증": v_check,
@@ -1390,6 +1671,9 @@ BUILDERS = {
     "약정내역&수수료": lambda s, c: v_commit(s, c, False),
     "KPI 실적 요약": v_kpi,
     "KPI보고용": lambda s, c: v_commit(s, c, True),
+    "약정내역(2010~2021)": v_hist,
+    "약정 통계": v_stats,
+    "기관별 약정(2010~현재)": v_orgs,
     "2026년 계약서": v_contract,
     "2026년 주요 마케팅 펀드 리스트": v_marketing,
     "2026 RFP·RFI": v_rfp,
