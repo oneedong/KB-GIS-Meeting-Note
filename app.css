@@ -227,7 +227,7 @@ label{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
   .backbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
   .list{max-height:none;overflow:clip}
   .topbtn{right:max(14px,env(safe-area-inset-right,0px));bottom:calc(74px + env(safe-area-inset-bottom,0px))}
-  .jump{font-size:16px;padding:4px 6px;width:108px}   /* 16px 미만이면 iOS 가 누를 때 화면을 확대 */
+  .jump{font-size:16px;padding:4px 6px;width:108px;min-height:36px}   /* 16px 미만이면 iOS 가 누를 때 화면을 확대 */
   input,select,textarea{font-size:16px}
   .ftog{display:inline-block}
   .filters:not(.open) .opt{display:none}
@@ -340,11 +340,11 @@ a.contact{color:inherit;font-weight:600;text-decoration:underline;text-decoratio
 @media (max-width:760px),(pointer:coarse){
   .iconbtn{width:40px;height:40px}
   .hr .iconbtn+.iconbtn{margin-left:-4px}
-  .btn{padding:9px 14px}
-  .btn.sm{padding:8px 13px;font-size:13px}
-  .seg button{padding:9px 15px}
-  .qbtn{padding:9px 14px}
-  .chip.tag{padding:8px 12px;font-size:12.5px}
-  .mem{padding:9px 8px;font-size:13.5px}
-  .pcard{padding:10px 12px}
+  .btn{padding:9px 14px;min-height:38px}   /* 글꼴마다 줄 높이가 달라 여백만으로는 모자랄 수 있어 최소 높이를 준다 */
+  .btn.sm{padding:8px 13px;font-size:13px;min-height:38px}
+  .seg button{padding:9px 15px;min-height:38px}
+  .qbtn{padding:9px 14px;min-height:38px}
+  .chip.tag{padding:8px 12px;font-size:12.5px;min-height:36px}
+  .mem{padding:9px 8px;font-size:13.5px;min-height:38px;align-items:center}
+  .pcard{padding:10px 12px;min-height:40px}
 }

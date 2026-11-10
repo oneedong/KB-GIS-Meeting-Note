@@ -327,8 +327,8 @@ body.dashmode .page{max-width:1680px}
 
 /* 손가락으로 누르는 화면: 필터 칩·정렬·연도 단추를 36px 안팎으로 */
 @media (max-width:760px),(pointer:coarse){
-  .fchip{padding:8px 12px;font-size:13px}
-  .seg.sm button{padding:8px 12px;font-size:13px}
-  .tb-sel select{padding:8px 8px;font-size:13.5px}
+  .fchip{padding:8px 12px;font-size:13px;min-height:36px}
+  .seg.sm button{padding:8px 12px;font-size:13px;min-height:36px}
+  .tb-sel select{padding:8px 8px;font-size:13.5px;min-height:36px}
   .dz-item{padding-block:9px}
 }
