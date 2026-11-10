@@ -61,11 +61,23 @@ ok('CSP 해시 맞음', (() => { try { execFileSync(process.execPath, [join(ROOT
       { t: 'notes', items: ['가상 출처 설명'] },
       tbl('금감원 보고 여부별', ['구분']),
       tbl('기관별 — 2010~현재 (기관명 통일 집계)', ['기관명', '2010~21 약정 건수', 'USD 환산', '함께 집계한 표기'])] },
-    { name: 'KPI 실적 요약', group: 'x', short: 'x', view: [] }] }));
+    { name: 'KPI 실적 요약', group: 'x', short: 'x', view: [] },
+    { name: '가상 시딩 관리판', group: 'x', short: 'x', view: [
+      { t: 'kpis', items: [{ l: '약정금액(원화 환산)', v: 1 }, { l: '누적 인출', v: 1 }] },
+      { t: 'table', id: 'sd', cols: [{ k: 'no', l: 'No', f: 'n0' }, { k: 'ck', l: '약정(억원)', f: 'wk' }, { k: 'cfx', l: '약정(외화)' }], rows: [
+        { c: { no: 1, ac: 'PE', ap: 300000000, apc: 'KRW', ck: 298000000, cf: 220000, cfx: 'USD 220,000', dr: 100000000 } },
+        { c: { no: 2, ac: 'PC', ap: 100000, apc: 'USD', ck: 80000000, dr: 100000000 } }] },
+      { t: 'table', id: 'sm', cols: [{ k: 'C', l: '자산군' }, { k: 'D', l: '개수', f: 'n0' }, { k: 'E', l: '약정금액(원)', f: 'won' }],
+        rows: [{ c: { C: 'PE', D: 1, E: 1 } }, { c: { C: 'PC', D: 1, E: 1 } }], foot: [{ c: { C: '합계', D: 2, E: 2 } }] }] }] }));
   execFileSync('python3', [join(ROOT, 'scripts/dash_curate.py'), f], { stdio: 'pipe' });
   execFileSync('python3', [join(ROOT, 'scripts/dash_curate.py'), f], { stdio: 'pipe' });   // 두 번 돌려도 같아야 한다
   const c = JSON.parse(readFileSync(f, 'utf8')), st = c.sheets.find((x) => x.name === '약정 통계');
-  ok('대시보드 다듬기: 시트 순서·검증 숨김', c.sheets.map((x) => x.short).join(',') === 'KPI 실적 요약,RFP·RFI,약정 현황 (2010~)');
+  ok('대시보드 다듬기: 시트 순서·검증 숨김', c.sheets.map((x) => x.short).join(',') === 'KPI 실적 요약,RFP·RFI,약정 현황 (2010~),시딩 관리판');
+  {
+    const sd = c.sheets.find((x) => x.short === '시딩 관리판').view, fund = sd[1].rows.map((r) => r.c);
+    ok('시딩 약정 = 심사 승인금액(원화 그대로·외화는 기준일 환율)', fund[0].ck === 300000000 && !fund[0].cfx && fund[1].ck === 100000000 && fund[1].cfx === 'USD 100,000'
+      && sd[0].items[0].v === 4 && sd[0].items[1].s === '소진율 50.0%' && sd[2].rows[0].c.E === 300000000 && sd[2].foot[0].c.E === 400000000);
+  }
   ok('대시보드 다듬기: 금감원·출처 설명 빼고 합계 열만', st.view.length === 2 && st.view[0].items.length === 1
     && st.view[1].cols.map((x) => x.l).join(',') === '기관명,USD 환산' && st.view[1].title === '기관별 (2010~현재)');
   ok('대시보드 다듬기: 억원 함께(카드 문장 한 번만)', st.view[0].items[0].s === '수수료 USD 1,000,000 (≈ 10.0억)');

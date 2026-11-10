@@ -183,6 +183,50 @@ def _mark_krw(d):
                     if u: c["cu"] = u
 
 
+# ── 해외대체 시딩: 약정 = 심사 승인금액(사용자 확인 2026-11-10) ─────────────────
+# 시트 맨 오른쪽 '약정금액(외화)·(원화환산)' 열은 6개 펀드에서 심사 승인금액과 달라(원화로 승인받은 펀드를 USD 로 적는 등),
+# 앱의 약정은 심사 승인금액으로 계산한다. 원화 승인은 그대로, USD·EUR 승인은 기준일 매매기준율(fx)로 원화 환산.
+# 바꾸는 곳: 시딩 관리판(지표 카드·펀드별 현황·자산군별 요약), 요약의 '해외대체 시딩 현황'.
+def _seed_by_approval(d):
+    fx = {k.upper(): v for k, v in (d.get("fx") or {}).items() if isinstance(v, (int, float))}
+    seed = next((s for s in d["sheets"] if re.search(r"시딩 관리판", s["name"])), None)
+    t = seed and next((b for b in _walk(seed.get("view") or []) if b.get("t") == "table" and b.get("id") == "sd"), None)
+    if not t: return
+    by, n = {}, 0
+    for r in t["rows"]:
+        c = r["c"]; ap, cur = c.get("ap"), str(c.get("apc") or "KRW").strip().upper()
+        rate = 1 if cur in ("KRW", "원", "₩") else fx.get(cur)
+        if not isinstance(ap, (int, float)) or not rate: continue        # 승인금액이 없으면 시트 값 그대로
+        c["ck"] = ap * rate
+        c.pop("cf", None)
+        if cur in ("KRW", "원", "₩"): c.pop("cfx", None)
+        else: c["cfx"] = f"{cur} {ap:,.0f}"
+        a = c.get("ac") or "기타"; by.setdefault(a, [0, 0.0]); by[a][0] += 1; by[a][1] += c["ck"]; n += 1
+    if not n: return
+    for x in t["cols"]:
+        if x["k"] == "cfx": x["l"] = "승인(외화)"
+    if "심사 승인" not in t.get("sub", ""): t["sub"] = "약정 = 심사 승인금액(외화 승인은 기준일 환율로 원화 환산) · " + t.get("sub", "")
+    tot = sum(v[1] for v in by.values()); dr = sum(r["c"].get("dr") or 0 for r in t["rows"])
+    for b in _walk(seed["view"]):
+        if b.get("t") == "kpis":
+            for k in b["items"]:
+                if k.get("l", "").startswith("약정금액"): k.update(v=tot / 1e8, s="심사 승인금액 기준")
+                if k.get("l") == "누적 인출" and tot: k["s"] = f"소진율 {dr / tot:.1%}"
+        if b.get("t") == "table" and b.get("id") == "sm":                 # 자산군별 요약(원)
+            ka, kn, kv = b["cols"][0]["k"], b["cols"][1]["k"], b["cols"][-1]["k"]
+            for r in b.get("rows") or []:
+                if r["c"].get(ka) in by: r["c"][kn], r["c"][kv] = by[r["c"][ka]][0], by[r["c"][ka]][1]
+            for f in b.get("foot") or []: f["c"][kv] = tot
+    demo = next((s for s in d["sheets"] if s["name"] == "대시보드(Demo)"), None)
+    for b in _walk((demo or {}).get("view") or []):
+        if b.get("t") == "table" and str(b.get("title", "")).startswith("해외대체 시딩"):   # 요약 표(억원)
+            ka, kn, kv = b["cols"][0]["k"], b["cols"][1]["k"], b["cols"][-1]["k"]
+            for r in b.get("rows") or []:
+                if r["c"].get(ka) in by: r["c"][kn], r["c"][kv] = by[r["c"][ka]][0], by[r["c"][ka]][1] / 1e8
+            for f in b.get("foot") or []: f["c"][kv] = tot / 1e8
+            if "심사 승인" not in b.get("sub", ""): b["sub"] = (b.get("sub", "") + " · 심사 승인금액 기준").strip(" ·")
+
+
 def curate(d):
     """dash.json(dict)을 제자리에서 다듬는다. 두 번 돌려도 결과가 같다."""
     sheets = [s for s in d["sheets"] if not any(re.search(p, s["name"]) for p in HIDE)]
@@ -191,6 +235,7 @@ def curate(d):
             s["view"] = _clean_blocks(s["view"])
             _sheet_rules(s)
     d["sheets"] = sheets
+    _seed_by_approval(d)
     _mark_krw(d)
     ordered, used = [], set()
     for grp, items in LAYOUT:
