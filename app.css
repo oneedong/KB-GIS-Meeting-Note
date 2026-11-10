@@ -2,7 +2,7 @@
  * 색은 KB 노랑(#FFBC00)·KB 회색(#60584C) — claude.ai 아티팩트 원본과 같은 토큰. */
 :root{
   --kb-yellow:#FFBC00; --kb-gray:#60584C; --kb-ink:#3A342C;
-  --bg:#F7F6F3; --panel:#FFFFFF; --fg:#2A2621; --muted:#7A7266; --line:#E4E0D8; --soft:#F1EEE7; --sel:#FFF6DC;
+  --bg:#F7F6F3; --panel:#FFFFFF; --fg:#2A2621; --muted:#6E665B; --line:#E4E0D8; --soft:#F1EEE7; --sel:#FFF6DC;
   --s-done:#2B5D8A; --s-done-bg:#E3ECF5; --s-go:#2F7A4F; --s-go-bg:#E2F1E8; --s-watch:#8A6A00; --s-watch-bg:#FFF2C8;
   --s-hold:#B4532A; --s-hold-bg:#FBE8DE; --s-no:#6E737B; --s-no-bg:#ECEDEF; --warn:#9A4A12; --warn-bg:#FDF0E2;
   --f-display:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
@@ -51,7 +51,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .filters .full{grid-column:1/-1}
 input,select,textarea{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 10px;width:100%;min-width:0}
 textarea{resize:vertical;line-height:1.65}
-.count{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.count{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px}
+/* 월 이동(건수 줄 오른쪽) · 맨 위로(길게 내려갔을 때 오른쪽 아래) */
+.jump{font:600 12px var(--f-body);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:3px 6px;width:86px;cursor:pointer;flex:none}   /* 닫힌 상자는 '월 이동'만 — 건수 줄이 두 줄로 밀리지 않게 */
+.topbtn{all:unset;position:fixed;right:24px;bottom:24px;z-index:14;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.18);cursor:pointer;color:var(--fg)}
+.topbtn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.topbtn:focus-visible{outline:2px solid var(--kb-yellow);outline-offset:2px}
 .list{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;max-height:calc(100vh - 250px);overflow-y:auto}
 @media (max-width:900px){.list{max-height:60vh}}
 .item{display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;padding:11px 14px;border:0;border-bottom:1px solid var(--line);cursor:pointer;text-align:left;background:none;color:inherit;font:inherit;width:100%}
@@ -64,7 +69,7 @@ textarea{resize:vertical;line-height:1.65}
 .ttl{font:600 14px/1.35 var(--f-display)}
 .sub2{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
-.chip{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--soft);color:var(--muted);letter-spacing:.01em;white-space:nowrap}
+.chip{font-size:11.5px;padding:1px 7px;border-radius:99px;background:var(--soft);color:var(--muted);letter-spacing:.01em;white-space:nowrap}
 .chip.cat{background:var(--kb-ink);color:#fff}
 .chip.flag{background:var(--warn-bg);color:var(--warn)}
 .chip.asset{border:1px solid var(--line);background:transparent;color:var(--fg)}
@@ -80,7 +85,12 @@ textarea{resize:vertical;line-height:1.65}
 .warnbox{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 13px;font-size:12.5px}
 .attendees{display:grid;gap:6px}
 .att{display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;padding:9px 13px;background:var(--soft);border-radius:8px}
-@media (max-width:560px){.att{grid-template-columns:minmax(0,1fr);gap:2px}}
+@media (max-width:560px){
+  .attendees{gap:0;background:var(--soft);border-radius:8px;padding:2px 13px}
+  .att{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px;row-gap:0;padding:8px 0;background:none;border-radius:0}
+  .att+.att{border-top:1px solid var(--line)}
+  .att>div{font-size:.9em;color:var(--muted)}
+}
 .att b{font-family:var(--f-display)}
 .sec h3{margin:0 0 6px;font:700 13.5px/1.4 var(--f-display);display:flex;align-items:center;gap:8px}
 .sec h3::before{content:"";width:8px;height:8px;background:var(--kb-yellow);border-radius:2px;flex:none}
@@ -129,7 +139,7 @@ table.mx{border-collapse:separate;border-spacing:0;font-size:12px;min-width:100%
 .mx thead th button:hover{color:var(--fg)}
 .mx .org{position:sticky;left:0;background:var(--panel);text-align:left;padding:7px 12px;z-index:2;min-width:170px;max-width:220px;white-space:normal;border-right:1px solid var(--line)}
 .mx thead .org{z-index:3}
-.mx .org small{display:block;color:var(--muted);font-size:10.5px}
+.mx .org small{display:block;color:var(--muted);font-size:11.5px}
 .mx td button{all:unset;cursor:pointer;display:block;width:100%;min-width:58px;padding:9px 4px;font-weight:600;font-size:11.5px}
 .mx td button:focus-visible{outline:2px solid var(--kb-yellow);outline-offset:-2px}
 .mx tr:hover td,.mx tr:hover .org{background:var(--soft)}
@@ -215,7 +225,9 @@ label{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
   .split.detail>.side{display:none}
   .split.detail>.main{display:block}
   .backbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
-  .list{max-height:none}
+  .list{max-height:none;overflow:clip}
+  .topbtn{right:max(14px,env(safe-area-inset-right,0px));bottom:calc(74px + env(safe-area-inset-bottom,0px))}
+  .jump{font-size:16px;padding:4px 6px;width:108px}   /* 16px 미만이면 iOS 가 누를 때 화면을 확대 */
   input,select,textarea{font-size:16px}
   .ftog{display:inline-block}
   .filters:not(.open) .opt{display:none}
@@ -266,10 +278,10 @@ body:not(.ready) .lockbtn{visibility:hidden}
 .item .ttl{font-size:15px;line-height:1.4}
 .ttl .mdept{font:500 12.5px var(--f-body);color:var(--muted)}
 #mCat{display:none}  /* 구분은 위 빠른 선택 칩으로 */
-.cattag{display:inline-block;font:700 10.5px/1.6 var(--f-body);padding:0 6px;border-radius:4px;margin-right:6px;vertical-align:2px;background:var(--kb-ink);color:#fff}
+.cattag{display:inline-block;font:700 11.5px/1.6 var(--f-body);padding:0 6px;border-radius:4px;margin-right:6px;vertical-align:2px;background:var(--kb-ink);color:#fff}
 .cattag.intel{background:var(--s-done-bg);color:var(--s-done)}
 .cattag.inner{background:var(--s-no-bg);color:var(--s-no)}
-.badge{display:inline-block;font:700 10px/1.6 var(--f-body);padding:0 5px;border-radius:4px;margin-left:6px;vertical-align:2px;letter-spacing:.03em}
+.badge{display:inline-block;font:700 10.5px/1.6 var(--f-body);padding:0 5px;border-radius:4px;margin-left:6px;vertical-align:2px;letter-spacing:.03em}
 .badge.new{background:var(--kb-yellow);color:#2A2621}
 .badge.upd{background:var(--soft);color:var(--muted);border:1px solid var(--line)}
 .pv{margin-top:3px;font-size:13px;line-height:1.55;color:var(--fg);opacity:.86;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
@@ -314,10 +326,25 @@ a.contact{color:inherit;font-weight:600;text-decoration:underline;text-decoratio
   .quick{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
   .quick::-webkit-scrollbar{display:none}
   .qbtn{flex:none;font-size:13px;padding:6px 13px}
-  .mhead{position:static}
+  .mhead{position:sticky;top:var(--stick,54px);z-index:2}
+  :root[data-fs="l"] .mhead{top:calc(var(--stick,54px)/1.1)}     /* 글자 크게(zoom)에서는 top 도 같이 커지므로 나눠 준다 */
+  :root[data-fs="xl"] .mhead{top:calc(var(--stick,54px)/1.22)}
 }
 .pwrow{position:relative}
 .pwrow input{padding-right:64px!important}
 .pwshow{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:var(--soft);color:var(--muted);font:600 12.5px var(--f-body);padding:6px 10px;border-radius:8px;cursor:pointer}
 .pwshow[aria-pressed="true"]{color:var(--fg)}
 .legacy{display:block;margin:0 0 4px;font-size:12px;color:var(--muted)}
+
+/* 손가락으로 누르는 화면: 누르는 대상은 36px 이상(헤더 단추 40px) */
+@media (max-width:760px),(pointer:coarse){
+  .iconbtn{width:40px;height:40px}
+  .hr .iconbtn+.iconbtn{margin-left:-4px}
+  .btn{padding:9px 14px}
+  .btn.sm{padding:8px 13px;font-size:13px}
+  .seg button{padding:9px 15px}
+  .qbtn{padding:9px 14px}
+  .chip.tag{padding:8px 12px;font-size:12.5px}
+  .mem{padding:9px 8px;font-size:13.5px}
+  .pcard{padding:10px 12px}
+}

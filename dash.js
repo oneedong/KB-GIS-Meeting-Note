@@ -175,8 +175,9 @@ const Dash = (() => {
   }
   function linksHtml() {
     const items = D.sheets.filter((s) => !(s.name === DEMO && hasView(s))).map((s) => {
-      const k = (s.view || []).find((b) => b.t === "kpis");
-      const line = k && k.items[0] ? `${k.items[0].l} ${typeof k.items[0].v === "number" ? fmt(k.items[0].v, k.items[0].f || "n0") : ""}${k.items[0].u || ""}` : `${s.group}`;
+      const k = (s.view || []).find((b) => b.t === "kpis"), yr = String(D.asof || "").slice(0, 4);
+      const it = k && (k.items.find((x) => yr && String(x.l).includes(yr)) || k.items[0]);
+      const line = it ? `${it.l} ${typeof it.v === "number" ? fmt(it.v, it.f || "n0") : ""}${it.u || ""}` : `${s.group}`;
       return `<button type="button" class="qk" data-s="${h(s.name)}"><b>${h(s.short)}</b><span>${h(line)}</span></button>`;
     }).join("");
     setTimeout(() => $$("#dzBody .qk[data-s]").forEach((b) => b.onclick = () => go(b.dataset.s)));
@@ -385,8 +386,17 @@ const Dash = (() => {
     if (typeof a === "number" && typeof b === "number") return a - b;
     return String(a).localeCompare(String(b), "ko", { numeric: true });
   };
+  // 가로로 더 있는 표: 오른쪽 끝을 흐리게 해서 옆으로 넘길 수 있음을 알린다(끝까지 넘기면 사라짐)
+  function hintX(root) {
+    $$(".dtw", root || document).forEach((w) => {
+      const upd = () => w.classList.toggle("more", w.scrollWidth - w.clientWidth - w.scrollLeft > 4);
+      upd();
+      if (!w._hx) { w._hx = 1; w.addEventListener("scroll", upd, { passive: true }); }
+    });
+  }
   function mountTable(id, b, key) {
     const host = document.getElementById(id); if (!host) return;
+    if (b.fold) host.addEventListener("toggle", () => hintX(host));      // 접힌 표는 펼칠 때 폭이 생긴다
     const st = T[key] || (T[key] = { q: "", f: {}, pick: b.pick ? b.pick.def : null, sort: null, open: new Set() });
     if (!st.sort && b.sort) st.sort = { k: b.sort.k, d: b.sort.d };
     if (pendingQ && !st.q) st.q = pendingQ;
@@ -403,6 +413,7 @@ const Dash = (() => {
       if (tb) drawTools(tb, b, st, base, shown, draw);
       curLabels = b.mlabels || null;
       body.innerHTML = shown || !total ? (useCards(b, st, body) ? cardsHtml(b, st, secs) : tableHtml(b, st, secs)) : `<div class="empty">조건에 맞는 항목이 없습니다.</div>`;
+      hintX(body);
       curLabels = null;
       wire(body, b, st, draw);
     };
@@ -512,7 +523,7 @@ const Dash = (() => {
         ${ex && open ? `<div class="cd-x">${detailHtml(b, st, r, detCols(b, st), skip)}</div>` : ""}${ex ? `<span class="cd-more">${open ? "접기" : "자세히"}</span>` : ""}</article>`;
     };
     const footCard = (f, cls) => {
-      const vs = cols.filter((c) => f.c[c.k] != null && f.c[c.k] !== "" && c.f !== "tag" && c.f !== "text" && c.k !== tk).map((c) => `<div><dt>${h(c.l)}</dt><dd class="n">${cell(c, f.c, true)}</dd></div>`).join("");
+      const vs = cols.filter((c) => f.c[c.k] != null && f.c[c.k] !== "" && c.f !== "tag" && c.f !== "text" && c.k !== tk).map((c) => `<div${c.f === "months" ? ' class="w"' : ""}><dt>${h(c.l)}</dt><dd class="n">${cell(c, f.c, true)}</dd></div>`).join("");
       return `<div class="cd-ft ${cls}"><b>${h(f.l)}</b>${vs ? `<dl>${vs}</dl>` : ""}</div>`;
     };
     const fl = filtered(st), sk = st.sort && st.sort.k;
@@ -719,6 +730,7 @@ const Dash = (() => {
     clearTimeout(rt); rt = setTimeout(() => {
       if (!document.body.classList.contains("dashmode")) return;
       if (lastMob !== mob()) { paint(); return; }
+      hintX($("#dzBody"));
       const cs = charts; charts = [];
       cs.forEach((c) => { const el = document.getElementById(c.id); if (!el) return; const w = $(".chslot", el).clientWidth; if (Math.abs(w - c.w) > 8) mountChart(c.id, c.b); else charts.push(c); });
     }, 150);

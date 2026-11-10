@@ -69,7 +69,7 @@
         <button class="qbtn" type="button" data-cat="">전체</button><button class="qbtn" type="button" data-cat="LP">LP</button><button class="qbtn" type="button" data-cat="GP">GP</button><button class="qbtn" type="button" data-cat="시장정보">시장정보</button><button class="qbtn" type="button" data-cat="내부">내부</button>
         <button class="qbtn new" id="mNewOnly" type="button" hidden>새 소식 <span></span></button><button class="qbtn ftog" id="mFt" type="button">필터</button>
       </div>
-      <div class="count"><span id="mCnt">불러오는 중…</span><button class="btn sm primary" id="mNew" type="button">+ 미팅 추가</button></div>
+      <div class="count"><span id="mCnt">불러오는 중…</span><select id="mJump" class="jump" aria-label="월 이동" hidden></select><button class="btn sm primary" id="mNew" type="button">+ 미팅 추가</button></div>
       <div class="list" id="mList"><div class="empty">미팅노트를 불러오는 중입니다.</div></div>
     </aside>
     <main class="main" id="mMain"><div class="empty">왼쪽에서 미팅을 선택하세요.</div></main>
@@ -136,6 +136,7 @@
   </form>
 </div>
 <button class="fab" id="fab" type="button" aria-label="미팅 추가" hidden>+</button>
+<button class="topbtn" id="topBtn" type="button" aria-label="맨 위로" title="맨 위로" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
 <nav class="bnav" aria-label="보기">
   <button type="button" data-tab="meetings" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg>미팅</button>
   <button type="button" data-tab="dash" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>대시보드</button>

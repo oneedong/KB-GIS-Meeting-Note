@@ -123,10 +123,12 @@ body.dashmode .page{max-width:1680px}
 
 /* 표(PC·태블릿) */
 .dtw{overflow:auto;border:1px solid var(--line);border-radius:8px;-webkit-overflow-scrolling:touch}
+/* 오른쪽에 열이 더 있으면 끝을 흐리게(dash.js hintX) */
+.dtw.more{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 34px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 34px),transparent)}
 .dtw.tall{max-height:min(74vh,900px)}
 .dt{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;font-variant-numeric:tabular-nums}
 .dt th,.dt td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;white-space:nowrap}
-.dt thead th{position:sticky;top:0;z-index:2;background:var(--soft);color:var(--muted);font-size:12px;font-weight:600;line-height:1.3;white-space:normal;min-width:56px;vertical-align:bottom}
+.dt thead th{word-break:keep-all;position:sticky;top:0;z-index:2;background:var(--soft);color:var(--muted);font-size:12px;font-weight:600;line-height:1.3;white-space:normal;min-width:56px;vertical-align:bottom}
 .dt thead th[data-sort]{cursor:pointer;user-select:none}
 .dt thead th[data-sort]:hover{color:var(--fg)}
 .dt thead th .so{font-style:normal;font-size:9px;margin-left:3px;color:var(--fg)}
@@ -166,9 +168,9 @@ body.dashmode .page{max-width:1680px}
 .mstrip{display:inline-grid;grid-template-columns:repeat(12,28px);gap:2px;vertical-align:middle}
 .mstrip>span{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-height:34px;border-radius:5px;background:var(--soft);padding:1px 0;font-size:10.5px;line-height:1.15;opacity:.55}
 .mstrip>span.on{background:var(--sel);opacity:1;box-shadow:inset 0 0 0 1px var(--kb-yellow)}
-.mstrip i{font-style:normal;color:var(--muted);font-size:9.5px}
-.mstrip em{font-style:normal;color:var(--s-hold);font-size:8px;letter-spacing:-1px;min-height:9px}
-.mstrip b{font-weight:700;font-variant-numeric:tabular-nums;font-size:10px}
+.mstrip i{font-style:normal;color:var(--muted);font-size:10.5px}
+.mstrip em{font-style:normal;color:var(--s-hold);font-size:9px;letter-spacing:-1px;min-height:10px}
+.mstrip b{font-weight:700;font-variant-numeric:tabular-nums;font-size:10.5px}
 .mstrip.hd>span{min-height:0;background:none;opacity:1}
 .mstrip.hd i{font-size:11px}
 
@@ -218,6 +220,7 @@ body.dashmode .page{max-width:1680px}
 .cd-ft dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;margin:0}
 .cd-ft dt{font-size:11px;color:var(--muted)}
 .cd-ft dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.cd-ft dl>.w{grid-column:1/-1}.cd-ft .mstrip{display:grid;width:100%;grid-template-columns:repeat(12,minmax(0,1fr))}   /* 소계·합계의 월별 칸: 한 줄 전체 폭에 맞춤(반 칸에 넣으면 화면 밖으로 넘쳤음) */
 
 /* 접는 표(문서형 시트의 연도별 목록) */
 .fold{background:var(--panel);border:1px solid var(--line);border-radius:10px}
@@ -289,6 +292,11 @@ body.dashmode .page{max-width:1680px}
   .dz-pick span{font:600 12px var(--f-body);color:var(--muted);flex:none}
   .dz-pick select{flex:1;min-width:0;font:700 15px var(--f-body);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--fg)}
   .dz-head{align-items:flex-start}
+  .tb-2>*{flex:none}   /* 가로로 넘기는 도구줄에서 정렬 상자가 18px 로 눌리지 않게 */
+  .quickg{grid-template-columns:repeat(2,minmax(0,1fr))}                  /* 시트 바로가기: 한 줄씩 16칸 → 2열 */
+  .qk{padding:8px 10px;min-width:0}.qk b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cd-w .mstrip{min-width:0;grid-template-columns:repeat(12,minmax(0,1fr))}   /* 월별 칸 12개를 카드 폭에 맞춤(큰 글자 모드에서 넘쳤음) */
+  .compact .dt th,.compact .dt td{padding:6px 6px}.compact .dt thead th{min-width:0}   /* 요약의 작은 표: 열이 한 화면에 들어오게 */
   .dz-head h2{font-size:19px}
   .dz-seg{width:100%}.dz-seg button{flex:1}
   .brow{grid-template-columns:minmax(0,1fr)}
@@ -316,3 +324,11 @@ body.dashmode .page{max-width:1680px}
   .fold-in{padding:0 12px 12px}
 }
 @media (max-width:420px){.kcards .kc:last-child:nth-child(odd){grid-column:1/-1}}
+
+/* 손가락으로 누르는 화면: 필터 칩·정렬·연도 단추를 36px 안팎으로 */
+@media (max-width:760px),(pointer:coarse){
+  .fchip{padding:8px 12px;font-size:13px}
+  .seg.sm button{padding:8px 12px;font-size:13px}
+  .tb-sel select{padding:8px 8px;font-size:13.5px}
+  .dz-item{padding-block:9px}
+}

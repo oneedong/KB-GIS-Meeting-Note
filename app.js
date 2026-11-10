@@ -49,11 +49,13 @@ function memoText(r){const {m,d}=md(r.date),att=parseAtt(r.attendees);
   att.forEach(a=>{if(a.note)s+=`- ${a.who}: ${a.note}\n`});return s+"\n"+(r.body||"").trim()+"\n"+(r.truncated?"※ 원문 잘림 — 카톡 '전체보기'로 보완 필요\n":"")}
 
 // ── 탭 ──
-function setTab(t,push=true){tab=t;document.querySelectorAll(".tab,.bnav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t?"true":"false"));
+const tabY={};
+function setTab(t,push=true){if(t!==tab)tabY[tab]=scrollY;tab=t;document.querySelectorAll(".tab,.bnav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t?"true":"false"));
   ["meetings","orgs","demand","people","dash"].forEach(k=>$("#p-"+k).hidden=k!==t);document.body.classList.toggle("dashmode",t==="dash");
   if(push){try{history.replaceState(null,"","#"+t)}catch(e){}}
-  renderTab();window.scrollTo({top:0});fabSync()}
-document.querySelectorAll(".tab,.bnav button").forEach(b=>b.onclick=()=>{if(b.dataset.tab===tab&&isMob()){closeDetail();return}setTab(b.dataset.tab)});
+  renderTab();window.scrollTo({top:tabY[t]||0});fabSync()}   /* 다른 탭에 다녀와도 보던 자리 그대로 */
+document.querySelectorAll(".tab,.bnav button").forEach(b=>b.onclick=()=>{if(b.dataset.tab===tab){const sec=$("#p-"+tab);   /* 현재 탭을 다시 누르면: 상세 닫기 → 맨 위로 */
+  if(isMob()&&sec&&sec.classList.contains("detail"))closeDetail();else{scrollTo({top:0,behavior:smooth()});const L=sec&&sec.querySelector(".list");if(L)L.scrollTo({top:0,behavior:smooth()})}return}setTab(b.dataset.tab)});
 mq.addEventListener?.("change",()=>{if(!isMob())document.querySelectorAll(".split.detail").forEach(s=>s.classList.remove("detail"));if(tab==="demand")renderDemand();fabSync()});
 function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,people:()=>{renderPList();renderPMain()},dash:()=>Dash.render()})[tab]()}
 function gotoOrg(name){const o=orgOf(name);if(!o){toast("기관 프로필이 아직 없습니다. 기관 탭에서 추가하세요.");return}oSel=o.id;oMode="view";setTab("orgs");openDetail()}
@@ -142,17 +144,23 @@ function renderMList(){const f=mFiltered(),L=$("#mList"),q=$("#mq").value.trim()
   const cat=$("#mCat").value;document.querySelectorAll("#mQuick [data-cat]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.cat===cat?"true":"false"));
   const nb=$("#mNewOnly");nb.hidden=!NEWS.size&&!UPDS.size;nb.querySelector("span").textContent=NEWS.size+UPDS.size;nb.setAttribute("aria-pressed",newOnly?"true":"false");
   const nf=["mType","mAsset","mAuthor","mFlag"].filter(i=>$("#"+i).value).length;$("#mFt").textContent=nf?`필터 ${nf}`:"필터";$("#mFt").setAttribute("aria-pressed",nf?"true":"false");
+  jumpFill(null);
   if(!M.length){L.innerHTML=`<div class="empty">아직 미팅노트가 없습니다.</div>`;return}
   if(!f.length){L.innerHTML=`<div class="empty">조건에 맞는 미팅이 없습니다. 검색어나 필터를 바꿔 보세요.</div>`;return}
   const per={};f.forEach(r=>{const k=(r.date||"").slice(0,7);per[k]=(per[k]||0)+1});let last="";
   L.innerHTML=f.map(r=>{const {y,m,d}=md(r.date),k=(r.date||"").slice(0,7),att=parseAtt(r.attendees).map(a=>a.who).join(", "),cat=r.category||"LP";
-    const head=k!==last?`<div class="mhead">${y}년 ${m}월<span>${per[k]}건</span></div>`:"";last=k;
+    const head=k!==last?`<div class="mhead" data-ym="${k}">${y}년 ${m}월<span>${per[k]}건</span></div>`:"";last=k;
     const badge=NEWS.has(r.id)?`<span class="badge new">NEW</span>`:UPDS.has(r.id)?`<span class="badge upd">수정</span>`:"";
     return head+`<button type="button" class="item${r.id===mSel?" on":""}" data-id="${esc(r.id)}"><div class="date"><b>${d}</b>${wk(r.date)}</div>
       <div style="min-width:0"><div class="ttl">${cat!=="LP"?`<span class="cattag ${CAT_CLS[cat]||""}">${esc(cat)}</span>`:""}${hl(esc(r.org),q)}${r.dept?` <span class="mdept">${hl(esc(r.dept),q)}</span>`:""}${badge}</div>
       <div class="sub2">${hl(esc(att||r.kbAttendees||""),q)}</div>
       ${(()=>{const pv=preview(r,q);return pv?`<div class="pv">${pv}</div>`:""})()}
-      <div class="chips">${(r.assets||[]).slice(0,3).map(t=>`<span class="chip asset">${esc(SHORT[t]||t)}</span>`).join("")}${r.truncated?`<span class="chip cut">✂ 잘림</span>`:""}${(r.flags||[]).some(x=>x.startsWith("내부용"))?`<span class="chip flag">내부용</span>`:""}</div></div></button>`}).join("")}
+      <div class="chips">${(r.assets||[]).slice(0,3).map(t=>`<span class="chip asset">${esc(SHORT[t]||t)}</span>`).join("")}${r.truncated?`<span class="chip cut">✂ 잘림</span>`:""}${(r.flags||[]).some(x=>x.startsWith("내부용"))?`<span class="chip flag">내부용</span>`:""}</div></div></button>`}).join("");jumpFill(per)}
+// 월 이동: 목록이 길어(휴대폰 230건 ≈ 화면 35장) 달을 골라 바로 간다. 두 달 이상일 때만 보인다
+function jumpFill(per){const J=$("#mJump");if(!J)return;const ks=per?Object.keys(per).sort().reverse():[];J.hidden=ks.length<2;
+  J.innerHTML=`<option value="">월 이동</option>`+ks.map(k=>`<option value="${k}">${+k.slice(0,4)}년 ${+k.slice(5)}월 · ${per[k]}건</option>`).join("")}
+const stickTop=()=>{const b=document.querySelector(".band");return b?Math.round(b.offsetHeight+(parseFloat(getComputedStyle(b).top)||0)):0};   /* 고정된 헤더의 아래 끝 */
+const smooth=()=>matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth";
 function ago(d){const n=Math.round((Date.parse(today())-Date.parse(d))/864e5);return n<=0?"오늘":n===1?"어제":n<7?`${n}일 전`:n<35?`${Math.round(n/7)}주 전`:n<365?`${Math.round(n/30)}개월 전`:""}
 function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm();
   const r=M.find(x=>x.id===mSel);if(!r){const f=!isMob()&&$("#mList .item");if(f&&f.dataset.id!==mSel){mSel=f.dataset.id;renderMList();return renderMMain()}   /* PC: 빈 칸 대신 맨 위(최근) 미팅 */
@@ -398,6 +406,15 @@ function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.dat
   mSel=M.length?M[0].id:null;oSel=null;pSel=null;
   authorsRefresh();orgSelRefresh();stats();renderTab();
   $("#asof").textContent=j.generatedAt?`${j.generatedAt} 업데이트`:"";ASOF=(j.generatedAt||"").slice(5).replace("-","/");renderMList();document.body.classList.add("ready")}
+// 월 이동 · 맨 위로 · 고정 머리(월·기관 구분줄)가 붙을 자리 = 헤더 바로 아래
+$("#mJump").onchange=e=>{const k=e.target.value;e.target.value="";const hd=k&&document.querySelector(`#mList .mhead[data-ym="${k}"]`);if(!hd)return;
+  const L=$("#mList");if(L.scrollHeight>L.clientHeight+2)L.scrollTop+=hd.getBoundingClientRect().top-L.getBoundingClientRect().top;   /* PC: 목록 안에서 */
+  else scrollTo({top:hd.getBoundingClientRect().top+scrollY-stickTop()+1})};
+const setStick=()=>document.documentElement.style.setProperty("--stick",stickTop()+"px");
+addEventListener("resize",setStick);setStick();if(document.fonts&&document.fonts.ready)document.fonts.ready.then(setStick);
+const topBtn=$("#topBtn");let topTick=false;
+addEventListener("scroll",()=>{if(topTick)return;topTick=true;requestAnimationFrame(()=>{topTick=false;topBtn.hidden=scrollY<900})},{passive:true});
+topBtn.onclick=()=>scrollTo({top:0,behavior:smooth()});
 // 인터넷이 끊기면 알림(서비스워커가 마지막으로 받은 사본을 보여준다)
 addEventListener("keydown",e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"");
   if(e.key==="/"&&!typing&&$("#gate").hidden){/* 비밀번호 화면이 아닐 때만 */const box={meetings:"#mq",orgs:"#oq",demand:"#dq",people:"#pq"}[tab];if(tab==="dash"){if(Dash.focusFind())e.preventDefault()}else if(box){e.preventDefault();$(box).focus();$(box).select()}}

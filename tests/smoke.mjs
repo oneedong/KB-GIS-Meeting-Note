@@ -233,6 +233,25 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('글자 크기 크게', await page.evaluate(() => document.documentElement.dataset.fs) === 'l');
   await page.click('#fsBtn'); await page.click('#fsBtn');
   ok('글자 크기 보통으로 돌아옴', await page.evaluate(() => document.documentElement.dataset.fs) === 'm');
+
+  // 긴 목록 이동: 월 이동 상자 · 맨 위로 단추 · 탭을 오가도 보던 자리 · 현재 탭 다시 누르면 맨 위 · 누르는 대상 크기
+  ok('월 이동: 한 달뿐이면 숨김', await page.locator('#mJump').isHidden());
+  await page.evaluate(() => jumpFill({ '2026-01': 2, '2025-12': 1 }));
+  ok('월 이동: 두 달 이상이면 달 목록', await page.locator('#mJump').isVisible() && (await page.locator('#mJump option').count()) === 3
+    && (await page.locator('#mJump option').nth(1).textContent()).startsWith('2026년 1월'));
+  await page.evaluate(() => { renderMList(); document.body.style.minHeight = '4000px'; scrollTo(0, 1500); });
+  ok('길게 내려가면 맨 위로 단추', await page.locator('#topBtn').waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false));
+  await page.locator(`${tabSel}[data-tab="orgs"]`).click();
+  await page.locator(`${tabSel}[data-tab="meetings"]`).click();
+  ok('탭을 다녀와도 보던 자리', Math.abs((await page.evaluate(() => scrollY)) - 1500) < 5);
+  await page.click('#topBtn');
+  ok('맨 위로 단추를 누르면 맨 위(단추는 사라짐)', await page.waitForFunction(() => scrollY === 0 && document.querySelector('#topBtn').hidden, null, { timeout: 4000 }).then(() => true, () => false));
+  await page.evaluate(() => scrollTo(0, 1200));
+  await page.locator(`${tabSel}[data-tab="meetings"]`).click();
+  ok('현재 탭을 다시 누르면 맨 위로', await page.waitForFunction(() => scrollY === 0, null, { timeout: 4000 }).then(() => true, () => false));
+  await page.evaluate(() => { document.body.style.minHeight = ''; });
+  if (vp.width < 760) ok('휴대폰: 누르는 대상 36px 이상', (await page.locator('.iconbtn, #mQuick .qbtn').evaluateAll((a) => Math.min(...a.map((e) => e.getBoundingClientRect().height).filter((x) => x > 0)))) >= 36);
+
   await page.evaluate(() => gotoPerson('p-test1'));
   const links = await page.locator('#pMain a.contact').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
   ok('전화·메일 링크', links.includes('tel:01000000000') && links.includes('mailto:hong@example.com'));
