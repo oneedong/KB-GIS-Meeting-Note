@@ -155,7 +155,8 @@ function renderMList(){const f=mFiltered(),L=$("#mList"),q=$("#mq").value.trim()
       <div class="chips">${(r.assets||[]).slice(0,3).map(t=>`<span class="chip asset">${esc(SHORT[t]||t)}</span>`).join("")}${r.truncated?`<span class="chip cut">✂ 잘림</span>`:""}${(r.flags||[]).some(x=>x.startsWith("내부용"))?`<span class="chip flag">내부용</span>`:""}</div></div></button>`}).join("")}
 function ago(d){const n=Math.round((Date.parse(today())-Date.parse(d))/864e5);return n<=0?"오늘":n===1?"어제":n<7?`${n}일 전`:n<35?`${Math.round(n/7)}주 전`:n<365?`${Math.round(n/30)}개월 전`:""}
 function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm();
-  const r=M.find(x=>x.id===mSel);if(!r){W.innerHTML=`<div class="empty">왼쪽에서 미팅을 선택하세요.</div>`;return}
+  const r=M.find(x=>x.id===mSel);if(!r){const f=!isMob()&&$("#mList .item");if(f&&f.dataset.id!==mSel){mSel=f.dataset.id;renderMList();return renderMMain()}   /* PC: 빈 칸 대신 맨 위(최근) 미팅 */
+    W.innerHTML=`<div class="empty">왼쪽에서 미팅을 선택하세요.</div>`;return}
   const {y,m,d}=md(r.date),att=parseAtt(r.attendees),{secs}=parseBody(r.body),o=orgOf(r.org),q=$("#mq").value.trim().toLowerCase();
   const inner=(r.flags||[]).some(x=>x.startsWith("내부용")),checks=(r.flags||[]).filter(x=>!x.startsWith("내부용")&&x!=="원문 잘림");
   const list=mFiltered(),i=list.findIndex(x=>x.id===r.id),newer=i>0?list[i-1]:null,older=i>=0&&i<list.length-1?list[i+1]:null;
@@ -234,7 +235,8 @@ function renderOList(){const f=oFiltered(),L=$("#oList");$("#oCnt").textContent=
       <div class="ttl">${esc(o.name)}</div><div class="sub2">${esc(o.type)} · 미팅 ${n}건${last?` · 최근 ${esc(last.slice(5).replace("-","/"))}`:""}</div>
       <div class="chips">${sg.slice(0,4).map(([k,v])=>`<span class="sg s-${esc(v.s)}" style="font-size:10.5px;padding:0 6px">${esc(SHORT[k]||k)}</span>`).join("")}</div></div></button>`}).join("")}
 function renderOMain(){const W=$("#oMain");if(oMode!=="view")return renderOForm();
-  const o=O.find(x=>x.id===oSel);if(!o){W.innerHTML=`<div class="empty">왼쪽에서 기관을 선택하세요.</div>`;return}
+  const o=O.find(x=>x.id===oSel);if(!o){const f=!isMob()&&$("#oList .item");if(f&&f.dataset.id!==oSel){oSel=f.dataset.id;renderOList();return renderOMain()}
+    W.innerHTML=`<div class="empty">왼쪽에서 기관을 선택하세요.</div>`;return}
   const ms=meetingsOf(o).sort((a,b)=>b.date.localeCompare(a.date)),ps=peopleOf(o),sig=Object.entries(o.signals||{}).sort((a,b)=>STATES.indexOf(a[1].s)-STATES.indexOf(b[1].s));
   W.innerHTML=BACK+`<div class="head"><div class="t"><div class="eyebrow">${esc(o.type)}${(o.aliases||[]).length?" · 약칭 "+(o.aliases||[]).map(esc).join(", "):""}</div>
     <h2>${esc(o.name)}</h2><div class="sub2">미팅 ${ms.length}건${ms[0]?` · 최근 ${esc(ms[0].date)}`:""} · 인물 ${ps.length}명</div></div>
@@ -333,6 +335,7 @@ function renderPMain(){const W=$("#pMain");if(pMode!=="view")return renderPForm(
       ${ms.length?`<div class="sec"><h3>참석한 미팅</h3><div class="timeline">${ms.map(m=>`<button type="button" class="tl" data-mid="${esc(m.id)}"><span class="d">${esc(m.date)}</span><span>${esc(m.org)} ${esc(m.dept||"")}</span></button>`).join("")}</div></div>`:""}</div>`}
   const chartOrg=org||(p&&p.org);
   if(chartOrg){const c=chartHtml(chartOrg);if(c)h+=(p?"":BACK)+`<div class="body" style="${p?"border-top:1px solid var(--line)":""}"><div class="sec"><h3>${esc(chartOrg)} 조직도</h3>${c}</div><p class="basis">● 표시는 연락처(휴대폰·이메일)가 있는 인물. 노란 배경은 팀장.</p></div>`}
+  if(!h&&!isMob()){const f=$("#pList .item");if(f&&f.dataset.id!==pSel){pSel=f.dataset.id;renderPList();return renderPMain()}}
   W.innerHTML=h||`<div class="empty">기관을 고르면 조직도가, 인물을 고르면 상세가 보입니다.</div>`;
   W.querySelectorAll("[data-pid]").forEach(b=>b.onclick=()=>{pSel=b.dataset.pid;pMode="view";renderPList();renderPMain()});
   W.querySelectorAll("[data-mid]").forEach(b=>b.onclick=()=>gotoMeeting(b.dataset.mid));

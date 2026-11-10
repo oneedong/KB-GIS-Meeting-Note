@@ -49,6 +49,26 @@ const ok = (name, cond) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}`); 
 // 보안 정책(CSP): 인라인 스크립트 해시가 index.html 과 맞는지
 ok('CSP 해시 맞음', (() => { try { execFileSync(process.execPath, [join(ROOT, 'scripts/csp.mjs'), '--check'], { stdio: 'pipe' }); return true; } catch { return false; } })());
 
+// 대시보드 다듬기(scripts/dash_curate.py): 작업 기록(금감원 보고·출처 설명·시트별 열)을 빼고 시트 순서·묶음·숨김을 정한다
+{
+  const f = join(ROOT, 'tests', '_curate.json');
+  const tbl = (title, cols) => ({ t: 'table', title, cols: cols.map((l, i) => ({ k: 'c' + i, l, f: 'text' })), rows: [{ c: Object.fromEntries(cols.map((l, i) => ['c' + i, '가상'])) }] });
+  writeFileSync(f, JSON.stringify({ sheets: [
+    { name: '2026 RFP·RFI', group: 'x', short: 'x', view: [tbl('목록', ['기관'])] },
+    { name: '검증', group: 'x', short: 'x', view: [] },
+    { name: '약정 통계', group: 'x', short: 'x', view: [
+      { t: 'kpis', items: [{ l: '약정 건수', v: 1 }, { l: '금감원 보고 중', v: 1 }] },
+      { t: 'notes', items: ['가상 출처 설명'] },
+      tbl('금감원 보고 여부별', ['구분']),
+      tbl('기관별 — 2010~현재 (기관명 통일 집계)', ['기관명', '2010~21 약정 건수', 'USD 환산', '함께 집계한 표기'])] },
+    { name: 'KPI 실적 요약', group: 'x', short: 'x', view: [] }] }));
+  execFileSync('python3', [join(ROOT, 'scripts/dash_curate.py'), f], { stdio: 'pipe' });
+  const c = JSON.parse(readFileSync(f, 'utf8')), st = c.sheets.find((x) => x.name === '약정 통계');
+  ok('대시보드 다듬기: 시트 순서·검증 숨김', c.sheets.map((x) => x.short).join(',') === 'KPI 실적 요약,RFP·RFI,약정 현황 (2010~)');
+  ok('대시보드 다듬기: 금감원·출처 설명 빼고 합계 열만', st.view.length === 2 && st.view[0].items.length === 1
+    && st.view[1].cols.map((x) => x.l).join(',') === '기관명,USD 환산' && st.view[1].title === '기관별 (2010~현재)');
+}
+
 const browser = await chromium.launch();
 for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', width: 1280, height: 860 }]) {
   console.log(`— ${vp.name} ${vp.width}×${vp.height}`);
@@ -107,7 +127,10 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('대시보드 요약 카드', (await page.locator('#dzMain .kc').count()) === 2 && (await page.textContent('#dzMain')).includes('12.30'));
   ok('대시보드 차트(2계열 범례)', (await page.locator('#dzBody svg.ch path').count()) >= 5 && (await page.locator('#dzBody .lg span').count()) === 2);
   ok('순위 막대', (await page.locator('#dzBody .hb-r').count()) === 3);
-  ok('검증 배지', (await page.textContent('#dzMain .ck')).includes('3/3'));
+  ok('검증은 어긋날 때만 표시(3/3 일치 → 배지 없음)', (await page.locator('#dzMain .ck').count()) === 0);
+  // 시트 고르기: PC·태블릿은 왼쪽 목록, 휴대폰은 묶음별 선택 상자
+  const pickSheet = (name) => vp.width < 760 ? page.selectOption('#dzNav .dz-pick select', name) : page.locator(`.dz-item[data-s="${name}"]`).click();
+  if (vp.width < 760) ok('휴대폰 시트 선택 상자(묶음별)', (await page.locator('#dzNav .dz-pick optgroup').count()) >= 1 && !(await page.locator('.dz-item').first().isVisible()));
   ok('요약에 시트 바로가기', (await page.locator('#dzBody .qk').count()) === 2);
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-dash.png`), fullPage: vp.width < 760 });
   await page.fill('#gq', 'Demo Partners'); await page.waitForTimeout(400);
@@ -136,14 +159,14 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator('#xs td.nt').first().click();
   ok('셀 누르면 전체 글자·메모', await page.locator('#cellbar').isVisible() && (await page.textContent('#cellbar')).includes('가상 메모'));
   await page.locator('.dz-seg button[data-m="v"]').click();
-  await page.locator('.dz-item[data-s="__sum"]').click();
+  await pickSheet('__sum');
   await page.locator('.dz-seg button[data-m="g"]').click();
   await page.locator('#xs td').first().waitFor();
   ok('요약의 원본(화면 배치 시트)은 머리글 고정 없음', (await page.locator('#xs tr.fz').count()) === 0);
   await page.locator('.dz-seg button[data-m="v"]').click();
 
   // 연도별 묶음(tabs, KPI 실적 요약): 처음엔 최근 연도, 단추로 그 해 카드·근거·목록으로 바뀐다
-  await page.locator('.dz-item[data-s="가상 연도별"]').click();
+  await pickSheet('가상 연도별');
   await page.locator('#dzBody .yseg button').first().waitFor();
   const ypanel = () => page.textContent('#dzBody .ypanel');
   ok('연도 단추·처음엔 최근 연도', (await page.locator('#dzBody .yseg button').count()) === 2
@@ -154,7 +177,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator('#dzBody .ypanel .fold summary').click();
   ok('그 해 목록 펼치기', (await page.textContent('#dzBody .ypanel .fold')).includes('가상 GP 2025-2'));
   ok('연도 화면 가로 넘침 없음', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-  await page.locator('.dz-item[data-s="__sum"]').click();
+  await pickSheet('__sum');
 
   // 기억하기 → 새로고침해도 바로 열림
   await page.reload();

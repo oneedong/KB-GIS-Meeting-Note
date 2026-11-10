@@ -302,8 +302,12 @@ def _clean(o):
     if isinstance(o, dict): return {k: _clean(v) for k, v in o.items()}
     if isinstance(o, list): return [_clean(v) for v in o]
     return o
+# ── 4) 앱 화면 다듬기 — 작업 기록 블록·열 빼기, 시트 묶음·순서·짧은 이름(scripts/dash_curate.py, 사용자 요청 2026-11-10)
+import dash_curate
+dash_curate.curate(data)
+out_sheets = data["sheets"]
 json.dump(_clean(data), open(OUT, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"), default=str)
 shutil.rmtree(tmp, ignore_errors=True)
-print(f"dash.json → {OUT}  시트 {len(out_sheets)}개 · 셀 {sum(len(r) for s in out_sheets for r in s['rows']):,}개 · "
+print(f"dash.json → {OUT}  앱에 보일 시트 {len(out_sheets)}개 · 셀 {sum(len(r) for s in out_sheets for r in s['rows']):,}개 · "
       f"{os.path.getsize(OUT)/1e6:.1f}MB · 검증 {chk['ok']}/{chk['n']} · 기준일 {asof}")
 for s in out_sheets: print(f"  [{s['group']}] {s['name']}: {len(s['rows'])}행 × {len(s['cols'])}열 · 정리 화면 {'블록 ' + str(len(s['view'])) + '개' if s.get('view') else '없음(원본만)'}")

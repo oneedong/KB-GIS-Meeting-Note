@@ -13,6 +13,7 @@ body.dashmode .page{max-width:1680px}
 .dz-item:hover{background:var(--soft)}
 .dz-item[aria-current="true"]{background:var(--sel);box-shadow:inset 3px 0 0 var(--kb-yellow);font-weight:700}
 .dz-item.sum{font-weight:700}
+.dz-pick{display:none}   /* 휴대폰에서만: 묶음별 시트 선택 상자 */
 .dz-main{min-width:0;display:flex;flex-direction:column;gap:14px}
 .dz-head{display:flex;gap:10px 14px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
 .dz-head h2{margin:2px 0 0;font:700 21px/1.3 var(--f-display)}
@@ -277,6 +278,10 @@ body.dashmode .page{max-width:1680px}
   .dz{gap:12px}
   .yseg{align-self:stretch}.yseg button{flex:1;padding:8px 2px;font-size:13.5px}   /* 연도 단추 다섯 개가 한 줄에 다 보이게 */
   .dz-nav{margin:0 -16px;border-radius:0;border-left:0;border-right:0;padding:8px 16px}
+  .dz-nav>.dz-item,.dz-nav>.dz-grp{display:none}
+  .dz-pick{display:flex;align-items:center;gap:10px;width:100%}
+  .dz-pick span{font:600 12px var(--f-body);color:var(--muted);flex:none}
+  .dz-pick select{flex:1;min-width:0;font:700 15px var(--f-body);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--fg)}
   .dz-head{align-items:flex-start}
   .dz-head h2{font-size:19px}
   .dz-seg{width:100%}.dz-seg button{flex:1}

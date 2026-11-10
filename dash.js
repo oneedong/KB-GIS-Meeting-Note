@@ -63,14 +63,19 @@ const Dash = (() => {
   function paintNav() {
     const nav = $("#dzNav");
     let out = `<button type="button" class="dz-item sum" data-s="${SUM}" aria-current="${sel === SUM}">요약</button>`;
+    // 휴대폰: 시트가 많아 가로 칩 대신 묶음별 목록(선택 상자)
+    let pick = `<option value="${SUM}"${sel === SUM ? " selected" : ""}>요약</option>`;
     let g = null;
     D.sheets.forEach((s) => {
       if (s.name === DEMO && hasView(s)) return;     // 요약이 곧 대시보드 시트
-      if (s.group !== g) { g = s.group; out += `<div class="dz-grp">${h(g)}</div>`; }
+      if (s.group !== g) { if (g !== null) pick += `</optgroup>`; g = s.group; out += `<div class="dz-grp">${h(g)}</div>`; pick += `<optgroup label="${h(g)}">`; }
       out += `<button type="button" class="dz-item" data-s="${h(s.name)}" title="${h(s.name)}" aria-current="${sel === s.name}">${h(s.short)}</button>`;
+      pick += `<option value="${h(s.name)}"${sel === s.name ? " selected" : ""}>${h(s.short)}</option>`;
     });
-    nav.innerHTML = out;
+    if (g !== null) pick += `</optgroup>`;
+    nav.innerHTML = out + `<label class="dz-pick"><span>시트</span><select aria-label="대시보드 시트 고르기">${pick}</select></label>`;
     nav.querySelectorAll("[data-s]").forEach((b) => b.onclick = () => go(b.dataset.s));
+    $(".dz-pick select", nav).onchange = (e) => go(e.target.value);
     const on = nav.querySelector('[aria-current="true"]');
     if (on && matchMedia("(max-width:1100px)").matches) on.scrollIntoView({ block: "nearest", inline: "center" });
   }
@@ -90,7 +95,7 @@ const Dash = (() => {
     const title = isSum ? "대시보드 요약" : s.short;
     const eyebrow = isSum ? `기준일 ${h(D.asof)} · ${h(D.generatedAt)} 업데이트` : `${h(s.group)} · 기준일 ${h(D.asof)}`;
     const meta = isSum ? `<div class="dz-meta"><span>USDKRW <b>${num(fx.usd, 2)}</b></span><span>EURKRW <b>${num(fx.eur, 2)}</b></span>
-        <button type="button" class="ck ${ck.ok === ck.n ? "ok" : "ng"}" data-s="검증" title="${h((ck.fails || []).join(" / "))}">검증 ${ck.ok}/${ck.n} ${ck.ok === ck.n ? "✔" : "확인 필요"}</button></div>` : "";
+        ${ck.ok !== ck.n ? `<button type="button" class="ck ng" data-s="검증" title="${h((ck.fails || []).join(" / "))}">검증 ${ck.ok}/${ck.n} 확인 필요</button>` : ""}</div>` : "";   // 엑셀 정합성 검증은 어긋날 때만 보인다
     const seg = canView && canGrid ? `<div class="seg dz-seg" role="group" aria-label="보기 방식"><button type="button" data-m="v" aria-pressed="${m === "v"}">정리 화면</button><button type="button" data-m="g" aria-pressed="${m === "g"}">엑셀 원본</button></div>` : "";
     const gs = isSum && m === "v" ? `<div class="gfind"><input type="search" id="gq" placeholder="대시보드 전체에서 찾기 (운용사·펀드·기관…)" aria-label="대시보드 전체에서 찾기" autocomplete="off"></div>` : "";
     $("#dzMain").innerHTML = `
