@@ -120,7 +120,10 @@ const Dash = (() => {
   function renderBlocks(blocks, el, key) {
     bid = 0; charts = [];
     const mounts = [];
-    el.innerHTML = blocks.map((b, i) => blockHtml(b, `${key}:${b.id || i}`, mounts)).join("");
+    let krwOn = false;
+    walk(blocks, (b) => { if (b.cu || (b.items || []).some((k) => k.cu) || (b.cols || []).some((c) => c.cu)) krwOn = true; });
+    const note = krwOn && D.fx && D.fx.usd ? `<p class="basis krwnote">억원 = 달러 금액 × 기준일(${h(D.asof)}) 매매기준율 USDKRW ${num(D.fx.usd, 2)} — 약정·발생 당시 환율과 다를 수 있습니다.</p>` : "";
+    el.innerHTML = note + blocks.map((b, i) => blockHtml(b, `${key}:${b.id || i}`, mounts)).join("");
     mounts.forEach((fn) => fn());
   }
   function blockHtml(b, key, mounts) {
@@ -165,7 +168,7 @@ const Dash = (() => {
       const p = k.pct == null ? null : Math.max(0, Math.min(1, k.pct));
       const v = typeof k.v === "number" ? fmt(k.v, k.f || "n0") : h(k.v ?? "-");
       return `<div class="kc${k.tone ? " t-" + k.tone : ""}"><div class="kc-l">${h(k.l)}</div>
-        <div class="kc-v">${v}${k.u ? `<span>${h(k.u)}</span>` : ""}</div>
+        <div class="kc-v">${v}${k.u ? `<span>${h(k.u)}</span>` : ""}</div>${k.cu && typeof k.v === "number" ? `<div class="kc-k">≈ ${krw(k.v, k.cu)}원</div>` : ""}
         ${p == null ? "" : `<div class="kc-bar" role="img" aria-label="${h(k.s || "")}"><i style="width:${(p * 100).toFixed(1)}%"></i></div>`}
         ${k.s ? `<div class="kc-s">${h(k.s)}</div>` : ""}${k.note ? `<div class="kc-n">${h(k.note)}</div>` : ""}</div>`;
     }).join("")}</div>`;
@@ -183,6 +186,14 @@ const Dash = (() => {
   // ── 숫자 형식 ──────────────────────────────────────────
   const NFS = [0, 1, 2, 3].map((d) => new Intl.NumberFormat("ko-KR", { minimumFractionDigits: d, maximumFractionDigits: d }));
   const num = (v, d = 0) => (v == null || typeof v !== "number" || isNaN(v)) ? "-" : NFS[Math.max(0, Math.min(3, d))].format(v);
+  // 억원 함께 표기(사용자 요청): cu = 값의 단위 M(USD 백만)·K(USD 천)·1(USD) → 기준일 USDKRW 로 억원(scripts/dash_curate.py 가 표시)
+  const CU = { M: 1e6, K: 1e3, 1: 1 };
+  const krw = (v, cu) => {
+    const r = D && D.fx && D.fx.usd;
+    if (!r || typeof v !== "number" || !CU[cu]) return "";
+    const e = v * CU[cu] * r / 1e8, a = Math.abs(e);
+    return num(e, a >= 100 || a === 0 ? 0 : a >= 10 ? 1 : 2) + "억";
+  };
   function fmt(v, f, row, unit) {
     if (v == null || v === "") return "";
     if (f === "bool") return v === true ? "✔ 일치" : v === false ? "✖ 불일치" : h(v);
@@ -217,8 +228,8 @@ const Dash = (() => {
     if (c.f === "bar" && typeof v === "number") return `<span class="pbar"><i style="width:${Math.max(0, Math.min(100, v * 100)).toFixed(1)}%"></i></span><span class="pv">${fmt(v, "pct")}</span>`;
     if (c.f === "months") return months(v);
     if (c.f === "long") return `<span class="long">${h(v)}</span>`;
-    const s = fmt(v, c.f, r, unit);
-    return typeof v === "number" && v < 0 ? `<span class="neg">${s}</span>` : s;
+    const s = fmt(v, c.f, r, unit), k = c.cu && typeof v === "number" ? krw(v, c.cu) : "";
+    return (typeof v === "number" && v < 0 ? `<span class="neg">${s}</span>` : s) + (k ? `<span class="krw">${k}</span>` : "");
   }
   let curLabels = null;
   function months(v) {
@@ -297,8 +308,10 @@ const Dash = (() => {
     const show = (e) => {
       const g = e.target.closest(".cg"); if (!g) { tip.hidden = true; return; }
       const i = +g.dataset.i, f = b.f || "n1";
-      const rows = b.series.map((s, j) => `<div><i style="background:${col[j]}"></i>${h(s.n)}<b>${fmt(s.v[i] || 0, f)}</b></div>`).join("");
-      const tot = b.stack && b.series.length > 1 ? `<div class="tt"><span>합계</span><b>${fmt(b.tot ? b.tot[i] : b.series.reduce((a, s) => a + (s.v[i] || 0), 0), f)}</b></div>` : "";
+      const kw = (v) => b.cu ? ` <small>${krw(v, b.cu)}</small>` : "";
+      const rows = b.series.map((s, j) => `<div><i style="background:${col[j]}"></i>${h(s.n)}<b>${fmt(s.v[i] || 0, f)}${kw(s.v[i] || 0)}</b></div>`).join("");
+      const tv = b.tot ? b.tot[i] : b.series.reduce((a, s) => a + (s.v[i] || 0), 0);
+      const tot = b.stack && b.series.length > 1 ? `<div class="tt"><span>합계</span><b>${fmt(tv, f)}${kw(tv)}</b></div>` : "";
       tip.innerHTML = `<div class="th">${h(b.cats[i])}${b.sub ? ` <small>${h(b.sub.split("·")[0])}</small>` : ""}</div>${rows}${tot}`;
       tip.hidden = false;
       const wr = wrap.getBoundingClientRect(), gr = g.getBoundingClientRect();
@@ -319,7 +332,7 @@ const Dash = (() => {
       const items = b.sets ? (b.sets[st.pick] || []) : b.items;
       const mx = Math.max(1e-9, ...items.map((x) => Math.abs(x.v)));
       const chips = b.sets ? `<div class="seg sm" role="group" aria-label="연도">${Object.keys(b.sets).map((k) => `<button type="button" data-p="${h(k)}" aria-pressed="${k === st.pick}">${h(k)}</button>`).join("")}</div>` : "";
-      el.innerHTML = `${head(b, chips)}<div class="hb${b.rank ? " rank" : ""}">${items.length ? items.map((x, i) => `<div class="hb-r${x.hi ? " on" : ""}${b.rank && i === 0 ? " on" : ""}">${b.rank ? `<span class="hb-n">${i + 1}</span>` : ""}<span class="hb-y" title="${h(x.l)}">${h(x.l)}</span><span class="hb-t"><i style="width:${Math.max(0, x.v / mx * 100).toFixed(1)}%"></i></span><span class="hb-v">${fmt(x.v, b.f)}</span></div>`).join("") : `<div class="empty">값 없음</div>`}</div>`;
+      el.innerHTML = `${head(b, chips)}<div class="hb${b.rank ? " rank" : ""}${b.cu ? " kr" : ""}">${items.length ? items.map((x, i) => `<div class="hb-r${x.hi ? " on" : ""}${b.rank && i === 0 ? " on" : ""}">${b.rank ? `<span class="hb-n">${i + 1}</span>` : ""}<span class="hb-y" title="${h(x.l)}">${h(x.l)}</span><span class="hb-t"><i style="width:${Math.max(0, x.v / mx * 100).toFixed(1)}%"></i></span><span class="hb-v">${fmt(x.v, b.f)}${b.cu ? `<small class="krw">${krw(x.v, b.cu)}</small>` : ""}</span></div>`).join("") : `<div class="empty">값 없음</div>`}</div>`;
       $$("[data-p]", el).forEach((x) => x.onclick = () => { st.pick = x.dataset.p; draw(); });
     };
     draw();

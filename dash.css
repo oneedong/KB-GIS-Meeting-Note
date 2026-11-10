@@ -14,6 +14,12 @@ body.dashmode .page{max-width:1680px}
 .dz-item[aria-current="true"]{background:var(--sel);box-shadow:inset 3px 0 0 var(--kb-yellow);font-weight:700}
 .dz-item.sum{font-weight:700}
 .dz-pick{display:none}   /* 휴대폰에서만: 묶음별 시트 선택 상자 */
+/* 달러 금액 옆 억원 환산(기준일 환율) — 값 아래 작게 */
+.krw{display:block;font-size:11px;font-weight:500;color:var(--muted);line-height:1.25;white-space:nowrap}
+.hb.kr .hb-r{grid-template-columns:62px minmax(0,1fr) 88px}.hb.kr.rank .hb-r{grid-template-columns:18px minmax(70px,120px) minmax(0,1fr) 88px}
+.kc-k{font-size:12.5px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.krwnote{margin:-2px 2px 0}
+.tip b small{font-weight:500;color:var(--muted);margin-left:4px}
 .dz-main{min-width:0;display:flex;flex-direction:column;gap:14px}
 .dz-head{display:flex;gap:10px 14px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
 .dz-head h2{margin:2px 0 0;font:700 21px/1.3 var(--f-display)}
@@ -300,6 +306,7 @@ body.dashmode .page{max-width:1680px}
   .tbl.pnl{background:none;border:0;padding:0}
   .tbl.pnl>.bh{padding:0 2px}
   .hb.rank .hb-r{grid-template-columns:16px minmax(60px,96px) minmax(0,1fr) 64px}
+  .hb.kr.rank .hb-r{grid-template-columns:16px minmax(60px,96px) minmax(0,1fr) 78px}
   .sh-tools{gap:8px}
   .sh-find{flex-basis:100%}
   .sh-zoom .btn,.sh-find .btn{padding:6px 11px}

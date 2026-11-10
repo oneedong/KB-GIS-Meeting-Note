@@ -111,22 +111,87 @@ def _sheet_rules(s):
                 b["series"] = [{"n": "약정", "v": [(x or 0) + (y or 0) for x, y in zip(a["v"], c["v"])]}]
                 b.pop("stack", None)
         if name.startswith("약정 통계"):
-            # 연도별 표는 차트와 같은 값 → 접어 두기, 자산군 × 투자전략은 접기
+            # 연도별 표(USD·억원 함께)는 펼쳐서 연도별 약정 차트 바로 아래로, 자산군 × 투자전략은 접기
             for b in _walk(v):
-                if b.get("t") == "table" and re.match(r"^연도별|^자산군 × 투자전략", b.get("title", "")):
-                    b["fold"] = True; b.setdefault("sub", ""); b["sub"] = (b["sub"] + f" · {len(b.get('rows') or [])}행").strip(" ·")
+                if b.get("t") == "table" and re.match(r"^자산군 × 투자전략", b.get("title", "")) and not b.get("fold"):
+                    b["fold"] = True; b["sub"] = (b.get("sub", "") + f" · {len(b.get('rows') or [])}행").strip(" ·")
+            yt = next((b for b in v if b.get("t") == "table" and re.match(r"^연도별", b.get("title", ""))), None)
+            ci = next((i for i, b in enumerate(v) if b.get("t") == "col"), None)
+            if yt is not None:
+                # 표 안의 작업 기록 줄: 설명 문장, 값이 0인 '차이' 줄. 연도 없는 약정은 합계가 맞도록 '연도 미기재'로 남김
+                k0, keep = yt["cols"][0]["k"], []
+                for r in yt.get("rows") or []:
+                    first = str(r["c"].get(k0, ""))
+                    if re.search(r"=|차이", first) and not any(isinstance(x, (int, float)) and x for x in r["c"].values()): continue
+                    if first.startswith("연도 칸 미기재"): r["c"][k0] = "연도 미기재"
+                    keep.append(r)
+                yt["rows"] = keep
+            if yt is not None and ci is not None:
+                yt.pop("fold", None); yt["sub"] = re.sub(r"\s*·\s*\d+행$", "", yt.get("sub", ""))
+                v = [b for b in v if b is not yt]
+                v.insert(ci + 1, yt)
         if name.startswith("기관별 약정"):
             v = [b for b in v if b.get("t") != "bars"]                                     # 약정 현황의 Top 15 와 같음
     s["view"] = v
 
 
+# ── 억원 함께 표기(사용자 요청 2026-11-10) ───────────────────────────────
+# 달러 금액(약정·발생 수수료 등)에 단위 표시 cu 를 붙이면 앱(dash.js)이 기준일 매매기준율(fx.usd)로 억원을 함께 보여준다.
+#   cu: "M" = USD 백만(USD M), "K" = USD 천, "1" = USD. 이미 원·억원인 값과 시점별 환율을 따로 쓰는 시트(KPI 실적 요약·시딩)는 제외.
+KRW_SKIP = re.compile(r"^KPI 실적 요약$|시딩")
+NOT_AMOUNT = re.compile(r"건수|수$|비중|bp|율|횟수|^No$|개수|순위")
+
+
+def _col_unit(c, sub, title=""):
+    f, l = c.get("f"), c.get("l", "")
+    if f in ("usd", "usd2", "usdk"): return "1"
+    if f not in ("n0", "n1", "n2", "n3") or NOT_AMOUNT.search(l): return None
+    if re.search(r"\(USD M\)", title): return "M"                      # '자산군별 약정금액(USD M)' 처럼 제목에 단위
+    if sub.startswith("USD M") and re.search(r"USD|환산|약정", l): return "M"
+    if re.search(r"약정\s*:\s*USD M", sub) and l == "약정": return "M"
+    if re.search(r"\(USD\)|USD 기준|USD 환산", l): return "1"
+    return None
+
+
+def _krw_text(s, fx):
+    """'USD 5,519,460' · 'USD 19,731.9M' · 'EUR 1,093.0M' 뒤에 '(≈ N억)'."""
+    def rep(m):
+        rate = (fx or {}).get(m.group(1).lower())
+        if not rate or m.string[m.end():].startswith(" (≈"): return m.group(0)      # 이미 붙어 있으면 그대로(두 번 돌려도 같게)
+        e = float(m.group(2).replace(",", "")) * (1e6 if m.group(3) else 1) * rate / 1e8
+        return f"{m.group(0)} (≈ {e:,.0f}억)" if abs(e) >= 100 else f"{m.group(0)} (≈ {e:,.1f}억)"
+    return re.sub(r"\b(USD|EUR) (\d[\d,]*(?:\.\d+)?)(M?)(?![\d,.])", rep, s)
+
+
+def _mark_krw(d):
+    fx = d.get("fx") or {}
+    for s in d["sheets"]:
+        if KRW_SKIP.search(s["name"]): continue
+        for b in _walk(s.get("view") or []):
+            t, sub = b.get("t"), b.get("sub") or ""
+            if t == "kpis":
+                for k in b["items"]:
+                    if isinstance(k.get("v"), (int, float)) and k.get("u") in ("USD M", "USD천"): k["cu"] = "M" if k["u"] == "USD M" else "K"
+                    if k.get("s"): k["s"] = _krw_text(k["s"], fx)
+            elif t in ("bars", "col"):
+                if b.get("f") == "usdk": b["cu"] = "1"
+                elif sub.startswith("USD M"): b["cu"] = "M"
+                elif sub.startswith("USD천"): b["cu"] = "K"
+            elif t == "table":
+                for c in b["cols"]:
+                    u = _col_unit(c, sub, b.get("title") or "")
+                    if u: c["cu"] = u
+
+
 def curate(d):
-    """dash.json(dict)을 제자리에서 다듬는다."""
+    """dash.json(dict)을 제자리에서 다듬는다. 두 번 돌려도 결과가 같다."""
     sheets = [s for s in d["sheets"] if not any(re.search(p, s["name"]) for p in HIDE)]
     for s in sheets:
         if s.get("view"):
             s["view"] = _clean_blocks(s["view"])
             _sheet_rules(s)
+    d["sheets"] = sheets
+    _mark_krw(d)
     ordered, used = [], set()
     for grp, items in LAYOUT:
         for pat, short in items:

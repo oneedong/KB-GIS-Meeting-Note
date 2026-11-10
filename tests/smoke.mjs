@@ -53,20 +53,22 @@ ok('CSP 해시 맞음', (() => { try { execFileSync(process.execPath, [join(ROOT
 {
   const f = join(ROOT, 'tests', '_curate.json');
   const tbl = (title, cols) => ({ t: 'table', title, cols: cols.map((l, i) => ({ k: 'c' + i, l, f: 'text' })), rows: [{ c: Object.fromEntries(cols.map((l, i) => ['c' + i, '가상'])) }] });
-  writeFileSync(f, JSON.stringify({ sheets: [
+  writeFileSync(f, JSON.stringify({ fx: { usd: 1000 }, sheets: [
     { name: '2026 RFP·RFI', group: 'x', short: 'x', view: [tbl('목록', ['기관'])] },
     { name: '검증', group: 'x', short: 'x', view: [] },
     { name: '약정 통계', group: 'x', short: 'x', view: [
-      { t: 'kpis', items: [{ l: '약정 건수', v: 1 }, { l: '금감원 보고 중', v: 1 }] },
+      { t: 'kpis', items: [{ l: '약정 건수', v: 1, s: '수수료 USD 1,000,000' }, { l: '금감원 보고 중', v: 1 }] },
       { t: 'notes', items: ['가상 출처 설명'] },
       tbl('금감원 보고 여부별', ['구분']),
       tbl('기관별 — 2010~현재 (기관명 통일 집계)', ['기관명', '2010~21 약정 건수', 'USD 환산', '함께 집계한 표기'])] },
     { name: 'KPI 실적 요약', group: 'x', short: 'x', view: [] }] }));
   execFileSync('python3', [join(ROOT, 'scripts/dash_curate.py'), f], { stdio: 'pipe' });
+  execFileSync('python3', [join(ROOT, 'scripts/dash_curate.py'), f], { stdio: 'pipe' });   // 두 번 돌려도 같아야 한다
   const c = JSON.parse(readFileSync(f, 'utf8')), st = c.sheets.find((x) => x.name === '약정 통계');
   ok('대시보드 다듬기: 시트 순서·검증 숨김', c.sheets.map((x) => x.short).join(',') === 'KPI 실적 요약,RFP·RFI,약정 현황 (2010~)');
   ok('대시보드 다듬기: 금감원·출처 설명 빼고 합계 열만', st.view.length === 2 && st.view[0].items.length === 1
     && st.view[1].cols.map((x) => x.l).join(',') === '기관명,USD 환산' && st.view[1].title === '기관별 (2010~현재)');
+  ok('대시보드 다듬기: 억원 함께(카드 문장 한 번만)', st.view[0].items[0].s === '수수료 USD 1,000,000 (≈ 10.0억)');
 }
 
 const browser = await chromium.launch();
@@ -169,6 +171,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await pickSheet('가상 연도별');
   await page.locator('#dzBody .yseg button').first().waitFor();
   const ypanel = () => page.textContent('#dzBody .ypanel');
+  ok('달러 금액에 억원 함께(기준일 환율 안내 포함)', /≈ [\d,.]+억원/.test(await page.textContent('#dzBody .ypanel .kc-k')) && (await page.locator('#dzBody .krwnote').count()) === 1);
   ok('연도 단추·처음엔 최근 연도', (await page.locator('#dzBody .yseg button').count()) === 2
     && (await page.getAttribute('#dzBody .yseg button[data-k="2026"]', 'aria-pressed')) === 'true' && (await ypanel()).includes('가상 근거 2026'));
   await page.locator('#dzBody .yseg button[data-k="2025"]').click();
