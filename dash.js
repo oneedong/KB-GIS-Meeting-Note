@@ -116,7 +116,7 @@ const Dash = (() => {
   }
 
   // ── 블록 ───────────────────────────────────────────────
-  let bid = 0;
+  let bid = 0, idp = "b";
   function renderBlocks(blocks, el, key) {
     bid = 0; charts = [];
     const mounts = [];
@@ -127,7 +127,7 @@ const Dash = (() => {
     mounts.forEach((fn) => fn());
   }
   function blockHtml(b, key, mounts) {
-    const id = "b" + (++bid);
+    const id = idp + (++bid);
     if (b.t === "row") {
       const cls = b.ratio === "2:1" ? " r21" : "";
       return `<div class="brow${cls}" style="--n:${b.blocks.length}">${b.blocks.map((x, i) => blockHtml(x, `${key}.${x.id || i}`, mounts)).join("")}</div>`;
@@ -740,5 +740,11 @@ const Dash = (() => {
     const q = $("#gq") || $("#dzBody .tb-q") || $("#shq");
     if (q) { q.focus(); q.select(); return true; } return false;
   }
-  return { render, focusFind };
+  // 리서치 탭 등 다른 화면에서 같은 블록(지표 카드·차트)을 그릴 때. id 접두어를 달리해 대시보드 요소와 겹치지 않는다
+  function blocks(list, el, key) {
+    const keep = idp; idp = "r";
+    try { const mounts = []; el.innerHTML = list.map((b, i) => blockHtml(b, `${key}:${b.id || i}`, mounts)).join(""); mounts.forEach((fn) => fn()); }
+    finally { idp = keep; }
+  }
+  return { render, focusFind, blocks };
 })();

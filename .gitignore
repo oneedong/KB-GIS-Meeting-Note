@@ -13,6 +13,10 @@ export/
 *.xls
 patch*.json
 posts*.json
+# 리서치: 구독 리포트(PDF)와 그 요약 평문 — 저장소에는 암호문 research.enc.json 만
+research.json
+research.src.json
+*.pdf
 *.csv
 node_modules/
 tests/_*.png

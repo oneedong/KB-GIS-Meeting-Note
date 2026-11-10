@@ -51,13 +51,13 @@ function memoText(r){const {m,d}=md(r.date),att=parseAtt(r.attendees);
 // ── 탭 ──
 const tabY={};
 function setTab(t,push=true){if(t!==tab)tabY[tab]=scrollY;tab=t;document.querySelectorAll(".tab,.bnav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t?"true":"false"));
-  ["meetings","orgs","demand","people","dash"].forEach(k=>$("#p-"+k).hidden=k!==t);document.body.classList.toggle("dashmode",t==="dash");
+  ["meetings","orgs","demand","people","dash","research"].forEach(k=>$("#p-"+k).hidden=k!==t);document.body.classList.toggle("dashmode",t==="dash");
   if(push){try{history.replaceState(null,"","#"+t)}catch(e){}}
   renderTab();window.scrollTo({top:tabY[t]||0});fabSync()}   /* 다른 탭에 다녀와도 보던 자리 그대로 */
 document.querySelectorAll(".tab,.bnav button").forEach(b=>b.onclick=()=>{if(b.dataset.tab===tab){const sec=$("#p-"+tab);   /* 현재 탭을 다시 누르면: 상세 닫기 → 맨 위로 */
   if(isMob()&&sec&&sec.classList.contains("detail"))closeDetail();else{scrollTo({top:0,behavior:smooth()});const L=sec&&sec.querySelector(".list");if(L)L.scrollTo({top:0,behavior:smooth()})}return}setTab(b.dataset.tab)});
 mq.addEventListener?.("change",()=>{if(!isMob())document.querySelectorAll(".split.detail").forEach(s=>s.classList.remove("detail"));if(tab==="demand")renderDemand();fabSync()});
-function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,people:()=>{renderPList();renderPMain()},dash:()=>Dash.render()})[tab]()}
+function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,people:()=>{renderPList();renderPMain()},dash:()=>Dash.render(),research:()=>Research.render()})[tab]()}
 function gotoOrg(name){const o=orgOf(name);if(!o){toast("기관 프로필이 아직 없습니다. 기관 탭에서 추가하세요.");return}oSel=o.id;oMode="view";setTab("orgs");openDetail()}
 function gotoMeeting(id){mSel=id;mMode="view";setTab("meetings");if(isMob()){openDetail();return}setTimeout(()=>{const el=document.querySelector(`#mList [data-id="${CSS.escape(id)}"]`);if(el)el.scrollIntoView({block:"nearest"})},30)}
 function gotoPerson(id){const p=P.find(x=>x.id===id);if(!p)return;pSel=id;pMode="view";setTab("people");openDetail()}
@@ -382,7 +382,7 @@ async function copy(t){try{await navigator.clipboard.writeText(t);toast("메모 
 // ── 초기화 ──
 const h=(location.hash||"").replace("#","");if(["meetings","orgs","demand","people"].includes(h))setTab(h,false);else renderTab();
 fabSync();
-addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");if(t!==tab&&["meetings","orgs","demand","people","dash"].includes(t))setTab(t,false)});
+addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");if(t!==tab&&["meetings","orgs","demand","people","dash","research"].includes(t))setTab(t,false)});
 // 암호화된 DB(data.enc.json)를 풀어서 읽기 전용으로 보여준다. 미팅 추가·수정은 Claude에 미팅노트 텍스트를 주면
 // data.enc.json 을 갱신해 다시 배포한다(CLAUDE.md).
 ["#mNew","#oNew","#pNew"].forEach(s=>$(s).hidden=true);fabSync();

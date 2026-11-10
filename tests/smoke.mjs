@@ -2,7 +2,7 @@
 // 실제 data.enc.json·비밀번호는 쓰지 않는다.   node tests/smoke.mjs
 import { createRequire } from 'module';
 import { createServer } from 'node:http';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, extname, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,12 +20,17 @@ execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', join
 const DENC = join(ROOT, 'tests', '_dash.enc.json');
 execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', join(ROOT, 'tests/dash-fixture.json'), DENC, '--salt-from', ENC],
   { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
+// 가상 리서치(tests/research-fixture.json): A4 1쪽 PDF 를 만들어 붙이고(research_build) 같은 비밀번호·salt 로 잠근다
+const RJSON = join(ROOT, 'tests', '_research.json'), RENC = join(ROOT, 'tests', '_research.enc.json');
+execFileSync(process.execPath, [join(ROOT, 'scripts/research_build.mjs'), join(ROOT, 'tests/research-fixture.json'), RJSON, '--data', join(ROOT, 'tests/fixture.json')], { stdio: 'inherit' });
+execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', RJSON, RENC, '--salt-from', ENC],
+  { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const server = createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p.endsWith('/')) p += 'index.html';
-  const file = p === '/data.enc.json' ? ENC : p === '/dash.enc.json' ? DENC : join(ROOT, p);
+  const file = p === '/data.enc.json' ? ENC : p === '/dash.enc.json' ? DENC : p === '/research.enc.json' ? RENC : join(ROOT, p);
   if (!file.startsWith(ROOT) || !existsSync(file)) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
   res.end(readFileSync(file));
@@ -193,6 +198,27 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('그 해 목록 펼치기', (await page.textContent('#dzBody .ypanel .fold')).includes('가상 GP 2025-2'));
   ok('연도 화면 가로 넘침 없음', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await pickSheet('__sum');
+
+  // 리서치 탭: 자산군 단추·지표 카드·차트·시사점·국내 LP 수요(수요판 연결), PDF 받기(A4 1쪽)
+  await page.locator(`${tabSel}[data-tab="research"]`).click();
+  await page.locator('#rsMain .rs-seg button').first().waitFor();
+  ok('리서치: 자산군 단추·지표 카드·표', (await page.locator('#rsMain .rs-seg button').count()) === 2 && (await page.locator('#rsKpi .kc').count()) === 2
+    && (await page.textContent('#rsMain .rs-hl')).includes('가상 종합 헤드라인') && (await page.locator('#rsMain .rs-tbl tbody tr').count()) === 1);
+  await page.locator('#rsMain .rs-seg button[data-k="fa"]').click();
+  ok('리서치: 자산군 바꾸기·차트·시사점·국내 LP 수요', (await page.textContent('#rsMain .rs-hl')).includes('가상 자산군 헤드라인') && (await page.locator('#rsCh svg rect').count()) === 2
+    && (await page.textContent('#rsMain .rs-ins')).includes('가상 시사점 둘') && (await page.locator('#rsMain .rs-st[data-strat="PE Buyout"]').count()) === 1);
+  ok('리서치 화면 가로 넘침 없음', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  {
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.click('#rsPdf')]);
+    const f = join(ROOT, 'tests', `_dl-${vp.width}.pdf`); await dl.saveAs(f);
+    const pdf = readFileSync(f); unlinkSync(f);
+    ok('리서치: PDF 받기(A4 1쪽·영문 파일 이름)', dl.suggestedFilename() === 'KB_GIS_Research_2026Q1_FakeAsset.pdf' && pdf.subarray(0, 5).toString() === '%PDF-'
+      && (pdf.toString('latin1').match(/\/Type\s*\/Page(?![s\w])/g) || []).length === 1);
+  }
+  await page.locator('#rsMain .rs-st[data-strat="PE Buyout"]').click();
+  ok('리서치 → 전략 수요판으로 이동', !(await page.locator('#p-demand').evaluate((e) => e.hidden)) && (await page.inputValue('#dStrat')) === 'PE Buyout');
+  await page.locator(`${tabSel}[data-tab="dash"]`).click();
+  await page.locator(vp.width < 760 ? '#dzNav .dz-pick select' : '#dzNav .dz-item').first().waitFor();
 
   // 기억하기 → 새로고침해도 바로 열림
   await page.reload();

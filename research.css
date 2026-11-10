@@ -1,0 +1,50 @@
+/* 리서치 탭 — 자산군별 리포트 정리(지표 카드·차트는 dash.css 의 블록 스타일을 그대로 쓴다) */
+#rsMain{display:flex;flex-direction:column;gap:14px;min-width:0}
+.rs-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.rs-head h2{margin:2px 0 0;font:800 22px/1.25 var(--f-display)}
+.rs-head h2 small{font-size:14px;font-weight:600;color:var(--muted);margin-left:4px}
+.rs-pdf{display:inline-flex;align-items:center;gap:7px;background:var(--kb-yellow);border-color:var(--kb-yellow);color:#2A2621;font-weight:700}
+.rs-pdf svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.rs-pdf small{font-weight:600;opacity:.75}
+.rs-seg{align-self:flex-start}
+.rs-warn{margin:0;padding:9px 12px;border-radius:8px;background:var(--warn-bg);color:var(--warn);font-size:13px}
+.rs-warn a{color:inherit;font-weight:700}
+.rs-ttl h3{margin:4px 0 6px;font:800 20px/1.25 var(--f-display)}
+.rs-ttl h3 small{font-size:13px;font-weight:600;color:var(--muted);margin-left:4px}
+.rs-hl{margin:0;padding:2px 0 2px 12px;border-left:4px solid var(--kb-yellow);font:700 16px/1.5 var(--f-display);word-break:keep-all}
+#rsKpi:empty,#rsCh:empty{display:none}
+#rsCh{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rs-c{display:flex;flex-direction:column;gap:2px;padding:12px 14px 8px}
+.rs-ct{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.rs-ct b{font:700 14px var(--f-display)}.rs-ct small{font-size:12px;color:var(--muted)}
+.rs-c svg{display:block;width:100%;max-width:270px;height:auto;margin:2px auto 0}
+.rs-c svg line{stroke:var(--line);stroke-width:.8}
+.rs-c svg rect{fill:var(--ch2,#8F8676)}.rs-c svg rect.on{fill:var(--kb-yellow)}
+.rs-c svg text{text-anchor:middle;font-family:var(--f-body)}
+.rs-c svg text.v{font-size:9.5px;font-weight:700;fill:var(--fg)}.rs-c svg text.l{font-size:8.2px;fill:var(--muted)}
+.rs-secs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.rs-sec h3,.rs-out h3,.rs-ins h3{margin:0 0 8px;font:700 15px var(--f-display);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.rs-sec h3::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--kb-yellow);flex:none;align-self:center}
+.rs-sec ul,.rs-out ul,.rs-ins ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;line-height:1.6;font-size:14.5px;word-break:keep-all}
+.rs-out{background:var(--soft);border-radius:10px;padding:14px 16px}
+.rs-ins{background:var(--sel);border:1px solid var(--kb-yellow);border-radius:10px;padding:14px 16px 16px}
+.rs-ins h3 small{font-size:12px;font-weight:500;color:var(--muted)}
+.rs-ins li{font-weight:500}
+.rs-dm{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+.rs-dmh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+.rs-dmh b{font:700 14px var(--f-display)}.rs-dmh span{font-size:12px;color:var(--muted)}
+.rs-dmr{display:flex;flex-wrap:wrap;gap:8px}
+.rs-st{appearance:none;display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:9px;padding:7px 10px;font:inherit;font-size:13px;cursor:pointer;min-height:38px}
+.rs-st:hover{border-color:var(--kb-yellow)}
+.rs-st>b{font-weight:700;margin-right:2px}.rs-st>b small{font-weight:500;color:var(--muted);font-size:11.5px}
+.rs-st .sg{font-size:11.5px;padding:1px 7px}
+.rs-tbl .dt td{white-space:normal;min-width:120px;line-height:1.5}
+.rs-tbl .dt td.rs-k{font-weight:700;white-space:nowrap;min-width:0}
+@media (max-width:760px){
+  .rs-head h2{font-size:19px}
+  .rs-pdf{width:100%;justify-content:center;min-height:44px}
+  .rs-seg{align-self:stretch}.rs-seg button{flex:1;padding:9px 2px;font-size:13px}
+  .rs-hl{font-size:15px}
+  .rs-secs{grid-template-columns:minmax(0,1fr)}
+  #rsCh{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.rs-c{padding:10px 10px 6px}
+  .rs-st{width:100%}
+}
