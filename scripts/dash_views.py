@@ -686,10 +686,10 @@ def v_cf(s, ctx):
         blocks.append({"t": "bars", "id": "yr", "title": "연도별 예상 수수료", "sub": "억원 · 원화 환산 합계", "f": "eok1",
                        "items": [{"l": y, "v": totals_krw[y] / 1e8, "hi": 1 if y in (cy, str(int(cy) + 1)) else 0} for y in ys if y in totals_krw]})
     tone = {"수취 완료": "ok", "미수금 인식": "warn", "진행중": "info", "예상": "muted"}
-    b = {"t": "table", "id": "cf", "title": "월별 수취 일정", "sub": "연도를 고르면 그 해 일정 · 금액은 펀드 통화",
+    b = {"t": "table", "id": "cf", "title": "월별 수취 일정", "sub": "전체 또는 연도를 골라 보기 · 금액은 펀드 통화",
          "cols": [col("sec", "구분", "tag"), col("gp", "운용사"), col("fd", "펀드"), col("ty", "보수 유형", "tag"),
                   col("am", "금액", "amt", ck="cy", sum=0), col("st", "상태", "tag", tone=tone), col("nt", "메모")],
-         "secs": secs, "pick": {"l": "연도", "opts": ys, "def": cur_y if cur_y in ys else ys[0]},
+         "secs": secs, "pick": {"l": "연도", "opts": ["전체"] + ys, "def": "전체"},
          "card": {"title": "fd", "sub": ["gp", "ty"], "amt": "am", "chips": ["st", "sec"]}, "filters": ["st", "sec"]}
     blocks.append(b)
     if notes: blocks.append({"t": "notes", "items": ["원화 환산은 엑셀의 적용 환율 기준 · " + " / ".join(notes)]})
@@ -772,9 +772,9 @@ def v_commit(s, ctx, kpi_sheet=False):
     cols += [col("fn", "펀드명(전체)", d=1), col("it", "투자유형", d=1), col("is", "투자전략", d=1), col("vi", "국내재간접 운용사", d=1),
              col("cd", "협회 코드", d=1), col("fs", "금감원 보고", d=1), col("fr", "보고 리소스", d=1)]
     cur_y = (ctx.get("asof") or "")[:4]
-    b = {"t": "table", "id": "cm", "title": "기관별 약정내역", "sub": "연도를 고르면 그 해 약정·수수료가 있는 건만",
+    b = {"t": "table", "id": "cm", "title": "기관별 약정내역", "sub": "전체 · 연도를 고르면 그 해 약정·수수료가 있는 건만",
          "cols": cols, "rows": rows, "foot": foot,
-         "pick": {"l": "연도", "opts": ylist + ["전체"], "def": cur_y if cur_y in ylist else ylist[0], "cols": pick_cols | {"전체": []}, "need": "u|f"},
+         "pick": {"l": "연도", "opts": ["전체"] + ylist, "def": "전체", "cols": {"전체": []} | pick_cols, "need": "u|f"},
          "card": {"title": "ab", "sub": ["lp", "gp"], "amt": "@u", "meta": ["@f"], "chips": (["kp"] if kpi_sheet else []) + ["st", "ac"]},
          "filters": ["ac"] + (["kp"] if kpi_sheet else []) + ["st", "gp"]}
     blocks = []
@@ -900,7 +900,7 @@ def kpi_by_year(secs, sub):
                          col("cj", "약정 실적", "n2"), col("pt", "PA 목표", "n0"), col("pa", "PA 실적", "n0"), col("pr", "PA 달성률", "pct"),
                          col("rv", "수익", "n2")],
                 "card": {"title": "y", "meta": ["kj", "kr", "pa"]}})
-    out.append({"t": "tabs", "id": "yr", "title": "연도별 상세", "items": items, "sel": items[0]["k"]})
+    out.append({"t": "tabs", "id": "yr", "title": "연도별 상세", "items": items, "sel": "전체", "all": True})   # 앱이 '전체'(모든 연도 차례로) 단추를 맨 앞에 붙인다
     out += common
     return out
 
@@ -1159,11 +1159,13 @@ def year_table(s, hr, cname, years_c, stop_words=("합계", "검증")):
 
 
 def ranking(rows, ys, f, title, sub, tid, n=10):
-    sets = {}
+    # 연도 단추: '전체'(모든 연도 합)를 맨 앞·기본값으로, 그 뒤에 연도별(사용자 요청 2026-11-12)
+    tot = sorted([{"l": r["c"]["nm"], "v": sum(r["c"].get(f"y{y}") or 0 for y in ys)} for r in rows], key=lambda x: -x["v"])
+    sets = {"전체": [x for x in tot if x["v"] > 0][:n]}
     for y in ys:
         it = sorted([{"l": r["c"]["nm"], "v": r["c"].get(f"y{y}") or 0} for r in rows], key=lambda x: -x["v"])
         sets[y] = [x for x in it if x["v"] > 0][:n]
-    return {"t": "bars", "id": tid, "title": title, "sub": sub, "f": f, "sets": sets, "def": ys[-1], "rank": True}
+    return {"t": "bars", "id": tid, "title": title, "sub": sub, "f": f, "sets": sets, "def": "전체", "rank": True}
 
 
 def v_lp(s, ctx):
@@ -1869,15 +1871,20 @@ def v_cash_history(wb, ctx):
                             col("tp", "많이 받은 곳 (상위 3)", d=1), col("dn", "당시 부서명", d=1)],
                    "rows": yrows})
     # 많이 받은 곳(연도별 상위 10)
-    sets = {}
-    for y in reversed(ys):                                                     # 최근 연도 단추가 먼저(휴대폰에서 기본 선택이 보이게)
+    allt = {}
+    for y in ys:
+        for x in data[y]["rows"]:
+            nm = x.get("gp") or x.get("fd") or "-"
+            allt[nm] = allt.get(nm, 0) + x["k"]
+    sets = {"전체": [{"l": n, "v": v / 1e8} for n, v in sorted(allt.items(), key=lambda z: -z[1]) if v > 0][:10]}   # '전체'(누적)가 맨 앞·기본값
+    for y in reversed(ys):                                                     # 그 뒤로 최근 연도부터
         top = {}
         for x in data[y]["rows"]:
             nm = x.get("gp") or x.get("fd") or "-"
             top[nm] = top.get(nm, 0) + x["k"]
         sets[f"{y}년"] = [{"l": n, "v": v / 1e8} for n, v in sorted(top.items(), key=lambda z: -z[1]) if v > 0][:10]   # '2025' 같은 숫자 키는 JS가 오름차순으로 돌려서 '년'을 붙인다
-    blocks.append({"t": "bars", "id": "top", "title": "많이 받은 곳 (연도별 상위 10)", "sub": "억원 · 2023년부터 운용사, 그 전은 시트의 펀드명 표기 그대로",
-                   "f": "eok1", "sets": sets, "def": f"{last}년", "rank": True})
+    blocks.append({"t": "bars", "id": "top", "title": "많이 받은 곳 (상위 10)", "sub": f"억원 · 전체 = {ys[0]}~{last} 누적 · 2023년부터 운용사, 그 전은 시트의 펀드명 표기 그대로",
+                   "f": "eok1", "sets": sets, "def": "전체", "rank": True})
     # 입금 내역(연도별 묶음, 최근 연도 먼저)
     secs = []
     for y in reversed(ys):

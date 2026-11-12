@@ -134,7 +134,7 @@ const Dash = (() => {
     }
     if (b.t === "tabs") {
       mounts.push(() => mountTabs(id, b, key));
-      const btns = b.items.map((x) => `<button type="button" data-k="${h(x.k)}" aria-pressed="false">${h(x.l)}</button>`).join("");
+      const btns = (b.all ? [{ k: "전체", l: "전체" }] : []).concat(b.items).map((x) => `<button type="button" data-k="${h(x.k)}" aria-pressed="false">${h(x.l)}</button>`).join("");
       return `<section class="blk ytabs" id="${id}">${head(b)}<div class="seg yseg" role="group" aria-label="${h(b.title || "선택")}">${btns}</div><div class="ypanel"></div></section>`;
     }
     if (b.t === "kpis") return kpisHtml(b);
@@ -151,11 +151,14 @@ const Dash = (() => {
   function mountTabs(id, b, key) {
     const el = document.getElementById(id); if (!el || !b.items.length) return;
     const paintTab = (k) => {
-      const it = b.items.find((x) => x.k === k) || b.items[0];
-      tabSel[key] = it.k;
-      $$(".yseg button", el).forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.k === it.k)));
+      const all = b.all && k === "전체";                                     // '전체' = 모든 연도를 차례로(맨 앞·기본값)
+      const it = all ? null : (b.items.find((x) => x.k === k) || b.items[0]);
+      tabSel[key] = all ? "전체" : it.k;
+      $$(".yseg button", el).forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.k === tabSel[key])));
       const ms = [];
-      $(".ypanel", el).innerHTML = it.blocks.map((x, i) => blockHtml(x, `${key}.${it.k}.${x.id || i}`, ms)).join("");
+      $(".ypanel", el).innerHTML = all
+        ? b.items.map((t) => `<h4 class="ysub">${h(t.l)}</h4>` + t.blocks.map((x, i) => blockHtml(x, `${key}.${t.k}.${x.id || i}`, ms)).join("")).join("")
+        : it.blocks.map((x, i) => blockHtml(x, `${key}.${it.k}.${x.id || i}`, ms)).join("");
       ms.forEach((fn) => fn());
     };
     $$(".yseg button", el).forEach((x) => x.onclick = () => paintTab(x.dataset.k));
@@ -332,7 +335,8 @@ const Dash = (() => {
     const draw = () => {
       const items = b.sets ? (b.sets[st.pick] || []) : b.items;
       const mx = Math.max(1e-9, ...items.map((x) => Math.abs(x.v)));
-      const chips = b.sets ? `<div class="seg sm" role="group" aria-label="연도">${Object.keys(b.sets).map((k) => `<button type="button" data-p="${h(k)}" aria-pressed="${k === st.pick}">${h(k)}</button>`).join("")}</div>` : "";
+      const keys = b.sets ? Object.keys(b.sets).sort((a, c) => (c === "전체") - (a === "전체")) : [];   // '전체'는 늘 맨 앞(숫자 키는 JS가 먼저 돌려서)
+      const chips = b.sets ? `<div class="seg sm" role="group" aria-label="연도">${keys.map((k) => `<button type="button" data-p="${h(k)}" aria-pressed="${k === st.pick}">${h(k)}</button>`).join("")}</div>` : "";
       el.innerHTML = `${head(b, chips)}<div class="hb${b.rank ? " rank" : ""}${b.cu ? " kr" : ""}">${items.length ? items.map((x, i) => `<div class="hb-r${x.hi ? " on" : ""}${b.rank && i === 0 ? " on" : ""}">${b.rank ? `<span class="hb-n">${i + 1}</span>` : ""}<span class="hb-y" title="${h(x.l)}">${h(x.l)}</span><span class="hb-t"><i style="width:${Math.max(0, x.v / mx * 100).toFixed(1)}%"></i></span><span class="hb-v">${fmt(x.v, b.f)}${b.cu ? `<small class="krw">${krw(x.v, b.cu)}</small>` : ""}</span></div>`).join("") : `<div class="empty">값 없음</div>`}</div>`;
       $$("[data-p]", el).forEach((x) => x.onclick = () => { st.pick = x.dataset.p; draw(); });
     };
@@ -362,7 +366,7 @@ const Dash = (() => {
     (r.x || []).map((x) => (x.rows || []).map((y) => Object.values(y).join(" ")).join(" ") + " " + (x.text || "")).join(" ")).toLowerCase());
   function baseRows(b, st) {
     let secs = b.secs || [{ rows: b.rows || [] }];
-    if (b.pick && !b.pick.cols) secs = secs.filter((s) => s.p == null || s.p === st.pick);
+    if (b.pick && !b.pick.cols && st.pick !== "전체") secs = secs.filter((s) => s.p == null || s.p === st.pick);
     const need = b.pick && b.pick.need && st.pick !== "전체" ? b.pick.need.split("|") : null;
     return secs.map((s) => ({ ...s, rows: need ? s.rows.filter((r) => need.some((p) => r.c[p + st.pick] != null)) : s.rows }));
   }
