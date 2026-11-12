@@ -1704,6 +1704,66 @@ def _fee_kind(t):
     return "그 외" if t else None
 
 
+# 수익 이력 '많이 받은 곳'용 운용사 묶음(사용자 요청 2026-11-12: 같은 운용사가 펀드명별로 쪼개지면 안 됨).
+# 2022년까지 시트엔 운용사 칸이 없어 펀드명·송금인 표기로 운용사를 찾는다. 위에서부터 처음 맞는 규칙.
+GP_RULES = [
+    (r"BIDF|BREF|BSREF|BSREP|BPREP|BGTF|BIF\s*III|BCP\s*V\b|Brookfield|BROOKFIELD", "Brookfield"),
+    (r"PCS|Permira|PERMIRA", "Permira"),
+    (r"EICF|EIVF|Exeter|Exter", "EQT Exeter"),
+    (r"EQT", "EQT"),
+    (r"AREOF|EPEP|^ARES|^Ares", "Ares"),
+    (r"Landmark|LANDMARK|LREP", "Landmark"),
+    (r"^GIP", "GIP"),
+    (r"Barings?\b|BARINGS|Baring", "Barings"),
+    (r"BSP", "BSP"),
+    (r"BDS|Bridge|BRIDGE", "Bridge"),
+    (r"USAA", "USAA"),
+    (r"Goldman|GOLDMAN|Vintage|REIP|WSSS|GSAM|GS credit|Peters\s*Hill", "Goldman Sachs"),
+    (r"Greystar|GREYSTAR", "Greystar"),
+    (r"Golden\s*Tree|GOLDEN TREE|Distressed Fund III", "Golden Tree"),
+    (r"[Cc]ar[Vv]al|CARVAL", "CarVal"),
+    (r"Coller|COLLER", "Coller"),
+    (r"Carlyle|CARLYLE|CP\s*VIII|CAP\s*V\b|CAPG|CEMOF|CICF", "Carlyle"),
+    (r"COF\s*IV|Blackstone|BLACKSTONE", "Blackstone"),
+    (r"Pomona|POMONA", "Pomona"),
+    (r"Pantheon|PANTHEON", "Pantheon"),
+    (r"Capital Dynamics", "Capital Dynamics"),
+    (r"SCP\s*III|[Ss]tep[Ss]tone|STEPSTONE", "StepStone"),
+    (r"Oaktree|OAKTREE", "Oaktree"),
+    (r"Canyon|CANYON", "Canyon"),
+    (r"홍콩|KB\s*Hong\s*Kong|KB HongKong", "KB홍콩법인"),
+    (r"^SLA|Silver\s*lake|Silverlake", "Silverlake"),
+    (r"Leucadia|LEUCADIA", "Leucadia"),
+    (r"Genstar", "Genstar"),
+    (r"Brightwood", "Brightwood"),
+    (r"Centerbridge|^Center$", "Centerbridge"),
+    (r"Madison|MADISON|MDCP", "Madison Dearborn"),
+    (r"PCCP|CORE-PLUS|Core-Plus", "PCCP"),
+    (r"Siris|SIRIS", "Siris"),
+    (r"Green\s*[Oo]ak|GREENOAK", "GreenOak"),
+    (r"COPA|Platon", "Campbell Lutyens(Project)"),
+    (r"Hancock", "John Hancock"),
+    (r"Northgate", "Northgate"),
+    (r"ARCLIGHT|ArcLight", "ArcLight"),
+    (r"JP Morgan|^jp$", "JP Morgan"),
+    (r"^APAX$|^Apax$", "Apax"),
+    (r"^Cip$|^CIP$", "CIP"),
+    (r"^Pimco$|^PIMCO$", "PIMCO"),
+    (r"^TDAM$|^TD$", "TD"),
+    (r"^Blackrock$", "BlackRock"),
+]
+
+
+def gp_name(x):
+    for src in (x.get("gp"), x.get("fd")):
+        if not src: continue
+        t = str(src).strip()
+        for rx, name in GP_RULES:
+            if re.search(rx, t): return name
+        if x.get("gp"): return t
+    return str(x.get("fd") or "-").strip()
+
+
 def cash_history_rows(wb):
     """연도 시트(2018, 2019 …) → {연도: {rows, tot, own, oth, chk}}. chk = 시트에 적힌 합계와 대조 결과."""
     out, warn = {}, []
@@ -1855,7 +1915,7 @@ def v_cash_history(wb, ctx):
             if kd: fk[kd] = fk.get(kd, 0) + x["k"]
         top = {}
         for x in rs:
-            nm = x.get("gp") or x.get("fd") or "-"
+            nm = gp_name(x)
             top[nm] = top.get(nm, 0) + x["k"]
         t3 = " · ".join(n for n, _ in sorted(top.items(), key=lambda z: -z[1])[:3])
         yrows.append({"c": {k2: v2 for k2, v2 in {
@@ -1874,16 +1934,16 @@ def v_cash_history(wb, ctx):
     allt = {}
     for y in ys:
         for x in data[y]["rows"]:
-            nm = x.get("gp") or x.get("fd") or "-"
+            nm = gp_name(x)
             allt[nm] = allt.get(nm, 0) + x["k"]
     sets = {"전체": [{"l": n, "v": v / 1e8} for n, v in sorted(allt.items(), key=lambda z: -z[1]) if v > 0][:10]}   # '전체'(누적)가 맨 앞·기본값
     for y in reversed(ys):                                                     # 그 뒤로 최근 연도부터
         top = {}
         for x in data[y]["rows"]:
-            nm = x.get("gp") or x.get("fd") or "-"
+            nm = gp_name(x)
             top[nm] = top.get(nm, 0) + x["k"]
         sets[f"{y}년"] = [{"l": n, "v": v / 1e8} for n, v in sorted(top.items(), key=lambda z: -z[1]) if v > 0][:10]   # '2025' 같은 숫자 키는 JS가 오름차순으로 돌려서 '년'을 붙인다
-    blocks.append({"t": "bars", "id": "top", "title": "많이 받은 곳 (상위 10)", "sub": f"억원 · 전체 = {ys[0]}~{last} 누적 · 2023년부터 운용사, 그 전은 시트의 펀드명 표기 그대로",
+    blocks.append({"t": "bars", "id": "top", "title": "많이 받은 곳 (상위 10)", "sub": f"억원 · 운용사 기준(2022년까지는 펀드명으로 운용사를 찾아 묶음) · 전체 = {ys[0]}~{last} 누적",
                    "f": "eok1", "sets": sets, "def": "전체", "rank": True})
     # 입금 내역(연도별 묶음, 최근 연도 먼저)
     secs = []
