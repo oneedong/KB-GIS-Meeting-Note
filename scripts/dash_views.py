@@ -1662,6 +1662,321 @@ def v_orgs(s, ctx):
     return blocks
 
 
+# ── 이력(숨긴 시트 → 앱 '정리 화면'만) ─────────────────────────────────────────
+# 사용자 요청(2026-11-12): 엑셀에서 숨긴 지난 연도 시트(현금 수취 2018~2025, 계약서 2023~2025)도 앱에서 볼 수 있게 정리.
+# 연도마다 시트 하나씩이 아니라 '수익 이력' · 'PA 계약 이력' 쪽 하나씩으로 묶는다(원본 격자 없음 — 엑셀에서 보기).
+# 시트마다 머리글이 다르다(2018~19: 펀드명·부서·금액 / 2020~21: 금액 + 부서명으로 당부서·RM 구분 /
+# 2022~: 당부서 칸·RM 부서 칸에 나눠 적음). 머리글 이름으로 칸을 찾고, 비어 있는 일자·펀드명은 바로 위 줄을 이어받는다.
+CASH_YEAR = re.compile(r"^(20\d\d)$")
+OWN_DEPT = re.compile(r"해외금상|국제금상|해외금융상품|국제금융상품|Global|글로벌")
+
+
+def _hdr(ws):
+    return {str(ws.cell(1, c).value).strip(): c for c in range(1, ws.max_column + 1) if ws.cell(1, c).value is not None}
+
+
+def _pick(H, *names, rx=None, not_rx=None):
+    for n in names:
+        if n in H: return H[n]
+    if rx:
+        for k, c in H.items():
+            if re.search(rx, k) and not (not_rx and re.search(not_rx, k)): return c
+    return None
+
+
+def _ymd(v):
+    if isinstance(v, (int, float)) and 19000101 <= v <= 21001231:
+        v = int(v); return f"{v // 10000:04d}-{v // 100 % 100:02d}-{v % 100:02d}"
+    if isinstance(v, str):
+        m = re.search(r"(20\d\d)[.\-/]?(\d\d)[.\-/]?(\d\d)", v)
+        if m: return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+        return None
+    v = clean(v)
+    return v if isinstance(v, str) and re.match(r"\d{4}-\d\d-\d\d", v) else None
+
+
+def _fee_kind(t):
+    t = t or ""
+    if "판매" in t: return "판매"
+    if "관리" in t: return "관리"
+    return "그 외" if t else None
+
+
+def cash_history_rows(wb):
+    """연도 시트(2018, 2019 …) → {연도: {rows, tot, own, oth, chk}}. chk = 시트에 적힌 합계와 대조 결과."""
+    out, warn = {}, []
+    for name in wb.sheetnames:
+        m = CASH_YEAR.match(name)
+        if not m: continue
+        y = int(m.group(1)); ws = wb[name]; H = _hdr(ws)
+        cD = _pick(H, "입금결의일", "입금 일자", "날짜") or 1
+        cR = H.get("수익인식일")
+        cG = H.get("운용사명"); cF = H.get("펀드명"); cT = H.get("보수 유형"); cP = H.get("부서")
+        cI = H.get("기관"); cM = _pick(H, "RM", "RM (Multi상품솔루션부)", "영업직원"); cN = H.get("비고")
+        cA = H.get("금액")                                                     # 2018~2021: 줄마다 금액 + 부서명
+        cO = _pick(H, rx=r"^(Global|글로벌).*(수익|부)$", not_rx=r"총액") if not cA else None   # 2022~: 당부서 칸
+        cX = _pick(H, rx=r"^(Multi.*수익|금융상품영업부)$", not_rx=r"총액") if not cA else None   # RM 부서 칸
+        if not cF or not (cA or cO):
+            warn.append(f"{name}: 머리글(펀드명·금액) 못 찾음"); continue
+        split = y >= 2020
+        rows, prev = [], {}
+        lab_own = lab_oth = 0.0; has_lab = False; ytot = None
+        sub_own = sub_oth = 0.0; has_sub = False
+        c_sub_o = _pick(H, rx=r"^(해외금융상품부|국제금융상품영업부) 수익$") if cA else None
+        c_sub_x = _pick(H, rx=r"^(기관영업본부|액티브영업본부) 수익$") if cA else None
+        for r in range(2, ws.max_row + 1):
+            a = ws.cell(r, 1).value
+            at = str(a or "").strip()
+            if re.match(r"^\d{1,2}월 부서별 수익", at):
+                has_lab = True
+                lab_own += num(ws.cell(r, cO).value) or 0 if cO else 0
+                lab_oth += num(ws.cell(r, cX).value) or 0 if cX else 0
+                continue
+            if "연간 총 합계" in at:
+                ytot = (num(ws.cell(r, cO).value) or 0) + (num(ws.cell(r, cX).value) or 0) if cO else None
+                break
+            labs = [str(ws.cell(r, c).value or "").strip() for c in range(1, 9)]
+            if "총계" in labs:                                                 # 2019: 맨 아래 총계(총액 칸)
+                g = _pick(H, "총액")
+                if g: ytot = num(ws.cell(r, g).value)
+                break
+            if any(re.fullmatch(r"연?\s*합\s*계", x) for x in labs):            # 2022 '연 합계'(일부 달만 더한 수식) — 대조에 안 씀
+                continue
+            if c_sub_o:
+                for cc, acc in ((c_sub_o, "o"), (c_sub_x, "x")):
+                    v = num(ws.cell(r, cc).value) if cc else None
+                    if v is not None:
+                        has_sub = True
+                        if acc == "o": sub_own += v
+                        else: sub_oth += v
+            if cA:
+                k = num(ws.cell(r, cA).value); own = oth = None
+            else:
+                own = num(ws.cell(r, cO).value); oth = num(ws.cell(r, cX).value) if cX else None
+                k = (own or 0) + (oth or 0) if (own is not None or oth is not None) else None
+            def g(c, key, inherit=True):
+                v = clean(ws.cell(r, c).value) if c else None
+                if isinstance(v, str): v = re.sub(r"\s+", " ", v)
+                if v is None and inherit: v = prev.get(key)
+                return v
+            dval = ws.cell(r, cD).value
+            d = _ymd(dval)
+            if k is None or k == 0:
+                if d or clean(ws.cell(r, cF).value): prev.update({k2: v2 for k2, v2 in (("d", d), ("fd", g(cF, "fd", False))) if v2})
+                continue
+            row = {"y": str(y)}
+            if cR:                                                             # 2025~: 수익인식일 기준, 입금결의일 없으면 미수금
+                row["d"] = _ymd(ws.cell(r, cR).value) or prev.get("d")
+                row["dp_"] = d
+                if d is None: row["st"] = "미수금"
+            else:
+                row["d"] = d or prev.get("d")
+            row["gp"] = g(cG, "gp") if cG else None
+            row["fd"] = g(cF, "fd")
+            row["ty"] = g(cT, "ty") if cT else None
+            dept = g(cP, "dp") if cP else None
+            if not isinstance(dept, str): dept = None                        # 부서 칸에 숫자가 잘못 들어간 줄
+            row["dp"] = dept
+            if split:
+                if cA: row["sd"] = "글로벌상품영업부" if OWN_DEPT.search(str(dept or "")) else "RM 부서 배분"
+                else: row["sd"] = "글로벌상품영업부" if own and not oth else ("RM 부서 배분" if oth and not own else "글로벌상품영업부 + RM")
+            else:
+                row["sd"] = "부서 구분 전"
+            row["i"] = g(cI, "i", False) if cI else None
+            row["rm"] = g(cM, "rm", False) if cM else None
+            row["n"] = g(cN, "n", False) if cN else None
+            row["k"] = k
+            if row["ty"] and "환차" in str(row["ty"]): row["st"] = "환차손익"
+            row["fk"] = "환차손익" if row.get("st") == "환차손익" else _fee_kind(row["ty"])
+            if not cA:
+                row["ko"], row["kx"] = own, oth
+            prev.update({kk: row[kk] for kk in ("d", "gp", "fd", "ty", "dp") if row.get(kk) is not None})
+            rows.append({k2: v2 for k2, v2 in row.items() if v2 is not None})
+        tot = sum(x["k"] for x in rows)
+        if cA:
+            own_s = sum(x["k"] for x in rows if x["sd"] == "글로벌상품영업부"); oth_s = tot - own_s
+        else:
+            own_s = sum(x.get("ko") or 0 for x in rows); oth_s = sum(x.get("kx") or 0 for x in rows)
+        chk = []
+        if ytot is not None: chk.append(("연간 총 합계" if cO else "총계", ytot, tot))
+        if has_lab: chk.append(("월별 부서별 수익 합", lab_own + lab_oth, tot))
+        if has_sub: chk.append(("월별 부서 수익 칸 합", sub_own + sub_oth, tot))
+        for lab, a_, b_ in chk:                                                # 원 단위 반올림 차이(2021 1원)는 넘어간다
+            if abs(a_ - b_) > 5: warn.append(f"{name}: {lab} {a_:,.0f} ≠ 줄 합계 {b_:,.0f} (차이 {b_ - a_:,.0f})")
+        out[y] = {"rows": rows, "tot": tot, "own": own_s, "oth": oth_s, "split": split,
+                  "chk": [(lab, round(a_), round(b_)) for lab, a_, b_ in chk],
+                  "dept": list(dict.fromkeys(x["dp"] for x in rows if isinstance(x.get("dp"), str) and x["sd"] == "글로벌상품영업부"))}
+    return out, warn
+
+
+def v_cash_history(wb, ctx):
+    data, warn = cash_history_rows(wb)
+    if not data: raise ValueError("연도 시트(2018 …) 없음")
+    ys = sorted(data)
+    tot = sum(data[y]["tot"] for y in ys)
+    best = max(ys, key=lambda y: data[y]["tot"])
+    last = ys[-1]
+    blocks = [{"t": "kpis", "id": "k", "items": [
+        kpi(f"{ys[0]}~{last} 누적 수익", tot / 1e8, "n1", "억원", f"{sum(len(data[y]['rows']) for y in ys):,}건 · 부서 배분 전 합계"),
+        kpi("연평균", tot / len(ys) / 1e8, "n1", "억원", f"{len(ys)}개 연도"),
+        kpi("가장 많이 받은 해", data[best]["tot"] / 1e8, "n1", "억원", f"{best}년"),
+        kpi(f"{last} 수익", data[last]["tot"] / 1e8, "n1", "억원", f"글로벌상품영업부 {data[last]['own'] / 1e8:,.1f}억 · RM 배분 {data[last]['oth'] / 1e8:,.1f}억"),
+    ]}]
+    # 2026(진행 중): '2026 현금기준 수익' 시트의 월별 부서별 수익
+    cur = None
+    if "2026 현금기준 수익" in wb.sheetnames:
+        c = wb["2026 현금기준 수익"]; H = _hdr(c)
+        kO, kX = H.get("글로벌상품영업부"), H.get("금융상품영업부")
+        o = x = 0.0; last_m = None
+        for r in range(2, c.max_row + 1):
+            mm = re.match(r"^(\d{1,2})월 부서별 수익", str(c.cell(r, 1).value or ""))
+            if mm and kO:
+                vo, vx = num(c.cell(r, kO).value) or 0, (num(c.cell(r, kX).value) or 0) if kX else 0
+                o += vo; x += vx
+                if vo or vx: last_m = int(mm.group(1))
+        if o or x: cur = {"y": "2026", "own": o, "oth": x, "m": last_m}
+    cats = [str(y) for y in ys] + (["2026"] if cur else [])
+    s_own = [data[y]["own"] / 1e8 if data[y]["split"] else 0 for y in ys] + ([cur["own"] / 1e8] if cur else [])
+    s_oth = [data[y]["oth"] / 1e8 if data[y]["split"] else 0 for y in ys] + ([cur["oth"] / 1e8] if cur else [])
+    s_pre = [0 if data[y]["split"] else data[y]["tot"] / 1e8 for y in ys] + ([0] if cur else [])
+    series = [{"n": "글로벌상품영업부", "v": s_own}, {"n": "RM 부서 배분", "v": s_oth}]
+    if any(s_pre): series.insert(0, {"n": "부서 구분 전", "v": s_pre})
+    blocks.append({"t": "col", "id": "yr", "title": "연도별 수익 (현금기준)", "sub": "억원 · 부서 배분 전 합계" + (f" · 2026은 1~{cur['m']}월" if cur and cur["m"] else ""),
+                   "cats": cats, "series": series, "stack": True, "f": "eok1"})
+    # 연도별 요약 표
+    yrows = []
+    for y in reversed(ys):
+        d = data[y]; rs = d["rows"]
+        fk = {}
+        for x in rs:
+            kd = _fee_kind(x.get("ty"))
+            if kd: fk[kd] = fk.get(kd, 0) + x["k"]
+        top = {}
+        for x in rs:
+            nm = x.get("gp") or x.get("fd") or "-"
+            top[nm] = top.get(nm, 0) + x["k"]
+        t3 = " · ".join(n for n, _ in sorted(top.items(), key=lambda z: -z[1])[:3])
+        yrows.append({"c": {k2: v2 for k2, v2 in {
+            "y": str(y), "t": d["tot"], "o": d["own"] if d["split"] else None, "x": d["oth"] if d["split"] else None,
+            "pa": fk.get("판매"), "mg": fk.get("관리"), "et": fk.get("그 외"), "n": len(rs),
+            "dn": " → ".join(d["dept"]) if d["split"] else "1부·2부 등 (영업부서별 배분)", "tp": t3}.items() if v2 is not None}})
+    if cur:
+        yrows.insert(0, {"c": {"y": f"2026 (~{cur['m']}월)", "t": cur["own"] + cur["oth"], "o": cur["own"], "x": cur["oth"],
+                               "dn": "글로벌상품영업부 · '수익 (현금기준)' 쪽"}, "st": "now"})
+    blocks.append({"t": "table", "id": "ys", "title": "연도별 요약", "sub": "단위 원 · 판매·관리는 보수 유형이 적힌 해(2021~)만", "compact": True,
+                   "cols": [col("y", "연도"), col("t", "수익 합계", "won"), col("o", "글로벌상품영업부", "won"), col("x", "RM 부서 배분", "won"),
+                            col("pa", "판매", "won"), col("mg", "관리", "won"), col("et", "그 외", "won"), col("n", "건수", "n0"),
+                            col("tp", "많이 받은 곳 (상위 3)", d=1), col("dn", "당시 부서명", d=1)],
+                   "rows": yrows})
+    # 많이 받은 곳(연도별 상위 10)
+    sets = {}
+    for y in reversed(ys):                                                     # 최근 연도 단추가 먼저(휴대폰에서 기본 선택이 보이게)
+        top = {}
+        for x in data[y]["rows"]:
+            nm = x.get("gp") or x.get("fd") or "-"
+            top[nm] = top.get(nm, 0) + x["k"]
+        sets[f"{y}년"] = [{"l": n, "v": v / 1e8} for n, v in sorted(top.items(), key=lambda z: -z[1]) if v > 0][:10]   # '2025' 같은 숫자 키는 JS가 오름차순으로 돌려서 '년'을 붙인다
+    blocks.append({"t": "bars", "id": "top", "title": "많이 받은 곳 (연도별 상위 10)", "sub": "억원 · 2023년부터 운용사, 그 전은 시트의 펀드명 표기 그대로",
+                   "f": "eok1", "sets": sets, "def": f"{last}년", "rank": True})
+    # 입금 내역(연도별 묶음, 최근 연도 먼저)
+    secs = []
+    for y in reversed(ys):
+        d = data[y]
+        rs = [{"c": dict(x)} for x in d["rows"]]
+        secs.append({"h": f"{y}년", "s": f"{len(rs)}건 · {d['tot'] / 1e8:,.1f}억원", "rows": rs,
+                     "foot": [{"l": f"{y}년 합계", "c": {"k": d["tot"]}}]})
+    cols = [col("d", "일자", "date"), col("gp", "운용사"), col("fd", "펀드"), col("ty", "보수 유형", "tag"),
+            col("sd", "구분", "tag", tone={"글로벌상품영업부": "ok", "RM 부서 배분": "info", "부서 구분 전": "muted"}),
+            col("k", "금액(원)", "won", sum=1), col("i", "기관"), col("rm", "RM·영업직원"), col("dp", "부서(당시)", d=1),
+            col("st", "상태", "tag", tone={"미수금": "warn", "환차손익": "info"}, d=1), col("fk", "보수 구분", d=1), col("dp_", "입금결의일", "date", d=1),
+            col("ko", "글로벌상품영업부 몫", "won", d=1), col("kx", "RM 부서 몫", "won", d=1), col("y", "연도", d=1), col("n", "비고", d=1)]
+    blocks.append(drop_empty_cols({"t": "table", "id": "hist", "title": "입금 내역", "sub": "연도별 묶음 · 최근 연도 먼저 · 단위 원 · 눌러서 부서·비고 보기",
+                                   "cols": cols, "secs": secs,
+                                   "card": {"title": "fd", "sub": ["gp", "i"], "amt": "k", "meta": ["d"], "chips": ["ty", "sd"]},
+                                   "filters": ["y", "fk", "sd"], "keep": ["k"]}))
+    nt = ["금액은 부서 배분 전 합계(글로벌상품영업부 몫 + RM 부서 배분). 2018~2019 시트는 영업부서(1부·2부 등)별로만 나뉘어 있어 부서 구분 없이 합계만 보입니다.",
+          "부서명 변천: 해외금융상품부(2020) → 국제금융상품영업부(2021) → Global솔루션영업부(2022~23) → 글로벌투자솔루션부(2024) → 글로벌상품영업부(2025~)."]
+    if warn: nt += ["시트 합계와 다른 곳: " + " / ".join(warn)]
+    blocks.append({"t": "notes", "id": "nt", "items": nt})
+    return blocks
+
+
+CONTRACT_YEAR = re.compile(r"^(20\d\d) 계약서$")
+
+
+def _ct_group(t, pa=None):
+    """pa: 엑셀 자동 필터(계약 종류)로 보이는 줄이면 True — 그 시트는 필터가 '판매·PA 계약' 기준(사용자 분류)."""
+    t = (t or "").lower()
+    if pa is True: return "판매·PA 계약"
+    if pa is None and re.search(r"distribution agreement|placement agent|solicitation|marketing agreement|coverage agreement|sub-?distribut", t): return "판매·PA 계약"
+    if re.search(r"nda|non ?disclosure|confidential", t): return "NDA·비밀유지"
+    if re.search(r"terminat", t): return "Termination"
+    if "투자계약" in t or "약정서" in t: return "국내 투자계약"
+    return "그 외" if t else None
+
+
+def v_contract_history(wb, ctx):
+    ys = sorted(int(m.group(1)) for n in wb.sheetnames if (m := CONTRACT_YEAR.match(n)))
+    if not ys: raise ValueError("연도 계약서 시트 없음")
+    secs, cnt = [], {}
+    for y in reversed(ys):
+        s = Sh(wb[f"{y} 계약서"])
+        h = s.find(lambda x: x.strip() == "계약 상대방", 1, 10)
+        if not h: raise ValueError(f"{y} 계약서: 머리글 '계약 상대방' 없음")
+        hr, cC = h
+        H = {}
+        for c in range(cC - 1, cC + 9):
+            t = (s.t(hr, c) or "").replace("\n", " ")
+            for k, v in (("번호", "no"), ("계약 상대방", "cp"), ("관련 펀드", "fd"), ("전략", "sr"), ("계약 종류", "ty"), ("계약 날짜", "dt"), ("Fee", "fe"), ("메모", "mm"), ("체결현황", "st")):
+                if t.startswith(k) and v not in H.values(): H[c] = v
+        rows = []
+        ws_ = wb[f"{y} 계약서"]
+        flt = bool(ws_.auto_filter and ws_.auto_filter.filterColumn)          # 엑셀에 계약 종류 필터가 걸려 있으면 보이는 줄 = 판매·PA
+        for r in range(hr + 1, s.maxr + 1):                                   # 필터로 숨은 줄도 모두(앱은 구분 칩으로 거른다)
+            no, cp = s.v(r, cC - 1), s.v(r, cC)
+            if no is None and cp is None:
+                if s.empty(r, cC - 1, cC + 6): break
+                continue
+            if no is None: continue                                         # 번호 없는 줄 = 입력 도움 목록
+            c_ = {v: s.v(r, c) for c, v in H.items()}
+            if c_.get("fe") in (0, "N/A", "-"): c_.pop("fe")
+            if c_.get("dt") in ("N/A",): c_["dt"] = None
+            c_["y"] = str(y); c_["g"] = _ct_group(c_.get("ty"), (r not in s.hr) if flt else None)
+            rows.append({"c": {k: v for k, v in c_.items() if v is not None}})
+        for x in rows:
+            g = x["c"].get("g") or "그 외"
+            cnt.setdefault(g, {}); cnt[g][str(y)] = cnt[g].get(str(y), 0) + 1
+        secs.append({"h": f"{y}년", "s": f"{len(rows)}건", "rows": rows})
+    blocks = [{"t": "kpis", "id": "k", "items": [kpi(f"{sec['h'][:4]} 계약", len(sec["rows"]), "n0", "건",
+                                                     f"판매·PA {sum(1 for r in sec['rows'] if r['c'].get('g') == '판매·PA 계약')}건") for sec in secs]}]
+    order = ["판매·PA 계약", "NDA·비밀유지", "Termination", "국내 투자계약", "그 외"]
+    blocks.append({"t": "col", "id": "yc", "title": "연도별 계약 건수", "sub": "건 · 계약 종류별", "cats": [str(y) for y in ys], "stack": True, "f": "n0",
+                   "series": [{"n": g, "v": [cnt.get(g, {}).get(str(y), 0) for y in ys]} for g in order if g in cnt]})
+    blocks.append(drop_empty_cols({"t": "table", "id": "cth", "title": "계약 목록", "sub": "연도별 묶음 · 최근 연도 먼저",
+                                   "cols": [col("no", "No", "n0"), col("cp", "계약 상대방"), col("g", "구분", "tag"), col("sr", "전략", "tag"),
+                                            col("fd", "관련 펀드"), col("dt", "계약일", "date"), col("ty", "계약 종류"), col("fe", "Fee"),
+                                            col("mm", "메모", d=1), col("y", "연도", d=1)],
+                                   "secs": secs, "card": {"title": "cp", "sub": ["fd", "ty"], "meta": ["dt"], "chips": ["g", "sr"]},
+                                   "filters": ["y", "g", "sr"]}))
+    blocks.append({"t": "notes", "id": "nt", "items": ["올해 계약은 'PA 계약 현황' 쪽. '판매·PA 계약'은 엑셀 시트의 계약 종류 필터(Distribution·Placement Agent Agreement 등)에 들어가는 계약, 나머지는 NDA·투자계약서 등."]})
+    return blocks
+
+
+# 앱에만 있는 쪽(엑셀 시트 하나에 대응하지 않음): (이름, 만드는 함수). dash_extract.py 가 sheets 에 붙인다.
+HISTORY = [("수익 이력 (2018~)", v_cash_history), ("PA 계약 이력 (2023~)", v_contract_history)]
+
+
+def build_history(wb, ctx):
+    out, warn = [], []
+    for name, fn in HISTORY:
+        try:
+            out.append((name, fn(wb, ctx)))
+        except Exception as e:
+            import traceback
+            warn.append(f"{name}: {type(e).__name__}: {e}\n{traceback.format_exc(limit=3)}")
+    return out, warn
+
+
 BUILDERS = {
     "대시보드(Demo)": v_demo,
     "검증": v_check,

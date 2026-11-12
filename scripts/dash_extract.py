@@ -286,6 +286,11 @@ views, vwarn = dash_views.build_views(wb, [s["name"] for s in out_sheets], {"aso
 for s in out_sheets:
     if s["name"] in views: s["view"] = views[s["name"]]
 for w in vwarn: print("경고 — 정리 화면을 만들지 못해 원본 격자만 보임:", w, file=sys.stderr)
+# 이력 쪽(앱에만 있음): 엑셀에서 숨긴 지난 연도 시트(현금 수취 2018~, 계약서 2023~)를 묶은 정리 화면 — 원본 격자 없음(사용자 요청 2026-11-12)
+hist, hwarn = dash_views.build_history(wb, {"asof": asof})
+for name, blocks in hist:
+    out_sheets.append(dict(name=name, short=name, group="이력", cols=[], rows=[], rh=[], hs=0, hdr=0, view=blocks))
+for w in hwarn: print("경고 — 이력 쪽을 만들지 못함:", w, file=sys.stderr)
 
 data = {
     "kind": "dashboard", "v": 2,

@@ -434,6 +434,7 @@ const Dash = (() => {
       const cnt = new Map(); all.forEach((r) => { const v = r.c[k]; if (v == null || v === "") return; cnt.set(String(v), (cnt.get(String(v)) || 0) + 1); });
       if (cnt.size < 2 && !st.f[k]) return "";
       const vals = [...cnt.entries()].sort((a, b2) => b2[1] - a[1] || a[0].localeCompare(b2[0], "ko"));
+      if (vals.every(([v]) => /^20\d\d$/.test(v))) vals.sort((a, b2) => b2[0].localeCompare(a[0]));   // 연도는 최근 연도부터
       if (vals.length > 9) return `<label class="tb-sel"><span>${h(c.l)}</span><select data-f="${h(k)}"><option value="">전체</option>${vals.map(([v, n]) => `<option value="${h(v)}"${st.f[k] === v ? " selected" : ""}>${h(v)} (${n})</option>`).join("")}</select></label>`;
       return `<div class="tb-chips" role="group" aria-label="${h(c.l)}"><span class="tb-l">${h(c.l)}</span><button type="button" class="fchip" data-f="${h(k)}" data-v="" aria-pressed="${!st.f[k]}">전체</button>${vals.map(([v, n]) => `<button type="button" class="fchip" data-f="${h(k)}" data-v="${h(v)}" aria-pressed="${st.f[k] === v}">${h(v)} <small>${n}</small></button>`).join("")}</div>`;
     }).join("");
