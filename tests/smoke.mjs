@@ -80,12 +80,26 @@ ok('CSP 해시 맞음', (() => { try { execFileSync(process.execPath, [join(ROOT
   ok('대시보드 다듬기: 시트 순서·검증 숨김', c.sheets.map((x) => x.short).join(',') === 'KPI 실적 요약,RFP·RFI,약정 현황 (2010~),시딩 관리판');
   {
     const sd = c.sheets.find((x) => x.short === '시딩 관리판').view, fund = sd[1].rows.map((r) => r.c);
-    ok('시딩 약정 = 심사 승인금액(원화 그대로·외화는 기준일 환율)', fund[0].ck === 300000000 && !fund[0].cfx && fund[1].ck === 100000000 && fund[1].cfx === 'USD 100,000'
+    ok('시딩 약정 = 심사 승인금액(원화 그대로·외화는 기준일 환율)', fund[0].ck === 300000000 && !fund[0].cfx && fund[1].ck === 100000000 && fund[1].cfx === 'USD 100,000.00'
       && sd[0].items[0].v === 4 && sd[0].items[1].s === '소진율 50.0%' && sd[2].rows[0].c.E === 300000000 && sd[2].foot[0].c.E === 400000000);
   }
   ok('대시보드 다듬기: 금감원·출처 설명 빼고 합계 열만', st.view.length === 2 && st.view[0].items.length === 1
     && st.view[1].cols.map((x) => x.l).join(',') === '기관명,USD 환산' && st.view[1].title === '기관별 (2010~현재)');
-  ok('대시보드 다듬기: 억원 함께(카드 문장 한 번만)', st.view[0].items[0].s === '수수료 USD 1,000,000 (≈ 10.0억)');
+  ok('대시보드 다듬기: 억원 함께(카드 문장 한 번만)', st.view[0].items[0].s === '수수료 USD 1,000,000 (≈ 10.00억)');
+}
+
+// 금액은 소수점 둘째 자리(Fee·약정금액 등): 금액 칸·카드·막대만 2자리 형식으로, 건수·원 단위는 그대로
+{
+  const f = join(ROOT, 'tests', '_money.json');
+  writeFileSync(f, JSON.stringify({ fx: { usd: 1000 }, sheets: [{ name: '가상 약정', group: 'x', short: 'x', view: [
+    { t: 'kpis', items: [{ l: '2026 약정', v: 1, f: 'n0', u: 'USD M' }, { l: '등록 건수', v: 3, f: 'n0', u: '건' }] },
+    { t: 'bars', title: '가상 순위', sub: '억원', f: 'eok1', items: [{ l: 'a', v: 1 }] },
+    { t: 'table', title: '가상 표', cols: [{ k: 'a', l: '수수료(USD)', f: 'usd' }, { k: 'b', l: '약정 건수', f: 'n0' }, { k: 'c', l: '총약정금액', f: 'amt' },
+      { k: 'd', l: 'Fee(bp)', f: 'n1' }, { k: 'e', l: '수익(원)', f: 'won' }, { k: 'g', l: 'KRW 기준', f: 'n0' }], rows: [{ c: { a: 1, b: 1, c: 1, d: 1, e: 1, g: 1 } }] }] }] }));
+  execFileSync('python3', [join(ROOT, 'scripts/dash_curate.py'), f], { stdio: 'pipe' });
+  const v = JSON.parse(readFileSync(f, 'utf8')).sheets[0].view, fs = Object.fromEntries(v[2].cols.map((x) => [x.l, x.f]));
+  ok('금액은 소수점 둘째 자리(금액 칸·카드·막대 → 2자리, 건수·원 단위는 그대로)', v[0].items[0].f === 'n2' && v[0].items[1].f === 'n0' && v[1].f === 'eok'
+    && fs['수수료(USD)'] === 'usd2' && fs['총약정금액'] === 'amt2' && fs['Fee(bp)'] === 'n2' && fs['약정 건수'] === 'n0' && fs['수익(원)'] === 'won' && fs['KRW 기준'] === 'n0');
 }
 
 const browser = await chromium.launch();

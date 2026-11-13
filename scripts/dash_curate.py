@@ -158,10 +158,10 @@ def _krw_text(s, fx):
     """'USD 5,519,460' · 'USD 19,731.9M' · 'EUR 1,093.0M' 뒤에 '(≈ N억)'."""
     def rep(m):
         rate = (fx or {}).get(m.group(1).lower())
-        if not rate or m.string[m.end():].startswith(" (≈"): return m.group(0)      # 이미 붙어 있으면 그대로(두 번 돌려도 같게)
+        if not rate: return m.group(0)
         e = float(m.group(2).replace(",", "")) * (1e6 if m.group(3) else 1) * rate / 1e8
-        return f"{m.group(0)} (≈ {e:,.0f}억)" if abs(e) >= 100 else f"{m.group(0)} (≈ {e:,.1f}억)"
-    return re.sub(r"\b(USD|EUR) (\d[\d,]*(?:\.\d+)?)(M?)(?![\d,.])", rep, s)
+        return f"{m.group(1)} {m.group(2)}{m.group(3)} (≈ {e:,.2f}억)"          # 이미 붙은 '(≈ …억)'은 새로 계산해 바꾼다(두 번 돌려도 같게)
+    return re.sub(r"\b(USD|EUR) (\d[\d,]*(?:\.\d+)?)(M?)(?![\d,.])(?: \(≈ [\d,.]+억\))?", rep, s)
 
 
 def _mark_krw(d):
@@ -201,7 +201,7 @@ def _seed_by_approval(d):
         c["ck"] = ap * rate
         c.pop("cf", None)
         if cur in ("KRW", "원", "₩"): c.pop("cfx", None)
-        else: c["cfx"] = f"{cur} {ap:,.0f}"
+        else: c["cfx"] = f"{cur} {ap:,.2f}"
         a = c.get("ac") or "기타"; by.setdefault(a, [0, 0.0]); by[a][0] += 1; by[a][1] += c["ck"]; n += 1
     if not n: return
     for x in t["cols"]:
@@ -228,6 +228,38 @@ def _seed_by_approval(d):
             if "심사 승인" not in b.get("sub", ""): b["sub"] = (b.get("sub", "") + " · 심사 승인금액 기준").strip(" ·")
 
 
+# ── 금액은 소수점 둘째 자리까지(사용자 요청 2026-11-13: Fee·약정금액 등) ─────────────
+# 수수료·약정·수익·NAV 같은 금액 칸의 표시 형식을 2자리로 바꾼다. 건수·비율·원(₩) 단위 금액(소수 없음)은 그대로.
+#   usd → usd2, usdk → usdk2, amt → amt2, eok1 → eok, 금액인 n0·n1 → n2 (app dash.js 의 fmt 형식)
+F2 = {"usd": "usd2", "usdk": "usdk2", "amt": "amt2", "eok1": "eok"}
+MONEY_LABEL = re.compile(r"약정|수수료|Fee|금액|Cash|발생|판매|투자금액|NAV|분배|인출|수익|USD|EUR|억|조원|mil|^Q\d$|^\d{1,2}월$|총합")
+NOT_MONEY = re.compile(r"KRW|원\)|부외부채|건수|횟수|개수|^No$|순위|비중|율$")
+MONEY_UNIT = re.compile(r"^(USD M|USD천|USD|EUR M|억원|조원)$")
+
+
+def _f2(f, money):
+    if f in F2: return F2[f]
+    if money and f in ("n0", "n1"): return "n2"
+    return f
+
+
+def _money_decimals(d):
+    for s in d["sheets"]:
+        for b in _walk(s.get("view") or []):
+            t = b.get("t")
+            if t == "table":
+                for c in b["cols"]:
+                    l = c.get("l", "")
+                    money = bool(c.get("cu")) or l == "Fee(bp)" or (MONEY_LABEL.search(l) and not NOT_MONEY.search(l))
+                    c["f"] = _f2(c.get("f"), money)
+            elif t == "kpis":
+                for k in b["items"]:
+                    if isinstance(k.get("v"), (int, float)) and k.get("f"):
+                        k["f"] = _f2(k["f"], bool(k.get("cu")) or bool(MONEY_UNIT.match(str(k.get("u") or ""))))
+            elif t in ("bars", "col") and b.get("f"):
+                b["f"] = _f2(b["f"], bool(b.get("cu")) or bool(re.match(r"(USD|억원|조원)", b.get("sub") or "")))
+
+
 def curate(d):
     """dash.json(dict)을 제자리에서 다듬는다. 두 번 돌려도 결과가 같다."""
     sheets = [s for s in d["sheets"] if not any(re.search(p, s["name"]) for p in HIDE)]
@@ -238,6 +270,7 @@ def curate(d):
     d["sheets"] = sheets
     _seed_by_approval(d)
     _mark_krw(d)
+    _money_decimals(d)
     ordered, used = [], set()
     for grp, items in LAYOUT:
         for pat, short in items:

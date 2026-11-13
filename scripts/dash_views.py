@@ -559,10 +559,10 @@ def v_monthly(s, ctx):
     blocks = []
     if gu or ge:
         blocks.append({"t": "kpis", "id": "k", "items": [x for x in [
-            kpi("발생 수수료", (ge["c"].get("fk") or 0) / 1e8, "n2", "억원", f"USD {gu['c'].get('fu', 0):,.0f}" if gu else None) if ge else None,
+            kpi("발생 수수료", (ge["c"].get("fk") or 0) / 1e8, "n2", "억원", f"USD {gu['c'].get('fu', 0):,.2f}" if gu else None) if ge else None,
             kpi("Cash 수취분", (ge["c"].get("ca") or 0) / 1e8, "n2", "억원", "발생분 중 2026 수취") if ge else None,
             kpi("약정(USD 환산)", (gu["c"].get("us") or 0) / 1e6, "n0", "USD M", "판매금액") if gu else None,
-            kpi("신규펀드 기준", (nu["c"].get("us") or 0) / 1e6, "n0", "USD M", f"발생 USD {nu['c'].get('fu', 0):,.0f}") if nu else None,
+            kpi("신규펀드 기준", (nu["c"].get("us") or 0) / 1e6, "n0", "USD M", f"발생 USD {nu['c'].get('fu', 0):,.2f}") if nu else None,
         ] if x]})
     foot = [{"l": g["l"], "c": {k: v for k, v in g["c"].items() if k in ("us", "fu", "fk", "ca") and v}} for g in grand if g["l"].startswith("총 계")]
     blocks.append({"t": "table", "id": "mon", "title": "월별 발생 실적", "sub": "펀드별 묶음 · 눌러서 기관별 보기", "cols": cols, "secs": out_secs,
@@ -781,7 +781,7 @@ def v_commit(s, ctx, kpi_sheet=False):
     # 연도별 합계 카드(엑셀 합계 행)
     if foot:
         fc = foot[0]["c"]
-        blocks.append({"t": "kpis", "id": "k", "items": [kpi(f"{y} 약정", (fc.get(f"u{y}") or 0) / 1e6, "n0", "USD M", f"수수료 USD {fc.get(f'f{y}') or 0:,.0f}") for y in ylist[:3]]
+        blocks.append({"t": "kpis", "id": "k", "items": [kpi(f"{y} 약정", (fc.get(f"u{y}") or 0) / 1e6, "n0", "USD M", f"수수료 USD {fc.get(f'f{y}') or 0:,.2f}") for y in ylist[:3]]
                        + [kpi("등록 건수", len(rows), "n0", "건", f"{len({r['c'].get('ab') or r['c'].get('fn') for r in rows})}개 펀드")]})
     if kpi_sheet:
         tg = s.find(lambda x: x.strip() == "해외대체펀드 판매규모 목표", 1, 10)
@@ -864,10 +864,10 @@ def kpi_by_year(secs, sub):
         k, rv = yrs[y]["k"], yrs[y].get("r") or {}
         g = lambda key: k.get(K[key]) if K.get(key) else None
         cards = [kpi("판매규모 (KPI 보고)", g("kj"), "n2", "조원",
-                     s=" · ".join(x for x in [f"목표 {f2(g('tg'))}조원", f"달성률 {pc(g('kr'))}", f"USD {g('ku'):,.1f}M" if isinstance(g("ku"), (int, float)) else ""] if x),
+                     s=" · ".join(x for x in [f"목표 {f2(g('tg'))}조원", f"달성률 {pc(g('kr'))}", f"USD {g('ku'):,.2f}M" if isinstance(g("ku"), (int, float)) else ""] if x),
                      pct=g("kr"), tone=tone(g("kr"))),
                  kpi("약정 실적", g("cj"), "n2", "조원",
-                     s=" · ".join(x for x in [f"USD {g('cu'):,.1f}M" if isinstance(g("cu"), (int, float)) else "", f"목표 대비 {pc(g('cr'))}" if g("cr") is not None else ""] if x) or None),
+                     s=" · ".join(x for x in [f"USD {g('cu'):,.2f}M" if isinstance(g("cu"), (int, float)) else "", f"목표 대비 {pc(g('cr'))}" if g("cr") is not None else ""] if x) or None),
                  kpi("신규 PA", g("pa"), "n0", "건", s=f"목표 {g('pt')}건 · 달성률 {pc(g('pr'))}", pct=g("pr"), tone=tone(g("pr")))]
         if rv:
             rt, rr = rv.get(R.get("tg")) if R.get("tg") else None, rv.get(R.get("r")) if R.get("r") else None
@@ -1050,7 +1050,7 @@ def v_marketing(s, ctx):
     tot = allfoot[0]["c"] if allfoot else {}
     blocks = [{"t": "kpis", "id": "k", "items": [
         kpi("판매금액", (tot.get("sm") or 0), "n0", "USD M", "펀드 통화 mil 합계"),
-        kpi("2026 발생", tot.get("fk") or 0, "n2", "억원", f"USD {tot.get('fu') or 0:,.0f}"),
+        kpi("2026 발생", tot.get("fk") or 0, "n2", "억원", f"USD {tot.get('fu') or 0:,.2f}"),
         kpi("2026 인식", (tot.get("rc") or 0) / 1e8, "n2", "억원", "Cash+미수금"),
         kpi("미인식", tot.get("ur") or 0, "n2", "억원", "발생 − 인식", tone="warn"),
         kpi("로드쇼", sum(tot.get("mo", {}).get("rs") or [0]), "n0", "회", f"{sum(len(x['rows']) for x in secs)}개 펀드"),
@@ -1216,7 +1216,7 @@ def v_gp(s, ctx):
     foot = [{"l": "합계", "c": ({f"c{y}": s.n(tr, x) for y, x in ys_c} | {f"a{y}": s.n(tr, ca + (x - cc)) for y, x in ys_c})}] if tr else []
     yl = [y for y, _ in ys_c]
     blocks = [{"t": "kpis", "id": "k", "items": [kpi(f"{y} Cash", (foot[0]["c"].get(f"c{y}") or 0) / 1e8 if foot else 0, "n2", "억원",
-                                                   f"발생 USD {(foot[0]['c'].get(f'a{y}') or 0):,.0f}" if foot else None) for y in yl[-3:]]}]
+                                                   f"발생 USD {(foot[0]['c'].get(f'a{y}') or 0):,.2f}" if foot else None) for y in yl[-3:]]}]
     rc = [{"c": {"nm": r["c"]["nm"]} | {f"y{y}": r["c"].get(f"c{y}") for y in yl}} for r in rows]
     ra = [{"c": {"nm": r["c"]["nm"]} | {f"y{y}": r["c"].get(f"a{y}") for y in yl}} for r in rows]
     rk1 = ranking(rc, yl, "eok1", "Cash 수익 Top 10", "억원", "rc")
@@ -1428,7 +1428,7 @@ def v_hist(s, ctx):
         rs = by[y]
         usd = sum(r["c"].get("am") or 0 for r in rs if r["c"].get("cy") == "USD")
         eur = sum(r["c"].get("am") or 0 for r in rs if r["c"].get("cy") == "EUR")
-        sub = f"{len(rs)}건 · USD {usd / 1e6:,.1f}M" + (f" · EUR {eur / 1e6:,.1f}M" if eur else "")
+        sub = f"{len(rs)}건 · USD {usd / 1e6:,.2f}M" + (f" · EUR {eur / 1e6:,.2f}M" if eur else "")
         secs.append({"h": f"{y}년" if isinstance(y, int) else str(y or "연도 미기재"), "s": sub, "rows": rs})
     cnt = lambda k, pred: len([r for r in rows if pred(r["c"].get(k))])
     usd = sum(r["c"].get("am") or 0 for r in rows if r["c"].get("cy") == "USD")
@@ -1436,7 +1436,7 @@ def v_hist(s, ctx):
     nr = cnt("fs", lambda v: isinstance(v, str) and (v.startswith("X(") or v.startswith("O(")))
     blocks = [{"t": "kpis", "id": "k", "items": [
         kpi("약정 건수", len(rows), "n0", "건", f"{len({r['c'].get('ab') for r in rows})}개 펀드 · {len({r['c'].get('lp') for r in rows})}개 기관"),
-        kpi("USD 약정", usd / 1e6, "n1", "USD M", f"EUR {eur / 1e6:,.1f}M 별도"),
+        kpi("USD 약정", usd / 1e6, "n1", "USD M", f"EUR {eur / 1e6:,.2f}M 별도"),
         kpi("금감원 보고 중", cnt("fs", lambda v: v == "O"), "n0", "건", "보고 여부 O", tone="ok"),
         kpi("미보고", cnt("fs", lambda v: v == "X"), "n0", "건", "보고 여부 X", tone="warn"),
         kpi("보고 대상 아님", nr, "n0", "건", "청산·청산 진행·양도·보고 생략"),
@@ -1539,7 +1539,7 @@ def v_stats(s, ctx):
     if tot:
         blocks.append({"t": "kpis", "id": "k", "items": [
             kpi("약정 건수", tot.get("C"), "n0", "건", f"2010~21 {a.get('C', 0):,.0f} · 2022~ {b_.get('C', 0):,.0f}"),
-            kpi("총 약정 (USD 환산)", tot.get("I"), "n1", "USD M", f"운용 중 USD {tot.get('J') or 0:,.1f}M"),
+            kpi("총 약정 (USD 환산)", tot.get("I"), "n1", "USD M", f"운용 중 USD {tot.get('J') or 0:,.2f}M"),
             kpi("펀드 · 기관", tot.get("D"), "n0", "개 펀드", f"기관 {tot.get('E') or 0:,.0f}곳"),
             kpi("금감원 보고 중", tot.get("K"), "n0", "건", "보고 여부 O", tone="ok"),
             kpi("미보고", tot.get("L"), "n0", "건", "청산·양도·보고 생략 제외", tone="warn"),
@@ -1629,7 +1629,7 @@ def v_orgs(s, ctx):
             continue
         if no is not None:
             cur = {"h": f"{no}. {nm}", "nm": nm, "us": s.n(r, C["us"]) or 0, "rows": [],
-                   "s": " · ".join(x for x in [s.t(r, C["yr"]), f"USD {(s.n(r, C['us']) or 0) / 1e6:,.1f}M", s.t(r, C["nt"])] if x)}
+                   "s": " · ".join(x for x in [s.t(r, C["yr"]), f"USD {(s.n(r, C['us']) or 0) / 1e6:,.2f}M", s.t(r, C["nt"])] if x)}
             secs.append(cur)
             continue
         if cur is None: continue
@@ -1882,7 +1882,7 @@ def v_cash_history(wb, ctx):
         kpi(f"{ys[0]}~{last} 누적 수익", tot / 1e8, "n1", "억원", f"{sum(len(data[y]['rows']) for y in ys):,}건 · 부서 배분 전 합계"),
         kpi("연평균", tot / len(ys) / 1e8, "n1", "억원", f"{len(ys)}개 연도"),
         kpi("가장 많이 받은 해", data[best]["tot"] / 1e8, "n1", "억원", f"{best}년"),
-        kpi(f"{last} 수익", data[last]["tot"] / 1e8, "n1", "억원", f"글로벌상품영업부 {data[last]['own'] / 1e8:,.1f}억 · RM 배분 {data[last]['oth'] / 1e8:,.1f}억"),
+        kpi(f"{last} 수익", data[last]["tot"] / 1e8, "n1", "억원", f"글로벌상품영업부 {data[last]['own'] / 1e8:,.2f}억 · RM 배분 {data[last]['oth'] / 1e8:,.2f}억"),
     ]}]
     # 2026(진행 중): '2026 현금기준 수익' 시트의 월별 부서별 수익
     cur = None
@@ -1950,7 +1950,7 @@ def v_cash_history(wb, ctx):
     for y in reversed(ys):
         d = data[y]
         rs = [{"c": dict(x)} for x in d["rows"]]
-        secs.append({"h": f"{y}년", "s": f"{len(rs)}건 · {d['tot'] / 1e8:,.1f}억원", "rows": rs,
+        secs.append({"h": f"{y}년", "s": f"{len(rs)}건 · {d['tot'] / 1e8:,.2f}억원", "rows": rs,
                      "foot": [{"l": f"{y}년 합계", "c": {"k": d["tot"]}}]})
     cols = [col("d", "일자", "date"), col("gp", "운용사"), col("fd", "펀드"), col("ty", "보수 유형", "tag"),
             col("sd", "구분", "tag", tone={"글로벌상품영업부": "ok", "RM 부서 배분": "info", "부서 구분 전": "muted"}),
