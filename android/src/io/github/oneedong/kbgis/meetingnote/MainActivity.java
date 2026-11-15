@@ -28,7 +28,7 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 
 /**
- * KB GIS Meeting Note — 웹앱을 전체 화면 WebView 로 연다.
+ * KB GIS(예전 이름 KB GIS Meeting Note) — 웹앱을 전체 화면 WebView 로 연다.
  * 화면·데이터는 모두 웹앱(GitHub Pages)에서 오므로, DB 가 갱신돼도 이 앱은 다시 설치할 필요가 없다.
  * 앱 주소 밖의 링크는 기본 브라우저로 넘긴다.
  * WebView 는 파일 내려받기를 스스로 못 하므로, 웹앱이 만든 PDF(리서치 요약 A4 1쪽)는

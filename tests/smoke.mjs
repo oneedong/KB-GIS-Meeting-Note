@@ -98,8 +98,8 @@ ok('CSP 해시 맞음', (() => { try { execFileSync(process.execPath, [join(ROOT
       { k: 'd', l: 'Fee(bp)', f: 'n1' }, { k: 'e', l: '수익(원)', f: 'won' }, { k: 'g', l: 'KRW 기준', f: 'n0' }], rows: [{ c: { a: 1, b: 1, c: 1, d: 1, e: 1, g: 1 } }] }] }] }));
   execFileSync('python3', [join(ROOT, 'scripts/dash_curate.py'), f], { stdio: 'pipe' });
   const v = JSON.parse(readFileSync(f, 'utf8')).sheets[0].view, fs = Object.fromEntries(v[2].cols.map((x) => [x.l, x.f]));
-  ok('금액은 소수점 둘째 자리(금액 칸·카드·막대 → 2자리, 건수·원 단위는 그대로)', v[0].items[0].f === 'n2' && v[0].items[1].f === 'n0' && v[1].f === 'eok'
-    && fs['수수료(USD)'] === 'usd2' && fs['총약정금액'] === 'amt2' && fs['Fee(bp)'] === 'n2' && fs['약정 건수'] === 'n0' && fs['수익(원)'] === 'won' && fs['KRW 기준'] === 'n0');
+  ok('금액은 소수점 둘째 자리(금액 칸·카드·막대 → 2자리, 건수·원 단위는 그대로)', v[0].items[0].f === 'm2' && v[0].items[1].f === 'n0' && v[1].f === 'eok'
+    && fs['수수료(USD)'] === 'usd2' && fs['총약정금액'] === 'amt2' && fs['Fee(bp)'] === 'm2' && fs['약정 건수'] === 'n0' && fs['수익(원)'] === 'won' && fs['KRW 기준'] === 'n0');
 }
 
 const browser = await chromium.launch();

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- KB GIS Meeting Note — 웹앱(GitHub Pages)을 전체 화면 WebView 로 여는 안드로이드 앱 -->
+<!-- KB GIS(예전 이름 KB GIS Meeting Note) — 웹앱(GitHub Pages)을 전체 화면 WebView 로 여는 안드로이드 앱 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.oneedong.kbgis.meetingnote">
 

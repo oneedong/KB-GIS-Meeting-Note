@@ -230,7 +230,7 @@ def _seed_by_approval(d):
 
 # ── 금액은 소수점 둘째 자리까지(사용자 요청 2026-11-13: Fee·약정금액 등) ─────────────
 # 수수료·약정·수익·NAV 같은 금액 칸의 표시 형식을 2자리로 바꾼다. 건수·비율·원(₩) 단위 금액(소수 없음)은 그대로.
-#   usd → usd2, usdk → usdk2, amt → amt2, eok1 → eok, 금액인 n0·n1 → n2 (app dash.js 의 fmt 형식)
+#   usd → usd2, usdk → usdk2, amt → amt2, eok1 → eok, 금액인 n0·n1·n2 → m2 (app dash.js 의 fmt 형식, 금액이 0 이면 '-')
 F2 = {"usd": "usd2", "usdk": "usdk2", "amt": "amt2", "eok1": "eok"}
 MONEY_LABEL = re.compile(r"약정|수수료|Fee|금액|Cash|발생|판매|투자금액|NAV|분배|인출|수익|USD|EUR|억|조원|mil|^Q\d$|^\d{1,2}월$|총합")
 NOT_MONEY = re.compile(r"KRW|원\)|부외부채|건수|횟수|개수|^No$|순위|비중|율$")
@@ -239,7 +239,7 @@ MONEY_UNIT = re.compile(r"^(USD M|USD천|USD|EUR M|억원|조원)$")
 
 def _f2(f, money):
     if f in F2: return F2[f]
-    if money and f in ("n0", "n1"): return "n2"
+    if money and f in ("n0", "n1", "n2"): return "m2"          # 0 은 '-'(사용자 요청 2026-11-15: 판매(mil) 0.00 → -)
     return f
 
 

@@ -202,7 +202,7 @@ const Dash = (() => {
     if (f === "bool") return v === true ? "✔ 일치" : v === false ? "✖ 불일치" : h(v);
     if (typeof v !== "number") return h(v);
     const u = (s) => unit ? s : "";
-    if (v === 0 && /^(won|wk|eok|eok1|usd|usd2|usdk|usdk2|amt|amt2)$/.test(f)) return "-";
+    if (v === 0 && /^(won|wk|eok|eok1|usd|usd2|usdk|usdk2|amt|amt2|m2)$/.test(f)) return "-";   // 금액이 0 이면 '-'
     switch (f) {
       case "won": return num(v, 0) + u("원");
       case "wk": return num(v / 1e8, 2) + u("억");
@@ -214,6 +214,7 @@ const Dash = (() => {
       case "usdk2": return u("USD ") + num(v / 1000, 2) + u("천");
       case "int": return String(v);
       case "n0": return num(v, 0); case "n1": return num(v, 1); case "n2": return num(v, 2); case "n3": return num(v, 3);
+      case "m2": return num(v, 2);                       // 금액(소수점 둘째 자리, 0 이면 위에서 '-')
       case "pct": case "bar": return num(v * 100, 1) + "%";
       case "pct0": return num(v * 100, 0) + "%";
       case "pct2": return num(v * 100, 2) + "%";
@@ -223,7 +224,7 @@ const Dash = (() => {
       default: return num(v, v % 1 ? 2 : 0);
     }
   }
-  const isNum = (c) => /^(won|wk|eok|eok1|usd|usd2|usdk|usdk2|n\d|pct\d?|bar|x2|amt|amt2|int)$/.test(c.f);
+  const isNum = (c) => /^(won|wk|eok|eok1|usd|usd2|usdk|usdk2|n\d|m2|pct\d?|bar|x2|amt|amt2|int)$/.test(c.f);
   const TONE = { ok: "ok", warn: "warn", info: "info", bad: "bad", muted: "muted" };
   function cell(c, r, unit) {
     const v = r[c.k];
@@ -278,7 +279,7 @@ const Dash = (() => {
     const tk = ticks(lo, hi * 1.08); lo = Math.min(lo, tk[0]); hi = Math.max(hi, tk[tk.length - 1]);
     const y = (v) => T + (hi - v) / (hi - lo || 1) * (H - T - B), z = y(0);
     const bw = (W - L - R) / n, gw = bw * (stack || S.length === 1 ? 0.56 : 0.74), sw = stack ? gw : gw / S.length;
-    const d = b.f === "n0" ? 0 : 1, d2 = /^(n2|eok|wk|usd2)$/.test(b.f);   // 금액 차트는 막대 위 값도 소수점 둘째 자리
+    const d = b.f === "n0" ? 0 : 1, d2 = /^(n2|m2|eok|wk|usd2)$/.test(b.f);   // 금액 차트는 막대 위 값도 소수점 둘째 자리
     const thin = bw < 20;   // 칸이 좁으면(연도 17개를 휴대폰에서 등) 막대 위 값은 빼고(눌러서 보기) 가로축 글자는 하나 걸러
     let g = tk.map((t) => `<line class="gl${t === 0 ? " z" : ""}" x1="${L}" x2="${W - R}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}"/><text class="yl" x="${L - 6}" y="${(y(t) + 3.5).toFixed(1)}">${num(t, Math.abs(t) < 10 && t % 1 ? 1 : 0)}</text>`).join("");
     for (let i = 0; i < n; i++) {

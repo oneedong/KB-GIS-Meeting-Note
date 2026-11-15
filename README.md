@@ -1,4 +1,4 @@
-# KB GIS Meeting Note
+# KB GIS (저장소 이름 KB-GIS-Meeting-Note)
 
 글로벌상품영업부 LP·GP 미팅노트 DB를 휴대폰에서 앱처럼 여는 웹앱입니다.
 자매 앱 **KB GIS Market**(`KB-GIS-App`)과 같은 방식으로 GitHub Pages에서 빌드 없이 배포되고, 홈 화면에 설치해 씁니다.
@@ -24,7 +24,7 @@
 
 설치 링크(`install.html`)를 휴대폰에서 열면 기기에 맞는 안내가 나옵니다. 카카오톡으로 받은 링크는 자동으로 사파리·크롬으로 넘깁니다(카카오톡 안에서는 설치 불가).
 
-**아이폰(사파리)**: 앱 주소 열기 → 공유 버튼 → "홈 화면에 추가" → 홈 화면의 "KB GIS Meeting Note" 실행 → 비밀번호 입력
+**아이폰(사파리)**: 앱 주소 열기 → 공유 버튼 → "홈 화면에 추가" → 홈 화면의 "KB GIS" 실행 → 비밀번호 입력
 
 **안드로이드(APK)**: 설치 링크의 "APK 내려받기" → 파일 열기 → "출처를 알 수 없는 앱" 허용 → 설치(Play 프로텍트 경고는 "그래도 설치") → 실행 → 비밀번호 입력
 
@@ -63,5 +63,5 @@ git add data.enc.json && git commit -m "data: 미팅노트 갱신" && git push
 | `scripts/upsert.mjs` | 새 미팅·인물·기관 레코드 넣기/고치기(원문 대조 검사 포함) |
 | `scripts/kakao.mjs` | 카톡 대화 내보내기 → 게시물(이어 보낸 메시지 묶음), 이미 DB에 있는 원문 표시 |
 | `docs/CONVERT.md` | 미팅노트 텍스트 → 레코드 변환 규칙 |
-| `scripts/gen-icons.mjs` | 앱 아이콘(KB GIS Market / Meeting Note 한 쌍) 생성 |
+| `scripts/gen-icons.mjs` | 앱 아이콘(KB GIS Market / KB GIS 한 쌍) 생성 |
 | `tests/smoke.mjs` | 가상 데이터(`tests/fixture.json`)로 브라우저 점검 — 실제 데이터·비밀번호는 쓰지 않음 |
