@@ -1381,6 +1381,57 @@ def v_seed(s, ctx):
     return blocks
 
 
+def v_seed_info(s, ctx):
+    """해외대체 시딩 관리판_기타정보: 펀드별 당사 심사부·담당 심사역(소위원회 참석 부서)·판매사·공동투자자·주요 일자.
+    엑셀로 가져올 때 입금은행·계좌번호 열은 뺐다(2026-11-16)."""
+    h = s.find(lambda x: x.strip() == "No", 1, 10, 1, 4)
+    if not h: raise ValueError("머리글 'No' 없음")
+    hr, cB = h
+    H = {}
+    for c in range(cB, s.maxc + 1):
+        t = (s.t(hr, c) or "").replace("\n", "")
+        if t: H.setdefault(t, c)
+    def hc(k):
+        return next((c for t, c in H.items() if t.startswith(k)), None)
+    F = {k: hc(t) for k, t in [("fd", "재간접 펀드명"), ("tg", "투자대상"), ("ap", "협의회 승인일"), ("cd", "약정일"), ("sd", "최초 설정일"),
+                               ("md", "예탁원 기준 만기일"), ("ip", "투자기간"), ("cr", "월말 신용등급"), ("rv", "담당 심사역"), ("sl", "판매사"),
+                               ("co", "공동"), ("rt", "GIS 투자"), ("mm", "비고")]}
+    if not F["fd"] or not F["rv"]: raise ValueError("펀드명·담당 심사역 열 없음")
+    rows, cnt = [], {}
+    for r in s.rows(hr + 1):
+        no = s.v(r, cB)
+        if not (isinstance(no, int) or (isinstance(no, str) and no.strip().isdigit())) or s.v(r, F["fd"]) is None: continue
+        g = lambda k: s.v(r, F[k]) if F.get(k) else None
+        lines = [x.strip() for x in str(g("rv") or "").split("\n") if x.strip()]
+        if lines and lines[0].startswith("소위원회"):
+            body = " ".join(lines[1:])
+            dp = "대체투자심사부" if "대체투자심사부" in body else ("기업금융심사부" if "기업금융심사부" in body else "확인 필요")
+            way, who = "소위원회", " · ".join(lines[1:]).replace("  ", " ")
+        else:
+            dp, way, who = (lines[0] if lines else "확인 필요"), "심사부 승인", " ".join(lines[1:])
+        cnt[dp] = cnt.get(dp, 0) + 1
+        tg = str(g("tg") or "")
+        c_ = {"no": int(str(no).strip()), "fd": g("fd"), "tg1": tg.split("\n")[0], "tg": tg, "dp": dp, "way": way, "who": who,
+              "sl": str(g("sl") or "").replace("\n", ""), "co": str(g("co") or "").replace("\n", " "), "cr": g("cr"),
+              "ap": str(g("ap")).replace("\n", " ") if g("ap") else None, "cd": str(g("cd")).replace("\n", " ") if g("cd") else None,
+              "sd": g("sd"), "md": g("md"), "ip": g("ip"), "ipd": s.v(r, F["ip"] + 1) if F.get("ip") else None,
+              "rt": num(g("rt")), "mm": g("mm")}
+        rows.append({"c": {k: v for k, v in c_.items() if v not in (None, "", "-")}})
+    if not rows: raise ValueError("펀드 행 없음")
+    rows.sort(key=lambda x: x["c"]["no"])
+    tone = {"대체투자심사부": "info", "기업금융심사부": "ok", "확인 필요": "warn"}
+    kp = [kpi("시딩 펀드", len(rows), "n0", "개")] + [kpi(k, v, "n0", "개") for k, v in sorted(cnt.items(), key=lambda kv: -kv[1])]
+    kp.append(kpi("소위원회 심의", sum(1 for r in rows if r["c"].get("way") == "소위원회"), "n0", "개", "리스크관리부서장·심사부서장 참석"))
+    cols = [col("no", "No", "n0"), col("fd", "펀드명"), col("tg1", "투자대상"), col("dp", "심사부", "tag", tone=tone), col("way", "심의", "tag"),
+            col("who", "담당 심사역 / 참석"), col("sl", "판매사"), col("co", "공동투자자", d=1), col("cr", "신용등급"),
+            col("ap", "협의회 승인일", d=1), col("cd", "약정일", d=1), col("sd", "최초 설정일", "date", d=1), col("md", "만기일", "date"),
+            col("ip", "투자기간", d=1), col("ipd", "투자기간 상세", d=1), col("rt", "GIS 약정비율", "pct2", d=1), col("tg", "투자대상(전체)", d=1),
+            col("mm", "비고", d=1)]
+    return [{"t": "kpis", "id": "k", "items": kp},
+            {"t": "table", "id": "si", "title": "펀드별 심사부·담당", "sub": "심사부 = 당사 심사 담당 부서(소위원회 심의 건은 참석한 심사부) · 눌러서 일자·투자기간 보기",
+             "cols": cols, "rows": rows, "card": {"title": "fd", "sub": ["tg1"], "meta": ["who", "sl"], "chips": ["dp", "way"]}, "filters": ["dp", "way"]}]
+
+
 # ── 등록 ────────────────────────────────────────────────────────────────────
 
 # ── 약정 이력: 2010~2021 약정 · 약정 통계 · 기관별 약정 ─────────────────────────
@@ -2065,6 +2116,7 @@ BUILDERS = {
     "(현금기준, 발생기준) GP별": v_gp,
     "(현금기준, 발생기준, 계약건) 자산군별": v_asset,
     "해외대체 시딩 관리판_금액, 수익률": v_seed,
+    "해외대체 시딩 관리판_기타정보": v_seed_info,
 }
 
 

@@ -19,7 +19,7 @@ LAYOUT = [
     ("약정", [(r"^약정 통계", "약정 현황 (2010~)"), (r"^기관별 약정", "기관별 약정"),
              (r"^약정내역\(2022|^약정내역&수수료$", "약정내역 (2022~)"), (r"^약정내역\(2010", "약정내역 (2010~21)")]),
     ("분석", [(r"국내 LP별", "LP별 수익"), (r"GP별", "GP별 수익"), (r"자산군별", "자산군별 실적")]),
-    ("시딩", [(r"시딩 관리판", "시딩 관리판")]),
+    ("시딩", [(r"시딩 관리판(_금액|$)", "시딩 관리판"), (r"시딩 관리판_기타정보", "시딩 심사부·기타정보")]),
 ]
 # 앱에서 뺄 시트: 검증(요약의 검증 표시로 충분 — 어긋날 때만 보임), KPI보고용(약정내역 2022~ 와 같은 목록 + KPI 실적 요약과 겹침)
 HIDE = [r"^검증$", r"^KPI보고용$"]
@@ -190,7 +190,7 @@ def _mark_krw(d):
 # 바꾸는 곳: 시딩 관리판(지표 카드·펀드별 현황·자산군별 요약), 요약의 '해외대체 시딩 현황'.
 def _seed_by_approval(d):
     fx = {k.upper(): v for k, v in (d.get("fx") or {}).items() if isinstance(v, (int, float))}
-    seed = next((s for s in d["sheets"] if re.search(r"시딩 관리판", s["name"])), None)
+    seed = next((s for s in d["sheets"] if re.search(r"시딩 관리판(_금액|$)", s["name"])), None)
     t = seed and next((b for b in _walk(seed.get("view") or []) if b.get("t") == "table" and b.get("id") == "sd"), None)
     if not t: return
     by, n = {}, 0
