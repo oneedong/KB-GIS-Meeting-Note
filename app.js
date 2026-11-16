@@ -10,13 +10,14 @@ let db=null, canWrite=false;
 const C={meetings:null,orgs:null,people:null};
 let M=[],O=[],P=[];
 let tab="meetings", mSel=null, mMode="view", oSel=null, oMode="view", pSel=null, pOrg="", pMode="view", confirmDel=false, cellSel=null;
-let cutOnly=false, showMatrix=false; const listY={};
+let cutOnly=false, showMatrix=false, starOnly=false, actOnly=false, actBy="date", oStarOnly=false; const listY={};
 const mq=matchMedia("(max-width:760px)"); const isMob=()=>mq.matches;
 const BACK=`<div class="backbar"><button class="btn sm" type="button" data-back>← 목록</button></div>`;
 function fabSync(){$("#fab").hidden=!(tab==="meetings"&&canWrite&&!$("#p-meetings").classList.contains("detail"))}
 function openDetail(){if(!isMob()||!["meetings","orgs","people"].includes(tab))return;const sec=$("#p-"+tab);if(!sec.classList.contains("detail")){listY[tab]=scrollY;sec.classList.add("detail");try{history.pushState({detail:tab},"",location.hash)}catch(e){}}scrollTo({top:0});fabSync()}
 // 휴대폰 뒤로가기(안드로이드 버튼·제스처)는 상세를 닫는다. 화면의 "← 목록"으로 닫을 때는 쌓아 둔 기록도 되돌린다.
-addEventListener("popstate",()=>{const sec=$("#p-"+tab);if(sec&&sec.classList.contains("detail"))closeDetail(true)});
+addEventListener("popstate",()=>{if(GS.after){const f=GS.after;GS.after=null;f();return}   /* 통합 검색 결과를 눌러 닫은 뒤 이동 */
+  if(!$("#gs").hidden){gsClose(true);return}const sec=$("#p-"+tab);if(sec&&sec.classList.contains("detail"))closeDetail(true)});
 function closeDetail(fromPop){const sec=$("#p-"+tab);if(!sec)return;const was=sec.classList.contains("detail");sec.classList.remove("detail");if(was&&!fromPop&&history.state&&history.state.detail){try{history.back()}catch(e){}}
   if(tab==="meetings"&&mMode!=="view"){mMode="view";renderMMain()} if(tab==="orgs"&&oMode!=="view"){oMode="view";renderOMain()} if(tab==="people"&&pMode!=="view"){pMode="view";renderPMain()}
   confirmDel=false;requestAnimationFrame(()=>scrollTo({top:listY[tab]||0}));fabSync()}
@@ -87,6 +88,8 @@ function terms(q){let s=(q||"").trim().toLowerCase();if(!s)return [];const T=[];
   SYN.flat().filter(x=>x.includes(" ")).sort((a,b)=>b.length-a.length).forEach(ph=>{if(s.includes(ph)){T.push(expand(ph));s=s.split(ph).join(" ")}});  // 띄어쓴 이름은 한 단어로
   s.split(/\s+/).filter(Boolean).forEach(t=>T.push(expand(t)));return T}
 const hits=(hay,T)=>T.every(alts=>alts.some(a=>hay.includes(a)));
+const hayO=o=>[o.name,...(o.aliases||[]),o.type,o.summary,o.prefs,o.hr,Object.keys(o.signals||{}).join(" ")].join(" ").toLowerCase();
+function hayP(p){const o=orgOf(p.org);return [p.name,p.org,...(o?[o.name,...(o.aliases||[])]:[]),p.dept,p.team,p.title,p.note].join(" ").toLowerCase()}
 function hayM(r){let h=HAY.get(r.id);if(h)return h;const o=orgOf(r.org);
   h=[r.org,...(o?[o.name,...(o.aliases||[])]:[]),r.dept,r.attendees,r.body,r.raw?rawText(r):"",r.nextAction,r.kbAttendees,(r.tags||[]).join(" "),(r.assets||[]).join(" "),r.category,r.orgType].join(" ").toLowerCase();HAY.set(r.id,h);return h}
 
@@ -94,9 +97,13 @@ function hayM(r){let h=HAY.get(r.id);if(h)return h;const o=orgOf(r.org);
 function authorsRefresh(){const el=$("#mAuthor"),cur=el.value;const set=[...new Set(M.map(m=>(m.kbAttendees||"").split(/[,·\/]/)[0].trim()).filter(Boolean))].sort();
   el.innerHTML=`<option value="">작성자 전체</option>`+set.map(a=>`<option${a===cur?" selected":""}>${esc(a)}</option>`).join("")}
 function mFiltered(){const T=terms($("#mq").value),c=$("#mCat").value,t=$("#mType").value,a=$("#mAsset").value,au=$("#mAuthor").value,f=$("#mFlag").value;
-  return M.filter(r=>(!c||(r.category||"LP")===c)&&(!t||r.orgType===t)&&(!a||(r.assets||[]).includes(a))&&(!au||(r.kbAttendees||"").includes(au))&&(!cutOnly||r.truncated)&&(!newOnly||NEWS.has(r.id)||UPDS.has(r.id))&&
-    (!f||(f==="원문 잘림"?r.truncated:f==="다음 액션"?!!r.nextAction:(r.flags||[]).some(x=>f==="확인"?/확인/.test(x):x.startsWith(f))))&&
-    (!T.length||hits(hayM(r),T)))}
+  const L=M.filter(r=>(!c||(r.category||"LP")===c)&&(!t||r.orgType===t)&&(!a||(r.assets||[]).includes(a))&&(!au||(r.kbAttendees||"").includes(au))&&(!cutOnly||r.truncated)&&(!newOnly||NEWS.has(r.id)||UPDS.has(r.id))&&
+    (!starOnly||STAR.m.has(r.id))&&(!actOnly||!!r.nextAction)&&
+    (!f||(f==="원문 잘림"?r.truncated:(r.flags||[]).some(x=>f==="확인"?/확인/.test(x):x.startsWith(f))))&&
+    (!T.length||hits(hayM(r),T)));
+  if(actOnly&&actBy==="org"){const last={};L.forEach(r=>{if(!last[r.org]||r.date>last[r.org])last[r.org]=r.date});   /* 기관별: 최근 액션이 있는 기관부터 */
+    return L.slice().sort((x,y)=>(last[y.org]||"").localeCompare(last[x.org]||"")||x.org.localeCompare(y.org,"ko")||(y.date||"").localeCompare(x.date||""))}
+  return L}
 // ── 읽기 도우미: 검색어 강조·금액 강조·미리보기 ──
 const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
 function hlRe(q){if(hlCache.q===q)return hlCache.re;const alts=[...new Set(terms(q).flat())].sort((a,b)=>b.length-a.length);
@@ -140,22 +147,34 @@ function preview(r,q){const {secs,take}=parseBody(r.body),lines=[...secs.flatMap
 let seenAt="",newOnly=false,ASOF="";const NEWS=new Set(),UPDS=new Set();
 const CAT_CLS={"GP":"gp","시장정보":"intel","내부":"inner"};
 function renderMList(){const f=mFiltered(),L=$("#mList"),q=$("#mq").value.trim().toLowerCase();
-  $("#mCnt").textContent=`${f.length}건 / 전체 ${M.length}건${ASOF?` · ${ASOF} 업데이트`:""}`;
+  $("#mCnt").textContent=`${f.length}건 / 전체 ${M.length}건${ASOF&&!actOnly?` · ${ASOF} 업데이트`:""}`;
   const cat=$("#mCat").value;document.querySelectorAll("#mQuick [data-cat]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.cat===cat?"true":"false"));
   const nb=$("#mNewOnly");nb.hidden=!NEWS.size&&!UPDS.size;nb.querySelector("span").textContent=NEWS.size+UPDS.size;nb.setAttribute("aria-pressed",newOnly?"true":"false");
+  const sb=$("#mStarOnly"),nStar=M.filter(r=>STAR.m.has(r.id)).length+O.filter(o=>STAR.o.has(o.id)).length;sb.querySelector("span").textContent=nStar||"";sb.setAttribute("aria-pressed",starOnly?"true":"false");
+  const ab=$("#mActOnly");ab.querySelector("span").textContent=M.filter(r=>r.nextAction).length;ab.setAttribute("aria-pressed",actOnly?"true":"false");
+  const ag=$("#mActBy");ag.hidden=!actOnly;ag.querySelectorAll("[data-by]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.by===actBy)));
   const nf=["mType","mAsset","mAuthor","mFlag"].filter(i=>$("#"+i).value).length;$("#mFt").textContent=nf?`필터 ${nf}`:"필터";$("#mFt").setAttribute("aria-pressed",nf?"true":"false");
   jumpFill(null);
+  const top=starOnly?starOrgsHtml():"";
   if(!M.length){L.innerHTML=`<div class="empty">아직 미팅노트가 없습니다.</div>`;return}
-  if(!f.length){L.innerHTML=`<div class="empty">조건에 맞는 미팅이 없습니다. 검색어나 필터를 바꿔 보세요.</div>`;return}
-  const per={};f.forEach(r=>{const k=(r.date||"").slice(0,7);per[k]=(per[k]||0)+1});let last="";
-  L.innerHTML=f.map(r=>{const {y,m,d}=md(r.date),k=(r.date||"").slice(0,7),att=parseAtt(r.attendees).map(a=>a.who).join(", "),cat=r.category||"LP";
-    const head=k!==last?`<div class="mhead" data-ym="${k}">${y}년 ${m}월<span>${per[k]}건</span></div>`:"";last=k;
+  if(!f.length){L.innerHTML=top+`<div class="empty">${starOnly&&!M.some(r=>STAR.m.has(r.id))?"★ 표시한 미팅이 없습니다. 미팅을 열고 ‘☆ 관심’을 누르면 여기에 모입니다(이 기기에만 저장).":actOnly&&!q?"다음 액션이 적힌 미팅이 없습니다.":"조건에 맞는 미팅이 없습니다. 검색어나 필터를 바꿔 보세요."}</div>`;wireStarOrgs(L);return}
+  const byOrg=actOnly&&actBy==="org",gk=r=>byOrg?r.org:(r.date||"").slice(0,7);   /* 다음 액션 · 기관별이면 기관으로 묶는다 */
+  const per={};f.forEach(r=>{const k=gk(r);per[k]=(per[k]||0)+1});let last=null;
+  L.innerHTML=top+f.map(r=>{const {y,m,d}=md(r.date),k=gk(r),att=parseAtt(r.attendees).map(a=>a.who).join(", "),cat=r.category||"LP";
+    const head=k!==last?(byOrg?`<div class="mhead">${hl(esc(k),q)}<span>${per[k]}건</span></div>`:`<div class="mhead" data-ym="${k}">${y}년 ${m}월<span>${per[k]}건</span></div>`):"";last=k;
     const badge=NEWS.has(r.id)?`<span class="badge new">NEW</span>`:UPDS.has(r.id)?`<span class="badge upd">수정</span>`:"";
-    return head+`<button type="button" class="item${r.id===mSel?" on":""}" data-id="${esc(r.id)}"><div class="date"><b>${d}</b>${wk(r.date)}</div>
-      <div style="min-width:0"><div class="ttl">${cat!=="LP"?`<span class="cattag ${CAT_CLS[cat]||""}">${esc(cat)}</span>`:""}${hl(esc(r.org),q)}${r.dept?` <span class="mdept">${hl(esc(r.dept),q)}</span>`:""}${badge}</div>
+    const pv=actOnly?`<span class="nlab">다음 액션</span> ${hl(esc(r.nextAction),q)}`:preview(r,q);
+    return head+`<button type="button" class="item${r.id===mSel?" on":""}" data-id="${esc(r.id)}"><div class="date"><b>${d}</b>${byOrg?`${m}월`:wk(r.date)}</div>
+      <div style="min-width:0"><div class="ttl">${STAR.m.has(r.id)?`<span class="smark" title="관심">★</span>`:""}${cat!=="LP"?`<span class="cattag ${CAT_CLS[cat]||""}">${esc(cat)}</span>`:""}${hl(esc(r.org),q)}${r.dept?` <span class="mdept">${hl(esc(r.dept),q)}</span>`:""}${badge}</div>
       <div class="sub2">${hl(esc(att||r.kbAttendees||""),q)}</div>
-      ${(()=>{const pv=preview(r,q);return pv?`<div class="pv">${pv}</div>`:""})()}
-      <div class="chips">${(r.assets||[]).slice(0,3).map(t=>`<span class="chip asset">${esc(SHORT[t]||t)}</span>`).join("")}${r.truncated?`<span class="chip cut">✂ 잘림</span>`:""}${(r.flags||[]).some(x=>x.startsWith("내부용"))?`<span class="chip flag">내부용</span>`:""}</div></div></button>`}).join("");jumpFill(per)}
+      ${pv?`<div class="pv${actOnly?" act":""}">${pv}</div>`:""}
+      <div class="chips">${(r.assets||[]).slice(0,3).map(t=>`<span class="chip asset">${esc(SHORT[t]||t)}</span>`).join("")}${r.truncated?`<span class="chip cut">✂ 잘림</span>`:""}${(r.flags||[]).some(x=>x.startsWith("내부용"))?`<span class="chip flag">내부용</span>`:""}${!actOnly&&r.nextAction?`<span class="chip nxa">다음 액션</span>`:""}</div></div></button>`}).join("");
+  wireStarOrgs(L);jumpFill(byOrg?null:per)}
+// ★ 모아보기: 관심 기관을 목록 맨 위에 카드로(누르면 기관 상세), 그 아래 관심 미팅
+function starOrgsHtml(){const os=O.filter(o=>STAR.o.has(o.id)).map(o=>({o,last:lastMeet(o),n:meetingsOf(o).length})).sort((a,b)=>(b.last||"").localeCompare(a.last||"")||a.o.name.localeCompare(b.o.name,"ko"));
+  return `<div class="mhead">관심 기관<span>${os.length}곳</span></div>`+(os.length?`<div class="starorgs">${os.map(({o,last,n})=>`<button type="button" class="so" data-soid="${esc(o.id)}"><b>★ ${esc(o.name)}</b><small>${esc(o.type)} · 미팅 ${n}건${last?` · 최근 ${esc(last.slice(5).replace("-","/"))}`:""}</small></button>`).join("")}</div>`
+    :`<div class="empty" style="padding:14px 18px">★ 표시한 기관이 없습니다. 기관 상세에서 ‘☆ 관심’을 누르세요.</div>`)+`<div class="mhead">관심 미팅<span>${M.filter(r=>STAR.m.has(r.id)).length}건</span></div>`}
+function wireStarOrgs(L){L.querySelectorAll("[data-soid]").forEach(b=>b.onclick=e=>{e.stopPropagation();oSel=b.dataset.soid;oMode="view";setTab("orgs");openDetail()})}
 // 월 이동: 목록이 길어(휴대폰 230건 ≈ 화면 35장) 달을 골라 바로 간다. 두 달 이상일 때만 보인다
 function jumpFill(per){const J=$("#mJump");if(!J)return;const ks=per?Object.keys(per).sort().reverse():[];J.hidden=ks.length<2;
   J.innerHTML=`<option value="">월 이동</option>`+ks.map(k=>`<option value="${k}">${+k.slice(0,4)}년 ${+k.slice(5)}월 · ${per[k]}건</option>`).join("")}
@@ -170,12 +189,12 @@ function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm(
   const list=mFiltered(),i=list.findIndex(x=>x.id===r.id),newer=i>0?list[i-1]:null,older=i>=0&&i<list.length-1?list[i+1]:null;
   const cut=r.truncated?`<div class="trunc"><div style="flex:1;min-width:0"><b>✂ 원문 잘림 — 보완 필요</b><div>카톡 내보내기에서 긴 메시지 뒷부분이 잘렸습니다. 카톡 '전체보기'에서 확인한 내용을 Claude에 주면 보완합니다.</div>${r.truncAt?`<q>${esc(r.truncAt)}</q>`:""}</div></div>`:"";
   const nav=(x,dir)=>x?`<button type="button" class="pn-b ${dir}" data-nav="${esc(x.id)}"><small>${dir==="newer"?"← 더 최근":"더 이전 →"}</small><b>${esc(x.org)}</b><span>${esc(x.date)}</span></button>`:`<span></span>`;
-  W.innerHTML=`<div class="backbar"><button class="btn sm" type="button" data-back>← 목록</button><span class="grow"></span><button class="btn sm" id="mCopyM" type="button">메모 복사</button></div>
+  W.innerHTML=`<div class="backbar"><button class="btn sm" type="button" data-back>← 목록</button><span class="grow"></span>${starBtn("m",r.id,"btn sm")}<button class="btn sm" id="mCopyM" type="button">메모 복사</button></div>
   <div class="head"><div class="t">
     <div class="eyebrow">${y}.${String(m).padStart(2,"0")}.${String(d).padStart(2,"0")} (${wk(r.date)})${ago(r.date)?` · ${ago(r.date)}`:""} · ${esc(r.category||"LP")}${r.orgType?" · "+esc(r.orgType):""}</div>
     <h2>${o?`<button class="link" id="mOrg" type="button">${hl(esc(r.org),q)}</button>`:hl(esc(r.org),q)}${r.dept?` <span class="h-dept">${hl(esc(r.dept),q)}</span>`:""}</h2>
     <div class="chips">${inner?`<span class="chip flag">내부용 · 외부 공유 금지</span>`:""}${(r.assets||[]).map(t=>`<span class="chip asset">${esc(t)}</span>`).join("")}</div></div>
-    <div class="actions"><button class="btn" id="mCopy" type="button">메모 복사</button>${canWrite?`<button class="btn" id="mEdit" type="button">수정</button>`:""}</div></div>
+    <div class="actions">${starBtn("m",r.id)}<button class="btn" id="mCopy" type="button">메모 복사</button>${canWrite?`<button class="btn" id="mEdit" type="button">수정</button>`:""}</div></div>
   <div class="body">
     ${r.raw?`<div class="seg" role="group" aria-label="보기"><button type="button" data-view="memo" aria-pressed="true">요약정리</button><button type="button" data-view="raw" aria-pressed="false">원문</button></div>`:""}
     ${r.nextAction?`<div class="next"><span>다음 액션</span>${hl(esc(r.nextAction),q)}</div>`:""}
@@ -228,19 +247,23 @@ $("#mList").addEventListener("click",e=>{const b=e.target.closest(".item");if(!b
 ["mq","mCat","mType","mAsset","mAuthor","mFlag"].forEach(i=>$("#"+i).addEventListener("input",()=>{renderMList();if(!isMob())renderMMain()}));  // PC는 상세의 검색어 강조·이전/다음도 갱신
 document.querySelectorAll("#mQuick [data-cat]").forEach(b=>b.onclick=()=>{$("#mCat").value=b.dataset.cat;renderMList();if(!isMob())renderMMain()});
 $("#mNewOnly").onclick=()=>{newOnly=!newOnly;renderMList()};
+$("#mStarOnly").onclick=()=>{starOnly=!starOnly;renderMList();if(!isMob())renderMMain()};
+$("#mActOnly").onclick=()=>{actOnly=!actOnly;renderMList();if(!isMob())renderMMain()};
+document.querySelectorAll("#mActBy [data-by]").forEach(b=>b.onclick=()=>{actBy=b.dataset.by;renderMList();if(!isMob())renderMMain()});
 $("#mFt").onclick=()=>$("#mFilters").classList.toggle("open");
 $("#mNew").onclick=$("#fab").onclick=()=>{if(!canWrite)return toast("이 링크에서는 수정 권한이 없습니다.");mMode="new";confirmDel=false;renderMMain();openDetail()};
 
 // ═════ 기관 ═════
 function lastMeet(o){const ms=meetingsOf(o);return ms.length?ms.reduce((a,b)=>a.date>b.date?a:b).date:""}
 function oFiltered(){const T=terms($("#oq").value),t=$("#oType").value;
-  return O.filter(o=>(!t||o.type===t)&&(!T.length||hits([o.name,...(o.aliases||[]),o.summary,o.prefs,o.hr,Object.keys(o.signals||{}).join(" ")].join(" ").toLowerCase(),T)))
+  return O.filter(o=>(!t||o.type===t)&&(!oStarOnly||STAR.o.has(o.id))&&(!T.length||hits(hayO(o),T)))
    .map(o=>({o,last:lastMeet(o),n:meetingsOf(o).length})).sort((a,b)=>(b.last||"").localeCompare(a.last||"")||a.o.name.localeCompare(b.o.name))}
 function renderOList(){const f=oFiltered(),L=$("#oList");$("#oCnt").textContent=`${f.length}곳 / 전체 ${O.length}곳`;
-  if(!f.length){L.innerHTML=`<div class="empty">조건에 맞는 기관이 없습니다.</div>`;return}
+  const sb=$("#oStarOnly"),ns=O.filter(o=>STAR.o.has(o.id)).length;sb.querySelector("span").textContent=ns||"";sb.setAttribute("aria-pressed",oStarOnly?"true":"false");
+  if(!f.length){L.innerHTML=`<div class="empty">${oStarOnly&&!ns?"★ 표시한 기관이 없습니다. 기관 상세에서 ‘☆ 관심’을 누르세요(이 기기에만 저장).":"조건에 맞는 기관이 없습니다."}</div>`;return}
   L.innerHTML=f.map(({o,last,n})=>{const sg=Object.entries(o.signals||{}).filter(([k,v])=>v.s==="진행"||v.s==="관심");
     return `<button type="button" class="item noDate${o.id===oSel?" on":""}" data-id="${esc(o.id)}"><div style="min-width:0">
-      <div class="ttl">${esc(o.name)}</div><div class="sub2">${esc(o.type)} · 미팅 ${n}건${last?` · 최근 ${esc(last.slice(5).replace("-","/"))}`:""}</div>
+      <div class="ttl">${STAR.o.has(o.id)?`<span class="smark" title="관심">★</span>`:""}${esc(o.name)}</div><div class="sub2">${esc(o.type)} · 미팅 ${n}건${last?` · 최근 ${esc(last.slice(5).replace("-","/"))}`:""}</div>
       <div class="chips">${sg.slice(0,4).map(([k,v])=>`<span class="sg s-${esc(v.s)}" style="font-size:10.5px;padding:0 6px">${esc(SHORT[k]||k)}</span>`).join("")}</div></div></button>`}).join("")}
 function renderOMain(){const W=$("#oMain");if(oMode!=="view")return renderOForm();
   const o=O.find(x=>x.id===oSel);if(!o){const f=!isMob()&&$("#oList .item");if(f&&f.dataset.id!==oSel){oSel=f.dataset.id;renderOList();return renderOMain()}
@@ -248,21 +271,23 @@ function renderOMain(){const W=$("#oMain");if(oMode!=="view")return renderOForm(
   const ms=meetingsOf(o).sort((a,b)=>b.date.localeCompare(a.date)),ps=peopleOf(o),sig=Object.entries(o.signals||{}).sort((a,b)=>STATES.indexOf(a[1].s)-STATES.indexOf(b[1].s));
   W.innerHTML=BACK+`<div class="head"><div class="t"><div class="eyebrow">${esc(o.type)}${(o.aliases||[]).length?" · 약칭 "+(o.aliases||[]).map(esc).join(", "):""}</div>
     <h2>${esc(o.name)}</h2><div class="sub2">미팅 ${ms.length}건${ms[0]?` · 최근 ${esc(ms[0].date)}`:""} · 인물 ${ps.length}명</div></div>
-    <div class="actions">${ps.length?`<button class="btn" id="oChart" type="button">조직도</button>`:""}${canWrite?`<button class="btn" id="oMeet" type="button">+ 미팅 추가</button>`:""}${canWrite?`<button class="btn" id="oEdit" type="button">수정</button>`:""}</div></div>
+    <div class="actions">${starBtn("o",o.id)}${ps.length?`<button class="btn" id="oChart" type="button">조직도</button>`:""}${canWrite?`<button class="btn" id="oMeet" type="button">+ 미팅 추가</button>`:""}${canWrite?`<button class="btn" id="oEdit" type="button">수정</button>`:""}</div></div>
   <div class="body">
     ${o.summary?`<div class="sec"><h3>최신 스탠스</h3><p>${esc(o.summary)}</p></div>`:""}
     <div class="kv">${[["선호·제약",o.prefs],["티켓",o.ticket],["심사·의사결정",o.process],["조직·인사",o.hr]].filter(x=>x[1]).map(([k,v])=>`<div><span>${k}</span>${esc(v)}</div>`).join("")}</div>
     ${sig.length?`<div class="sec"><h3>전략 시그널</h3><div class="sigrows">${sig.map(([k,v])=>`<div class="sigrow"><b>${esc(k)}</b><span class="sg s-${esc(v.s)}">${esc(v.s)}</span><span>${esc(v.note)}</span><span class="d">${esc(v.date||"")}</span></div>`).join("")}</div></div>`:""}
+    <div id="oDash" class="sec dzorg" hidden></div>
     ${ps.length?`<div class="sec"><h3>인물</h3><div class="pgrid">${ps.sort((a,b)=>(b.lastSeen||"").localeCompare(a.lastSeen||"")).slice(0,18).map(p=>`<button type="button" class="pcard" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b> ${esc(p.title||"")}<div class="sub2">${esc([p.dept,p.team].filter(Boolean).join(" · ")||p.note||"")}</div></button>`).join("")}</div>${ps.length>18?`<p class="basis">외 ${ps.length-18}명은 인물·조직도 탭에서 볼 수 있습니다.</p>`:""}</div>`:""}
     <div class="sec"><h3>미팅 이력</h3>${ms.length?`<div class="timeline">${ms.map(m=>{const {secs,take}=parseBody(m.body);const first=(take.length?take.map(t=>"→ "+t):secs.flatMap(s=>s.b)).slice(0,2).join(" / ");
-      return `<button type="button" class="tl" data-mid="${esc(m.id)}"><span class="d">${esc(m.date)}</span><span style="min-width:0"><b>${esc(m.dept||m.category||"")}</b> ${esc(parseAtt(m.attendees).map(a=>a.who).join(", "))}${m.truncated?` <span class="chip cut">✂ 잘림</span>`:""}<span class="s">${esc(first)}</span></span></button>`}).join("")}</div>`:`<p class="ro">기록된 미팅이 없습니다.</p>`}</div>
+      return `<button type="button" class="tl" data-mid="${esc(m.id)}"><span class="d">${esc(m.date)}</span><span style="min-width:0"><b>${esc(m.dept||m.category||"")}</b> ${esc(parseAtt(m.attendees).map(a=>a.who).join(", "))}${m.truncated?` <span class="chip cut">✂ 잘림</span>`:""}<span class="s">${esc(first)}</span>${m.nextAction?`<span class="s nx"><b>다음 액션</b> ${esc(m.nextAction)}</span>`:""}</span></button>`}).join("")}</div>`:`<p class="ro">기록된 미팅이 없습니다.</p>`}</div>
     <p class="basis">${esc(o.basis||"")}${o.updatedAt?` · 최종 수정 ${esc(o.updatedAt.slice(0,10))}`:""}</p>
   </div>`;
   W.querySelectorAll("[data-mid]").forEach(b=>b.onclick=()=>gotoMeeting(b.dataset.mid));
   W.querySelectorAll("[data-pid]").forEach(b=>b.onclick=()=>gotoPerson(b.dataset.pid));
   const c=$("#oChart");if(c)c.onclick=()=>{pOrg=o.name;pSel=null;pMode="view";$("#pOrg").value=o.name;setTab("people");openDetail()};
   const om=$("#oMeet");if(om)om.onclick=()=>{if(!canWrite)return toast("이 링크에서는 수정 권한이 없습니다.");mMode="new";setTab("meetings");openDetail();setTimeout(()=>{$("#fOrg").value=o.name;$("#fType").value=o.type},0)};
-  const e=$("#oEdit");if(e)e.onclick=()=>{oMode="edit";renderOMain()}}
+  const e=$("#oEdit");if(e)e.onclick=()=>{oMode="edit";renderOMain()};
+  fillODash(o)}
 function renderOForm(){const o=oMode==="edit"?O.find(x=>x.id===oSel)||{}:{type:"공제회",signals:{}};const sg=o.signals||{};
   $("#oMain").innerHTML=BACK+`<form id="oFrm" novalidate><div class="eyebrow">${oMode==="edit"?"기관 프로필 수정":"새 기관"}</div>
     <div class="row"><label>기관명<input id="gName" value="${esc(o.name)}"></label><label>업권<select id="gType">${TYPES.map(t=>`<option${t===o.type?" selected":""}>${t}</option>`).join("")}</select></label>
@@ -287,6 +312,7 @@ function renderOForm(){const o=oMode==="edit"?O.find(x=>x.id===oSel)||{}:{type:"
     await write(C.orgs,oMode==="edit"?oSel:null,data,id=>{oSel=id;oMode="view"},"#gSave")}}
 $("#oList").addEventListener("click",e=>{const b=e.target.closest(".item");if(!b)return;oSel=b.dataset.id;oMode="view";confirmDel=false;renderOList();renderOMain();if(isMob())openDetail();else if(innerWidth<=900)$("#oMain").scrollIntoView()});
 ["oq","oType"].forEach(i=>$("#"+i).addEventListener("input",renderOList));
+$("#oStarOnly").onclick=()=>{oStarOnly=!oStarOnly;renderOList();if(!isMob())renderOMain()};
 $("#oNew").onclick=()=>{if(!canWrite)return toast("이 링크에서는 수정 권한이 없습니다.");oMode="new";confirmDel=false;renderOMain();openDetail()};
 
 // ═════ 전략 수요판 ═════
@@ -372,6 +398,125 @@ $("#pq").addEventListener("input",renderPList);$("#pOrg").addEventListener("inpu
 $("#pNew").onclick=()=>{if(!canWrite)return toast("이 링크에서는 수정 권한이 없습니다.");pMode="new";confirmDel=false;renderPMain();openDetail()};
 
 
+// ═════ 관심(★) — 미팅·기관에 표시해 모아 본다. 이 기기에만 저장(localStorage kbnote-star, 데이터 파일은 그대로) ═════
+const STAR={m:new Set(),o:new Set()};
+try{const v=JSON.parse(localStorage.getItem("kbnote-star")||"{}");(v.m||[]).forEach(x=>STAR.m.add(x));(v.o||[]).forEach(x=>STAR.o.add(x))}catch(e){}
+function starSave(){try{localStorage.setItem("kbnote-star",JSON.stringify({m:[...STAR.m],o:[...STAR.o]}))}catch(e){}}
+const starBtn=(k,id,cls="btn")=>{const on=STAR[k].has(id);return `<button type="button" class="${cls} starbtn" data-sk="${k}" data-sid="${esc(id)}" aria-pressed="${on}" title="관심 표시 — 이 기기에만 저장"><span aria-hidden="true">${on?"★":"☆"}</span> 관심</button>`};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-sk]");if(!b)return;const k=b.dataset.sk,id=b.dataset.sid,S=STAR[k],on=!S.has(id);
+  on?S.add(id):S.delete(id);starSave();toast(on?"★ 관심에 넣었습니다":"관심에서 뺐습니다");
+  document.querySelectorAll(`[data-sk="${k}"][data-sid="${CSS.escape(id)}"]`).forEach(x=>{x.setAttribute("aria-pressed",String(on));x.querySelector("span").textContent=on?"★":"☆"});
+  const L=k==="m"?$("#mList"):$("#oList"),y=L.scrollTop;if(k==="m")renderMList();else renderOList();L.scrollTop=y;if(k==="o"&&tab==="meetings")renderMList()});
+
+// ═════ 기관 ↔ 대시보드 약정·수수료 ═════
+// 대시보드 '기관별 약정(2010~현재)'(표 id og: 기관마다 묶음)과 '약정내역(2022~현재)'(표 id cm: 연도별 수수료)를 기관 상세에 붙인다.
+// 대시보드 표기(KTCU, KPOST(보험과) …)는 DB 기관의 이름·약칭과 맞춘다(괄호 밖·안도 각각). 운용사(GP) 기관은 펀드의 운용사로 맞춘다.
+// 표기가 달라 안 붙는 기관은 DB 기관의 약칭(aliases)에 대시보드 표기를 더한다 — 공개 코드에 기관명을 두지 않는다.
+const nk=s=>String(s??"").toLowerCase().replace(/\s+/g,"");
+function nameKeys(s){s=String(s??"").trim();const k=[nk(s)],m=/^(.+?)\s*\(([^)]+)\)$/.exec(s);if(m)k.push(nk(m[1]),nk(m[2]));return k.filter(Boolean)}
+function orgKeys(o){const k=new Set();[o.name,...(o.aliases||[])].forEach(n=>nameKeys(n).forEach(x=>k.add(x)));return k}
+const n2=(v,d=2)=>Number(v||0).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+let DZ=null;
+function dzTable(D,id){let f=null;D.sheets.forEach(s=>Dash.walk(s.view||[],b=>{if(!f&&b.t==="table"&&b.id===id)f={s,b}}));return f}
+function dzIndex(D){const og=dzTable(D,"og"),cm=dzTable(D,"cm"),com=[],fee=[],fy=[];
+  if(og)(og.b.secs||[]).forEach(sec=>{const lbl=String(sec.h||"").replace(/^\d+\.\s*/,"");sec.rows.forEach(r=>com.push({lbl,k:nameKeys(lbl),c:r.c}))});
+  if(cm){cm.b.cols.forEach(c=>{const m=/^f(\d{4})$/.exec(c.k);if(m)fy.push(m[1])});(cm.b.rows||[]).forEach(r=>fee.push({lbl:String(r.c.lp??""),k:nameKeys(r.c.lp),c:r.c}))}
+  return {asof:D.asof,usd:(D.fx||{}).usd||0,com,fee,fy:fy.sort().reverse(),og:og&&og.s.name,cm:cm&&cm.s.name}}
+function dzOf(o){if(!DZ)return null;const K=orgKeys(o),gp=o.type==="GP",mine=x=>gp?K.has(nk(x.c.gp)):x.k.some(k=>K.has(k));
+  const com=DZ.com.filter(mine),fee=DZ.fee.filter(mine);if(!com.length&&!fee.length)return null;
+  const used=new Set(),same=(x,y)=>nk(x.c.ab)===nk(y.c.ab)&&nk(x.c.gp)===nk(y.c.gp);
+  const rows=com.map(x=>{let f=fee.find(y=>!used.has(y)&&same(x,y)&&y.k.some(k=>x.k.includes(k)));if(!f&&!gp)f=fee.find(y=>!used.has(y)&&same(x,y));if(f)used.add(f);return {x,f}});
+  fee.filter(y=>!used.has(y)).forEach(y=>rows.push({x:null,f:y}));   // 약정 목록에는 아직 없는 건(진행·청구예정 등)
+  const yr=r=>String((r.x&&r.x.c.yr)||(r.f&&String(r.f.c.ym||"").slice(0,4))||""),us=r=>(r.x?r.x.c.us:r.f&&(DZ.fy.map(y=>r.f.c["u"+y]).find(v=>v)))||0;
+  rows.sort((a,b)=>yr(b).localeCompare(yr(a))||us(b)-us(a));
+  const yrs=com.map(x=>String(x.c.yr||"")).filter(Boolean).sort(),fees=DZ.fy.map(y=>({y,v:fee.reduce((a,r)=>a+(+r.c["f"+y]||0),0)})).filter(z=>z.v);
+  const lbls={};[...com,...fee].forEach(x=>{const l=gp?x.c.gp:x.lbl;if(l)lbls[l]=(lbls[l]||0)+1});
+  return {gp,rows,yr,us,n:com.length,usd:com.reduce((a,x)=>a+(+x.c.us||0),0),y0:yrs[0],y1:yrs[yrs.length-1],fees,lbls:Object.keys(lbls).sort((a,b)=>lbls[b]-lbls[a])}}
+const eok=v=>DZ&&DZ.usd&&v?`≈ ${n2(v*DZ.usd/1e8)}억`:"";
+const amtTxt=(cy,am)=>am==null||am===""?"":cy==="KRW"?`${n2(am/1e8)}억원`:`${esc(cy||"")} ${n2(am/1e6)}M`;
+function fillODash(o){const el=$("#oDash");if(!el)return;
+  if(!DZ){el.hidden=true;Dash.data().then(D=>{if(!D)return;if(!DZ)DZ=dzIndex(D);const cur=O.find(x=>x.id===oSel);if(cur&&cur.id===o.id&&tab==="orgs"&&oMode==="view")fillODash(cur)});return}
+  const z=dzOf(o);if(!z){el.hidden=true;el.innerHTML="";return}
+  const SHOW=6,row=r=>{const c=r.x?r.x.c:r.f.c,f=r.f?r.f.c:null;
+    const fs=f?DZ.fy.filter(y=>+f["f"+y]).map(y=>`${y} USD ${n2(f["f"+y])}${f["r"+y]?` (${n2(f["r"+y]*100)}%)`:""}`):[];
+    const who=z.gp?(r.x?r.x.lbl:r.f.lbl):c.gp,amt=amtTxt(c.cy,c.am),u=r.x?c.us:z.us(r);
+    return `<div class="dzr"><span class="d">${esc(z.yr(r)||"—")}</span><span class="m"><b>${esc([who,c.ab].filter(Boolean).join(" · "))}</b>
+      <small>${esc([c.ac,c.is,c.st].filter(Boolean).join(" · "))}${!r.x?" · 약정 목록 밖(수수료 표)":""}${!z.gp&&r.x&&z.lbls.length>1?` · 표기 ${esc(r.x.lbl)}`:""}</small>${fs.length?`<small class="fee">수수료 ${esc(fs.join(" · "))}</small>`:""}</span>
+      <span class="a">${amt}${u?`<small>${eok(u)}</small>`:""}</span></div>`};
+  const last=z.fees[0];
+  el.innerHTML=`<h3>${z.gp?"당사 경유 약정 (이 운용사 펀드)":"약정·수수료"} <span class="h-sub">대시보드 · 기준일 ${esc(DZ.asof||"")}</span></h3>
+    <div class="dzk"><div><span>누적 약정</span><b>${z.n}건</b><small>${z.y0?esc(z.y0===z.y1?z.y0:z.y0+"~"+z.y1):"—"}</small></div>
+      <div><span>약정 합계 (USD 환산)</span><b>USD ${n2(z.usd/1e6)}M</b><small>${eok(z.usd)}</small></div>
+      ${last?`<div><span>수수료 ${esc(last.y)} (발생)</span><b>USD ${n2(last.v)}</b><small>${eok(last.v)}</small></div>`:""}</div>
+    ${z.fees.length>1?`<div class="dzfy"><span>연도별 수수료</span>${z.fees.map(x=>`<span class="yy"><b>${esc(x.y)}</b> USD ${n2(x.v)} <small>${eok(x.v)}</small></span>`).join("")}</div>`:""}
+    <div class="dzrows">${z.rows.slice(0,SHOW).map(row).join("")}</div>
+    ${z.rows.length>SHOW?`<details class="dzmore"><summary>나머지 ${z.rows.length-SHOW}건 더 보기</summary><div class="dzrows">${z.rows.slice(SHOW).map(row).join("")}</div></details>`:""}
+    <div class="dzfoot"><p class="basis">대시보드 ‘기관별 약정’·‘약정내역(2022~)’ 기준 · ${z.gp?"운용사":"대시보드"} 표기 ${z.lbls.map(esc).join(", ")} · 억원은 기준일 USDKRW ${n2(DZ.usd)} 환산</p>
+      ${DZ.og?`<button type="button" class="btn sm" id="oDzGo">대시보드에서 보기</button>`:""}</div>`;
+  el.hidden=false;
+  const g=$("#oDzGo");if(g)g.onclick=()=>{Dash.open(DZ.og,z.lbls[0]);setTab("dash")}}
+
+// ═════ 통합 검색(머리줄 돋보기 · Ctrl+K) — 미팅·기관·인물·대시보드·리서치를 한 번에 ═════
+// 검색어 넓히기(기관 약칭·한영 표기)는 각 탭 검색과 같다(terms). 결과를 누르면 그 탭의 해당 항목으로 간다.
+const GS={after:null,dz:null,rs:null,dzSt:"",rsSt:"",t:0};
+function gsOpen(){const el=$("#gs"),i=$("#gsq");if(!el.hidden){i.focus();return}
+  el.hidden=false;document.body.classList.add("gs-on");try{history.pushState({gs:1},"",location.hash)}catch(e){}
+  i.focus();i.select();gsRun();
+  if(!GS.dz){GS.dzSt="loading";Dash.data().then(D=>{GS.dz=D;GS.dzSt=D?"ready":"none";if(D&&!DZ)DZ=dzIndex(D);if(!el.hidden)gsRun()})}
+  if(!GS.rs){GS.rsSt="loading";Research.data().then(R=>{GS.rs=R;GS.rsSt=R?"ready":"none";if(!el.hidden)gsRun()})}}
+function gsHide(){$("#gs").hidden=true;document.body.classList.remove("gs-on")}
+function gsClose(fromPop){if($("#gs").hidden)return;gsHide();if(!fromPop&&history.state&&history.state.gs){try{history.back()}catch(e){}}}
+// 결과를 누르면: 검색 창의 기록을 먼저 되돌린 뒤 이동(휴대폰 뒤로가기가 꼬이지 않게)
+function gsGo(fn){gsHide();if(history.state&&history.state.gs){GS.after=fn;try{history.back();setTimeout(()=>{if(GS.after){const f=GS.after;GS.after=null;f()}},500);return}catch(e){GS.after=null}}fn()}
+const dzHay=new WeakMap();
+function dzRowText(r,sh){let v=dzHay.get(r);if(v==null){v=Object.values(r.c).map(x=>typeof x==="object"?"":String(x)).join(" ")+" "+sh;dzHay.set(r,v)}return v}
+function gsDash(T){const out=[];if(!GS.dz)return out;
+  GS.dz.sheets.forEach(s=>{if(!Array.isArray(s.view)||!s.view.length||s.name==="대시보드(Demo)")return;const hs=[];
+    Dash.walk(s.view,b=>{if(b.t!=="table")return;const cd=b.card||{},tk=(cd.title&&cd.title[0]!=="@"?cd.title:null)||b.cols[0].k,subs=(cd.sub||[]).filter(k=>k[0]!=="@");
+      (b.secs||[{rows:b.rows||[]}]).forEach(sec=>{const sh=String(sec.h||"");sec.rows.forEach(r=>{const ho=dzRowText(r,sh),hy=ho.toLowerCase();if(hits(hy,T))hs.push({t:r.c[tk],s:[sh.replace(/^\d+\.\s*/,""),...subs.map(k=>r.c[k])].filter(v=>v!=null&&v!=="").join(" · "),hy,ho})})})});
+    if(hs.length){const q=T.map(alts=>{for(const a of alts){const x=hs.find(y=>y.hy.includes(a));if(x){const i=x.hy.indexOf(a);return x.ho.substr(i,a.length)}}return alts[0]}).join(" ");out.push({s,hs,q})}});   /* 시트 찾기 칸에는 실제로 맞은 표기를 그대로 넣는다(교공 → KTCU) */
+  return out.sort((a,b)=>b.hs.length-a.hs.length)}   /* 많이 맞은 시트부터 */
+function gsResearch(T,q){const out=[];if(!GS.rs)return out;
+  GS.rs.reports.forEach(r=>{const lines=[r.headline,...(r.kpis||[]).map(k=>[k.l,k.v,k.s].filter(Boolean).join(" ")),...(r.sections||[]).flatMap(x=>[x.h,...(x.items||[])]),...(r.outlook||[]),...(r.insights||[])].filter(Boolean).map(String);
+    if(!hits([r.name,r.short,r.en,...lines].join(" ").toLowerCase(),T))return;const hit=lines.find(l=>firstHit(l,q));out.push({r,snip:hit?snippet(hit,q):esc(r.headline||"")})});
+  return out}
+function gsRun(){const raw=$("#gsq").value,q=raw.trim().toLowerCase(),B=$("#gsBody");
+  if(!q){B.innerHTML=`<div class="gs-hint"><b>미팅노트·기관·인물·대시보드·리서치를 한 번에 찾습니다.</b><span>기관 약칭(예: 교공)이나 GP 이름을 한글·영문 어느 쪽으로 써도 찾습니다. 여러 단어는 모두 들어 있는 것만.</span></div>`;return}
+  const T=terms(q),LIM=5;
+  // 순서: 기관명·약칭이 검색어와 같거나 맞는 것 먼저(교공 → 교직원공제회 미팅·기관), 그다음 최근 순
+  const orgHit=r=>{const o=orgOf(r.org);return hits([r.org,...(o?[o.name,...(o.aliases||[])]:[])].join(" ").toLowerCase(),T)?1:0};
+  const oScore=o=>{const ns=[o.name,...(o.aliases||[])].map(x=>x.toLowerCase());return ns.includes(q)?2:hits(ns.join(" "),T)?1:0};
+  const ms=M.filter(r=>hits(hayM(r),T)).sort((a,b)=>orgHit(b)-orgHit(a)||(b.date||"").localeCompare(a.date||""));
+  const os=O.filter(o=>hits(hayO(o),T)).sort((a,b)=>oScore(b)-oScore(a)||(lastMeet(b)||"").localeCompare(lastMeet(a)||""));
+  const ps=P.filter(p=>hits(hayP(p),T)).sort((a,b)=>(hits(a.name.toLowerCase(),T)?0:1)-(hits(b.name.toLowerCase(),T)?0:1)),dz=gsDash(T),rs=gsResearch(T,q);
+  const grp=(name,n,body,all)=>`<section class="gs-g"><div class="gs-gh"><b>${name}</b><span>${n}</span>${all||""}</div>${body}</section>`;
+  let h="";
+  if(ms.length)h+=grp("미팅노트",`${ms.length}건`,ms.slice(0,LIM).map(r=>`<button type="button" class="gs-it" data-gm="${esc(r.id)}"><span class="gs-d">${esc(r.date.slice(5).replace("-","/"))}</span><span class="gs-m"><b>${hl(esc(r.org),q)}${r.dept?` <small>${hl(esc(r.dept),q)}</small>`:""}</b><small>${preview(r,q)}</small></span></button>`).join(""),
+    ms.length>LIM?`<button type="button" class="link" data-gall="m">${ms.length}건 모두 보기</button>`:"");
+  if(os.length)h+=grp("기관",`${os.length}곳`,os.slice(0,LIM).map(o=>{const n=meetingsOf(o).length,l=lastMeet(o);return `<button type="button" class="gs-it" data-go="${esc(o.id)}"><span class="gs-m"><b>${STAR.o.has(o.id)?"★ ":""}${hl(esc(o.name),q)}</b><small>${esc(o.type)} · 미팅 ${n}건${l?` · 최근 ${esc(l)}`:""}</small></span></button>`}).join(""),
+    os.length>LIM?`<button type="button" class="link" data-gall="o">${os.length}곳 모두 보기</button>`:"");
+  if(ps.length)h+=grp("인물",`${ps.length}명`,ps.slice(0,LIM).map(p=>`<button type="button" class="gs-it" data-gp="${esc(p.id)}"><span class="gs-m"><b>${hl(esc(p.name),q)} <small>${esc(p.title||"")}</small></b><small>${hl(esc([p.org,p.dept,p.team].filter(Boolean).join(" · ")),q)}</small></span></button>`).join(""),
+    ps.length>LIM?`<button type="button" class="link" data-gall="p">${ps.length}명 모두 보기</button>`:"");
+  if(dz.length)h+=grp("대시보드",`${dz.reduce((a,x)=>a+x.hs.length,0)}건 · 시트 ${dz.length}개`,dz.map((x,i)=>`<div class="gs-sh"><button type="button" class="gs-shh" data-gd="${i}"><b>${esc(x.s.short||x.s.name)}</b><span>${x.hs.length}건 · 시트에서 보기 →</span></button>${x.hs.slice(0,3).map(y=>`<button type="button" class="gs-it sub" data-gd="${i}"><span class="gs-m"><b>${hl(esc(y.t??"-"),q)}</b>${y.s?`<small>${hl(esc(y.s),q)}</small>`:""}</span></button>`).join("")}</div>`).join(""));
+  else if(GS.dzSt==="loading")h+=grp("대시보드","",`<p class="gs-wait">대시보드 여는 중…</p>`);
+  if(rs.length)h+=grp("리서치",`${rs.length}건`,rs.map(x=>`<button type="button" class="gs-it" data-gr="${esc(x.r.id)}"><span class="gs-m"><b>${esc(x.r.name)}${x.r.en?` <small>${esc(x.r.en)}</small>`:""}</b><small>${x.snip}</small></span></button>`).join(""));
+  else if(GS.rsSt==="loading")h+=grp("리서치","",`<p class="gs-wait">리서치 여는 중…</p>`);
+  B.innerHTML=h||`<div class="empty">‘${esc(raw.trim())}’ — 찾은 항목이 없습니다.</div>`;
+  B.querySelectorAll("[data-gm]").forEach(b=>b.onclick=()=>gsGo(()=>{mResetFilters();$("#mq").value=raw.trim();renderMList();gotoMeeting(b.dataset.gm)}));
+  B.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>gsGo(()=>{oSel=b.dataset.go;oMode="view";setTab("orgs");openDetail()}));
+  B.querySelectorAll("[data-gp]").forEach(b=>b.onclick=()=>gsGo(()=>gotoPerson(b.dataset.gp)));
+  B.querySelectorAll("[data-gd]").forEach(b=>b.onclick=()=>{const x=dz[+b.dataset.gd];gsGo(()=>{Dash.open(x.s.name,x.q);setTab("dash")})});
+  B.querySelectorAll("[data-gr]").forEach(b=>b.onclick=()=>gsGo(()=>{Research.open(b.dataset.gr);setTab("research")}));
+  B.querySelectorAll("[data-gall]").forEach(b=>b.onclick=()=>gsGo(()=>{const k=b.dataset.gall,v=raw.trim();
+    if(k==="m"){mResetFilters();$("#mq").value=v;mSel=ms[0].id;setTab("meetings")}
+    else if(k==="o"){oStarOnly=false;$("#oType").value="";$("#oq").value=v;oSel=null;setTab("orgs")}
+    else{$("#pOrg").value="";pOrg="";$("#pq").value=v;pSel=null;setTab("people")}}))}
+function mResetFilters(){["mCat","mType","mAsset","mAuthor","mFlag"].forEach(i=>$("#"+i).value="");starOnly=actOnly=newOnly=cutOnly=false}
+$("#gsBtn").onclick=gsOpen;$("#gsClose").onclick=()=>gsClose();
+$("#gs").addEventListener("click",e=>{if(e.target.id==="gs")gsClose()});   /* PC: 바깥(어두운 곳)을 누르면 닫기 */
+$("#gsq").addEventListener("input",()=>{clearTimeout(GS.t);GS.t=setTimeout(gsRun,150)});
+$("#gsq").addEventListener("keydown",e=>{if(e.key==="Enter"){const f=$("#gsBody .gs-it");if(f){e.preventDefault();f.click()}}else if(e.key==="Escape"){e.preventDefault();e.stopPropagation();gsClose()}});
+
 // ── 공통 저장 ──
 async function write(col,id,data,after,btn){if(!col){toast("저장소에 연결되지 않아 저장할 수 없습니다.");return}const b=$(btn);if(b)b.disabled=true;
   try{const ref=id?col.doc(id):col.doc();await ref.set(data);after(ref.id);toast("저장했습니다.");renderTab()}
@@ -417,6 +562,8 @@ addEventListener("scroll",()=>{if(topTick)return;topTick=true;requestAnimationFr
 topBtn.onclick=()=>scrollTo({top:0,behavior:smooth()});
 // 인터넷이 끊기면 알림(서비스워커가 마지막으로 받은 사본을 보여준다)
 addEventListener("keydown",e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"");
+  if((e.ctrlKey||e.metaKey)&&!e.altKey&&e.key.toLowerCase()==="k"&&$("#gate").hidden&&document.body.classList.contains("ready")){e.preventDefault();gsOpen();return}
+  if(!$("#gs").hidden){if(e.key==="Escape"){e.preventDefault();gsClose()}return}   /* 통합 검색 창이 열려 있으면 그 창만 */
   if(e.key==="/"&&!typing&&$("#gate").hidden){/* 비밀번호 화면이 아닐 때만 */const box={meetings:"#mq",orgs:"#oq",demand:"#dq",people:"#pq"}[tab];if(tab==="dash"){if(Dash.focusFind())e.preventDefault()}else if(box){e.preventDefault();$(box).focus();$(box).select()}}
   else if(e.key==="Escape"&&typing&&document.activeElement.type==="search"&&document.activeElement.value){document.activeElement.value="";document.activeElement.dispatchEvent(new Event("input"))}});
 addEventListener("offline",()=>toast("오프라인 — 마지막으로 받은 사본을 보여줍니다"));addEventListener("online",()=>toast("다시 연결됐습니다"));

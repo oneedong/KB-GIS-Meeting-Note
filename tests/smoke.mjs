@@ -164,7 +164,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   // 시트 고르기: PC·태블릿은 왼쪽 목록, 휴대폰은 묶음별 선택 상자
   const pickSheet = (name) => vp.width < 760 ? page.selectOption('#dzNav .dz-pick select', name) : page.locator(`.dz-item[data-s="${name}"]`).click();
   if (vp.width < 760) ok('휴대폰 시트 선택 상자(묶음별)', (await page.locator('#dzNav .dz-pick optgroup').count()) >= 1 && !(await page.locator('.dz-item').first().isVisible()));
-  ok('요약에 시트 바로가기', (await page.locator('#dzBody .qk').count()) === 2);
+  ok('요약에 시트 바로가기', (await page.locator('#dzBody .qk').count()) === 3);
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-dash.png`), fullPage: vp.width < 760 });
   await page.fill('#gq', 'Demo Partners'); await page.waitForTimeout(400);
   ok('전체 찾기', (await page.locator('#dzBody .gres li').count()) >= 6 && (await page.textContent('#dzBody .gres')).includes('샘플 수익표'));
@@ -303,6 +303,52 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('현재 탭을 다시 누르면 맨 위로', await page.waitForFunction(() => scrollY === 0, null, { timeout: 4000 }).then(() => true, () => false));
   await page.evaluate(() => { document.body.style.minHeight = ''; });
   if (vp.width < 760) ok('휴대폰: 누르는 대상 36px 이상', (await page.locator('.iconbtn, #mQuick .qbtn').evaluateAll((a) => Math.min(...a.map((e) => e.getBoundingClientRect().height).filter((x) => x > 0)))) >= 36);
+
+  // 관심(★)·다음 액션 모아보기·기관 약정·수수료·통합 검색(가상 데이터)
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.locator('#mActOnly').click();
+  ok('다음 액션 모아보기(다음 액션이 적힌 미팅만, 미리보기는 다음 액션)', (await page.locator('#mList .item').count()) === 1 && (await page.textContent('#mList .pv.act')).includes('자료 송부'));
+  await page.locator('#mActBy [data-by="org"]').click();
+  ok('다음 액션 기관별로 묶기', (await page.locator('#mList .mhead').first().textContent()).startsWith('샘플공제회'));
+  await page.locator('#mActOnly').click();
+  await page.locator('#mList .item').first().click();
+  await page.locator(vp.width < 760 ? '#mMain .backbar [data-sk]' : '#mMain .actions [data-sk]').click();
+  ok('미팅 관심(★) 표시', await page.evaluate(() => JSON.parse(localStorage.getItem('kbnote-star')).m.length === 1) && (await page.locator('#mList .smark').count()) === 1);
+  if (vp.width < 760) await page.locator('#mMain [data-back]').click();
+  await page.evaluate(() => gotoOrg('샘플공제회'));
+  await page.locator('#oDash:not([hidden])').waitFor({ timeout: 5000 });
+  const od = await page.textContent('#oDash');
+  ok('기관 상세에 대시보드 약정·수수료(약칭·괄호 표기로 맞춤, 다른 기관 제외)', (await page.locator('#oDash .dzr').count()) === 3 && od.includes('2건') && od.includes('USD 31.00M')
+    && od.includes('Test Fund III') && od.includes('수수료 2025 USD 11,000.00') && !od.includes('5.00M'));
+  ok('약정 금액에 억원 함께', /≈ [\d,.]+억/.test(await page.textContent('#oDash .dzk')));
+  await page.locator('#oMain .actions [data-sk]').click();
+  await page.locator('#oDzGo').click();
+  await page.locator('#dzMain .tb-q').first().waitFor();
+  ok('대시보드에서 보기 → 그 기관으로 거른 시트', (await page.textContent('#dzMain h2')) === '가상 기관별 약정' && (await page.inputValue('#dzBody .tb-q >> nth=0')) === '샘공'
+    && (await page.textContent('#dzBody .tb-n >> nth=0')).startsWith('2건'));
+  await page.locator(`${tabSel}[data-tab="meetings"]`).click();
+  await page.locator('#mStarOnly').click();
+  ok('관심 모아보기(관심 기관 + 관심 미팅)', (await page.locator('#mList .so').count()) === 1 && (await page.locator('#mList .item').count()) === 1);
+  await page.locator('#mStarOnly').click();
+  await page.click('#gsBtn');
+  await page.fill('#gsq', '샘공');
+  await page.locator('#gsBody .gs-g', { hasText: '대시보드' }).waitFor({ timeout: 5000 });
+  ok('통합 검색: 미팅·기관·인물·대시보드를 한 번에(약칭으로)', (await page.locator('#gsBody .gs-gh b').allInnerTexts()).join(',') === '미팅노트,기관,인물,대시보드' &&(await page.locator('#gsBody [data-gm]').count()) === 1
+    && (await page.locator('#gsBody [data-go]').count()) === 1 && (await page.locator('#gsBody [data-gd]').count()) >= 1);
+  await page.fill('#gsq', '헤드라인');
+  await page.locator('#gsBody [data-gr]').first().waitFor({ timeout: 5000 });
+  ok('통합 검색: 리서치 글도', (await page.locator('#gsBody [data-gr]').count()) >= 1);
+  await page.fill('#gsq', '샘공');
+  await page.locator('#gsBody [data-gm]').first().click();
+  await page.locator('#gs').waitFor({ state: 'hidden' });
+  ok('통합 검색 결과 → 그 미팅(검색어 강조)', (await page.textContent('#mMain h2')).includes('샘플공제회') && (await page.inputValue('#mq')) === '샘공');
+  if (vp.width < 760) { await page.goBack(); ok('통합 검색에서 연 상세도 뒤로가기로 목록', await page.waitForFunction(() => !document.querySelector('#p-meetings').classList.contains('detail'), null, { timeout: 3000 }).then(() => true, () => false)); }
+  await page.keyboard.press('Control+k');
+  ok('Ctrl+K 로 통합 검색', await page.locator('#gs').isVisible());
+  await page.goBack();
+  ok('뒤로가기로 검색 창 닫힘', await page.locator('#gs').waitFor({ state: 'hidden', timeout: 3000 }).then(() => true, () => false));
+  await page.fill('#mq', '');
+  await page.evaluate(() => { localStorage.removeItem('kbnote-star'); STAR.m.clear(); STAR.o.clear(); renderMList(); });
 
   await page.evaluate(() => gotoPerson('p-test1'));
   const links = await page.locator('#pMain a.contact').evaluateAll((as) => as.map((a) => a.getAttribute('href')));

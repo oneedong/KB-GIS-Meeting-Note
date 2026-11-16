@@ -11,14 +11,25 @@ const Research = (() => {
   const LS = { get(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
   let D = null, state = "idle", err = "", sel = LS.get("kbnote-rsel", "");
 
-  async function ensure() {
-    if (D || state === "loading") return;
+  let loadP = null;
+  function ensure() {
+    if (D) return Promise.resolve(D);
+    if (loadP) return loadP;
     state = "loading"; paint();
-    const r = await Vault.openExtra("research.enc.json");
-    if (r.data && Array.isArray(r.data.reports) && r.data.reports.length) { D = r.data; state = "ready"; }
-    else { state = "error"; err = r.error || "broken"; }
-    paint();
+    loadP = Vault.openExtra("research.enc.json").then((r) => {
+      if (r.data && Array.isArray(r.data.reports) && r.data.reports.length) { D = r.data; state = "ready"; }
+      else { state = "error"; err = r.error || "broken"; }
+      loadP = null; paint(); return D;
+    });
+    return loadP;
   }
+  // 통합 검색이 리포트 글을 읽을 때(없거나 못 열면 null). open = 그 자산군을 골라 둔다(앱이 리서치 탭으로 옮긴 뒤 그린다)
+  function data() {
+    if (D) return Promise.resolve(D);
+    if (state === "error" && (err === "missing" || err === "mismatch")) return Promise.resolve(null);
+    return ensure().catch(() => null);
+  }
+  function open(id) { sel = id; LS.set("kbnote-rsel", id); }
   function render() { if (!D && state !== "loading" && state !== "error") ensure(); paint(); }
 
   // 전략 수요판(기관 시그널)에서 그 자산군의 전략별 진행·관심·약정 기관 수
@@ -44,7 +55,7 @@ const Research = (() => {
   }
 
   function paint() {
-    const el = $("#rsMain"); if (!el) return;
+    const el = $("#rsMain"), sec = $("#p-research"); if (!el || (sec && sec.hidden)) return;   // 리서치 탭이 보일 때만
     if (!D) {
       const msg = state === "error"
         ? ({ missing: "아직 올라온 리서치 자료가 없습니다.", mismatch: "리서치 자료가 다른 비밀번호로 잠겨 있습니다. Claude에 리서치 업데이트를 다시 요청해 주세요.",
@@ -113,5 +124,5 @@ const Research = (() => {
   let rt = 0;
   window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { const sec = document.querySelector("#p-research"); if (D && sec && !sec.hidden) paint(); }, 200); });
 
-  return { render };
+  return { render, data, open };
 })();

@@ -1,7 +1,8 @@
 // PWA 아이콘 생성 — 로컬 Chromium 으로 HTML 배지를 그려 PNG 로 저장한다.
 // KB GIS 앱 아이콘 한 쌍(KB 노랑 #FFBC00 · KB 회색 #60584C):
 //   KB GIS Market       — 노랑 바탕, 회색 KB 상자, "Market"
-//   KB GIS              — 회색 바탕, 노랑 KB 상자, 큰 "GIS"   ← 이 저장소(2026-11-15 'KB GIS Meeting Note' 에서 이름 변경, 앱 키는 note 그대로)
+//   KB GIS              — 회색 둥근 바탕, 가운데 노랑 KB 상자 + 큰 "GIS"   ← 이 저장소(2026-11-15 'KB GIS Meeting Note' 에서 이름 변경, 앱 키는 note 그대로)
+//                         2026-11-16 둥근 아이콘(사용자 요청): 'any' 아이콘·구형 안드로이드는 원(바깥 투명), 마스크·적응형·애플은 꽉 찬 바탕 + 가운데 배치
 //   node scripts/gen-icons.mjs [market|note] [출력 폴더=icons]
 //   node scripts/gen-icons.mjs note android/res --android    안드로이드 런처 아이콘(적응형 전경 + 구형 기기용)
 import { createRequire } from 'module';
@@ -15,12 +16,30 @@ catch { ({ chromium } = require('/opt/node22/lib/node_modules/playwright')); }
 const Y = '#FFBC00', G = '#60584C';
 const APPS = {
   market: { bg: Y, box: G, boxText: Y, gis: G, name: ['Market'], nameColor: G },
-  note:   { bg: G, box: Y, boxText: G, gis: null, name: ['GIS'], nameColor: '#FFFFFF', nameSize: 0.30 },
+  note:   { bg: G, box: Y, boxText: G, gis: null, name: ['GIS'], nameColor: '#FFFFFF', center: true, circle: true },
 };
 
 // inset = 내용을 가운데로 모으는 비율(마스크용 아이콘은 안전 영역 안에 들어오도록 더 작게)
 // round = 모서리를 둥글게 깎고 바깥은 투명(구형 안드로이드), fgOnly = 바탕 없이 전경만(적응형 아이콘)
-function html(app, S, inset, { round = false, fgOnly = false } = {}) {
+function html(app, S, inset, opt = {}) {
+  return APPS[app].center ? htmlCenter(app, S, inset, opt) : htmlCorner(app, S, inset, opt);
+}
+
+// 가운데 배치(KB 상자 위, 이름 아래). circle = 원으로 깎고 바깥은 투명. 내용은 원 안(중심에서 0.35 이내)에 든다
+function htmlCenter(app, S, inset, { round = false, fgOnly = false, square = false } = {}) {
+  const a = APPS[app], k = 1 - inset * 2, u = (f) => +(S * f * k).toFixed(2);
+  const shape = fgOnly || square ? '' : (a.circle || round) ? 'border-radius:50%;' : '';
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    html,body{margin:0;padding:0;background:transparent}
+    .c{position:relative;width:${S}px;height:${S}px;background:${fgOnly ? 'transparent' : a.bg};overflow:hidden;${shape}
+       display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Inter,'Helvetica Neue',Arial,sans-serif}
+    .kb{width:${u(.30)}px;height:${u(.30)}px;border-radius:${u(.07)}px;background:${a.box};color:${a.boxText};
+        font:900 ${u(.15)}px/${u(.30)}px Inter,sans-serif;text-align:center;letter-spacing:-.03em}
+    .name{margin-top:${u(.035)}px;font:800 ${u(.235)}px/1 Inter,sans-serif;color:${a.nameColor};letter-spacing:-.02em}
+  </style></head><body><div class="c"><div class="kb">KB</div><div class="name">${a.name.join('<br>')}</div></div></body></html>`;
+}
+
+function htmlCorner(app, S, inset, { round = false, fgOnly = false } = {}) {
   const a = APPS[app], k = 1 - inset * 2, u = (f) => +(S * f * k).toFixed(2), o = S * inset;
   const nameSize = a.nameSize || (a.name.length > 1 ? 0.155 : 0.19);
   return `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -39,15 +58,15 @@ function html(app, S, inset, { round = false, fgOnly = false } = {}) {
 const app = process.argv[2] || 'note', dir = process.argv[3] || 'icons', android = process.argv.includes('--android');
 if (!APPS[app]) { console.error('market 또는 note'); process.exit(2); }
 const targets = android ? [
-  // 적응형 아이콘 전경(108dp, xxxhdpi=432px). 원형 마스크에도 안 잘리게 가운데 60%에 배치. 바탕색은 res/values/colors.xml
-  { file: 'drawable-nodpi/ic_launcher_foreground.png', size: 432, inset: 0.2, fgOnly: true },
+  // 적응형 아이콘 전경(108dp, xxxhdpi=432px). 보이는 원(72dp)에 맞춰 가운데 2/3 에 배치(안전 영역 66dp 안). 바탕색은 res/values/colors.xml
+  { file: 'drawable-nodpi/ic_launcher_foreground.png', size: 432, inset: APPS[app].center ? 1 / 6 : 0.2, fgOnly: true },
   ...[['mdpi', 48], ['hdpi', 72], ['xhdpi', 96], ['xxhdpi', 144], ['xxxhdpi', 192]]
     .map(([d, size]) => ({ file: `mipmap-${d}/ic_launcher.png`, size, inset: 0, round: true })),
 ] : [
   { file: 'icon-192.png',         size: 192, inset: 0 },
   { file: 'icon-512.png',         size: 512, inset: 0 },
-  { file: 'maskable-512.png',     size: 512, inset: 0.1 },   // 안드로이드 원형·물방울 마스크 안전 영역
-  { file: 'apple-touch-icon.png', size: 180, inset: 0 },
+  { file: 'maskable-512.png',     size: 512, inset: 0.1, square: true },   // 안드로이드 원형·물방울 마스크 안전 영역(꽉 찬 바탕)
+  { file: 'apple-touch-icon.png', size: 180, inset: 0.05, square: true },   // iOS 는 투명을 검게 칠하므로 꽉 찬 네모(시스템이 둥글게 깎음)
 ];
 const browser = await chromium.launch();
 for (const t of targets) {

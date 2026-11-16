@@ -18,14 +18,26 @@ const Dash = (() => {
   let pendingQ = "", lastMob = null, gridView = null;
 
   // ── 데이터 열기 ─────────────────────────────────────────
-  async function ensure() {
-    if (D || state === "loading") return;
+  let loadP = null;
+  function ensure() {
+    if (D) return Promise.resolve(D);
+    if (loadP) return loadP;
     state = "loading"; paint();
-    const r = await Vault.openExtra("dash.enc.json");
-    if (r.data) { D = r.data; state = "ready"; buildStyles(); index(); }
-    else { state = "error"; err = r.error; }
-    paint();
+    loadP = Vault.openExtra("dash.enc.json").then((r) => {
+      if (r.data) { D = r.data; state = "ready"; buildStyles(); index(); }
+      else { state = "error"; err = r.error; }
+      loadP = null; paint(); return D;
+    });
+    return loadP;
   }
+  // 다른 탭(기관 상세의 약정·수수료, 통합 검색)이 대시보드 데이터를 읽을 때. 없거나 못 열면 null
+  function data() {
+    if (D) return Promise.resolve(D);
+    if (state === "error" && (err === "missing" || err === "mismatch")) return Promise.resolve(null);
+    return ensure().catch(() => null);
+  }
+  // 다른 탭에서 시트를 골라 연다(앱이 대시보드 탭으로 옮긴 뒤 그린다). q = 그 시트 첫 표의 찾기 칸에 넣을 말
+  function open(name, q) { sel = name; LS.set("kbnote-dzsel", name); pendingQ = q || ""; if (q) mode[name] = "v"; }
   function render() { if (!D) { if (state !== "loading" && state !== "error") ensure(); paint(); return; } paint(); }
 
   function index() {
@@ -41,8 +53,8 @@ const Dash = (() => {
   const hasView = (s) => s && Array.isArray(s.view) && s.view.length;
 
   function paint() {
-    const nav = $("#dzNav"), main = $("#dzMain");
-    if (!nav) return;
+    const nav = $("#dzNav"), main = $("#dzMain"), sec = $("#p-dash");
+    if (!nav || (sec && sec.hidden)) return;     // 대시보드 탭이 보일 때만 그린다(다른 탭이 데이터만 읽을 때)
     if (!D) {
       nav.innerHTML = "";
       const msg = state === "error"
@@ -108,9 +120,10 @@ const Dash = (() => {
     const blocks = s.view.slice();
     if (isSum) blocks.push({ t: "links" }, { t: "basis" });
     renderBlocks(blocks, body, sel);
-    if (pendingQ) {   // 전체 찾기에서 넘어왔으면 첫 표의 찾기 칸으로
-      const inp = $("#dzBody .tb-q"); pendingQ = "";
-      if (inp) { inp.closest(".blk").scrollIntoView({ block: "start" }); }
+    if (pendingQ) {   // 전체 찾기·통합 검색·기관 상세에서 넘어왔으면 찾은 것이 있는 첫 표로(머리줄에 가리지 않게)
+      pendingQ = "";
+      const n = $$("#dzBody .tb-n").find((x) => !/^0건/.test(x.textContent.trim())), blk = n && n.closest(".blk");
+      if (blk) setTimeout(() => { const band = document.querySelector(".band"); window.scrollTo({ top: blk.getBoundingClientRect().top + window.scrollY - (band ? band.offsetHeight : 0) - 8 }); }, 30);
     }
     if (isSum) mountGlobalFind();
   }
@@ -377,7 +390,8 @@ const Dash = (() => {
     const fk = Object.keys(st.f || {}).filter((k) => st.f[k] != null);
     const sk = st.sort && st.sort.k, sd = st.sort ? st.sort.d : 1;
     return secs.map((s) => {
-      let rows = s.rows.filter((r) => fk.every((k) => String(r.c[k] ?? "(없음)") === st.f[k]) && ws.every((w) => hay(r).includes(w)));
+      const sh = String(s.h || "").toLowerCase();   // 묶음 머리(기관별 약정의 '1. NPS' 등)도 찾기에 넣는다
+      let rows = s.rows.filter((r) => fk.every((k) => String(r.c[k] ?? "(없음)") === st.f[k]) && ws.every((w) => sh.includes(w) || hay(r).includes(w)));
       if (sk) rows = rows.slice().sort((a, b2) => {
         const x = a.c[sk], y = b2.c[sk], ex = x == null || x === "", ey = y == null || y === "";
         if (ex || ey) return ex === ey ? 0 : (ex ? 1 : -1);   // 빈 값은 방향과 상관없이 맨 뒤
@@ -753,5 +767,7 @@ const Dash = (() => {
     try { const mounts = []; el.innerHTML = list.map((b, i) => blockHtml(b, `${key}:${b.id || i}`, mounts)).join(""); mounts.forEach((fn) => fn()); }
     finally { idp = keep; }
   }
-  return { render, focusFind, blocks };
+  // 약정 계산·화면에 쓰는 도우미(기관 상세)
+  const sheets = () => (D ? D.sheets : []);
+  return { render, focusFind, blocks, data, open, walk, sheets };
 })();
