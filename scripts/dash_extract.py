@@ -35,6 +35,8 @@ NOFREEZE = {"대시보드(Demo)"}   # 표가 아니라 화면 배치인 시트�
 
 # 엑셀에만 두고 앱에는 아직 올리지 않는 시트(사용자 요청 — 자료를 더 정리한 뒤 앱에 반영). 앱에 올릴 때 여기서 빼고 GROUPS 에 넣는다.
 EXCEL_ONLY = set()
+# 계산 근거 시트(엑셀에서만 보는 산식 시트) — 이름 앞부분으로 뺀다. '근거_NN_…' = 해외대체 시딩 수익률 근거(2026-11-16, 관리판 BH~BK 가 이 시트 결과를 가리킴)
+EXCEL_ONLY_PREFIX = ("근거_",)
 
 # ── 1) LibreOffice HTML 내보내기
 tmp = tempfile.mkdtemp(prefix="dashx_")
@@ -191,7 +193,7 @@ def pack(sh):
 order = {n: (gi, i) for gi, (_, names) in enumerate(GROUPS) for i, n in enumerate(names)}
 out_sheets = []
 for sh in sheets:
-    if sh["name"] in EXCEL_ONLY: continue
+    if sh["name"] in EXCEL_ONLY or sh["name"].startswith(EXCEL_ONLY_PREFIX): continue
     pk = pack(sh)
     if not pk["rows"]: continue
     gi, i = order.get(sh["name"], (len(GROUPS), 0))
