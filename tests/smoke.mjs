@@ -25,12 +25,17 @@ const RJSON = join(ROOT, 'tests', '_research.json'), RENC = join(ROOT, 'tests', 
 execFileSync(process.execPath, [join(ROOT, 'scripts/research_build.mjs'), join(ROOT, 'tests/research-fixture.json'), RJSON, '--data', join(ROOT, 'tests/fixture.json')], { stdio: 'inherit' });
 execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', RJSON, RENC, '--salt-from', ENC],
   { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
+// 가상 운용보고서(tests/reports-fixture.json): reports_build 로 검사·정리한 뒤 같은 비밀번호·salt 로 잠근다
+const PJSON = join(ROOT, 'tests', '_reports.json'), PENC = join(ROOT, 'tests', '_reports.enc.json');
+execFileSync(process.execPath, [join(ROOT, 'scripts/reports_build.mjs'), join(ROOT, 'tests/reports-fixture.json'), PJSON], { stdio: 'inherit' });
+execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', PJSON, PENC, '--salt-from', ENC],
+  { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const server = createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p.endsWith('/')) p += 'index.html';
-  const file = p === '/data.enc.json' ? ENC : p === '/dash.enc.json' ? DENC : p === '/research.enc.json' ? RENC : join(ROOT, p);
+  const file = p === '/data.enc.json' ? ENC : p === '/dash.enc.json' ? DENC : p === '/research.enc.json' ? RENC : p === '/reports.enc.json' ? PENC : join(ROOT, p);
   if (!file.startsWith(ROOT) || !existsSync(file)) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
   res.end(readFileSync(file));
@@ -231,6 +236,57 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   }
   await page.locator('#rsMain .rs-st[data-strat="PE Buyout"]').click();
   ok('리서치 → 전략 수요판으로 이동', !(await page.locator('#p-demand').evaluate((e) => e.hidden)) && (await page.inputValue('#dStrat')) === 'PE Buyout');
+
+  // 운용보고서 탭: 요약(지표 카드·먼저 볼 것·펀드 카드) → 펀드 상세(휴대폰은 목록 → 상세 → 뒤로) → 이슈자산(공통·펼침·필터) → 비교표 → 공시·확인
+  const noX = () => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
+  await page.locator(`${tabSel}[data-tab="reports"]`).click();
+  await page.locator('#rpBody .kc').first().waitFor();
+  ok('운용보고서: 요약 지표 카드·펀드 카드', (await page.locator('#rpBody .kc').count()) === 6 && (await page.locator('#rpBody .rp-fc').count()) === 2
+    && (await page.textContent('#rpTop h2')).includes('펀드 2개'));
+  ok('운용보고서: 먼저 볼 것(기준일 차이·Non-accrual·높음·여러 펀드 공통 차주)', (await page.locator('#rpBody .rp-al').count()) === 4
+    && (await page.textContent('#rpBody .rp-alerts')).includes('Shared Borrower'));
+  ok('운용보고서 요약 가로 넘침 없음', await noX());
+  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-reports.png`), fullPage: vp.width < 760 });
+  await page.locator('#rpBody .rp-fc[data-fund="fake-feeder-1q26"]').click();
+  await page.locator('#rpMain h2').waitFor({ state: 'visible' });
+  ok('운용보고서: 펀드 카드 → 펀드 상세(핵심 지표·이슈자산·A~J)', (await page.textContent('#rpMain h2')) === '가상 재간접 1호' && (await page.locator('#rpMain .rp-fact').count()) === 8
+    && (await page.locator('#rpMain details.rp-is').count()) === 3 && (await page.textContent('#rpMain')).includes('H · I · J'));
+  if (vp.width < 760) {
+    ok('운용보고서(휴대폰): 상세만 보임', await page.locator('#p-reports').evaluate((e) => e.classList.contains('detail')) && !(await page.locator('#rpList').isVisible()));
+    await page.goBack();
+    ok('운용보고서(휴대폰): 뒤로가기 → 요약으로', await page.waitForFunction(() => !document.querySelector('#p-reports').classList.contains('detail') && !!document.querySelector('#rpBody .rp-fc'), null, { timeout: 3000 }).then(() => true, () => false));
+  } else ok('운용보고서(PC): 목록과 상세 함께', await page.locator('#rpList .item.on').isVisible() && (await page.locator('#rpList .item').count()) === 2);
+  ok('운용보고서 상세 가로 넘침 없음', await noX());
+  await page.locator('#rpTop [data-v="issue"]').click();
+  await page.locator('#rpBody details.rp-is').first().waitFor();
+  ok('운용보고서: 이슈자산(펀드를 가로질러 같은 자산 한 줄·공통 표시)', (await page.locator('#rpBody details.rp-is').count()) === 4 && (await page.locator('#rpBody .rp-is .rp-sh').count()) === 1
+    && (await page.textContent('#rpTop [data-v="issue"]')).includes('4'));
+  await page.locator('#rpBody details.rp-is >> nth=0 >> summary').click();
+  ok('운용보고서: 이슈자산 펼치기(핵심 수치·경과·GP 대응·LP 확인 질문)', (await page.textContent('#rpBody details.rp-is[open]')).includes('가상 LP 확인 질문') && (await page.locator('#rpBody details.rp-is[open] .rp-hist li').count()) === 2);
+  await page.locator('#rpBody [data-f="lv"][data-fv="high"]').click();
+  ok('운용보고서: 수준 필터(높음)', (await page.locator('#rpBody details.rp-is').count()) === 1);
+  await page.locator('#rpBody [data-f="lv"][data-fv=""]').click();
+  ok('운용보고서 이슈자산 가로 넘침 없음', await noX());
+  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-reports-issue.png`), fullPage: vp.width < 760 });
+  await page.locator('#rpTop [data-v="cmp"]').click();
+  if (vp.width < 760) { await page.locator('#rpBody details.rp-cg').first().waitFor(); ok('운용보고서(휴대폰): 비교표는 항목 묶음별 카드', (await page.locator('#rpBody details.rp-cg').count()) === 10 && (await page.locator('#rpBody .rp-cmp').count()) === 0); }
+  else { await page.locator('#rpBody table.rp-cmp').waitFor(); ok('운용보고서(PC): 비교표(펀드 2열·항목 묶음 10)', (await page.locator('#rpBody .rp-cmp thead th').count()) === 3 && (await page.locator('#rpBody .rp-cmp tr.rp-grp').count()) === 10); }
+  await page.locator('#rpBody [data-pk="fake-multi-3q26"]').click();
+  ok('운용보고서: 비교할 펀드 고르기', vp.width < 760 ? (await page.locator('#rpBody .rp-cr >> nth=0 >> .rp-cr-v').count()) === 1 : (await page.locator('#rpBody .rp-cmp thead th').count()) === 2);
+  await page.locator('#rpBody [data-pk="fake-multi-3q26"]').click();
+  ok('운용보고서 비교표 가로 넘침 없음', await noX());
+  await page.locator('#rpTop [data-v="disc"]').click();
+  await page.locator('#rpBody .rp-dc').first().waitFor();
+  ok('운용보고서: 공시·확인(펀드 단위 이슈·누락·확인)', (await page.locator('#rpBody .rp-fl').count()) === 1 && (await page.locator('#rpBody .rp-dc').count()) === 2 && (await page.textContent('#rpBody')).includes('가상 공시 누락 하나'));
+  await page.click('#gsBtn');
+  await page.fill('#gsq', 'Shared Borrower');
+  await page.locator('#gsBody [data-grp]').first().waitFor({ timeout: 5000 });
+  ok('통합 검색: 운용보고서 이슈자산도', (await page.locator('#gsBody [data-grp]').count()) === 1 && (await page.textContent('#gsBody')).includes('운용보고서'));
+  await page.locator('#gsBody [data-grp]').first().click();
+  await page.locator('#gs').waitFor({ state: 'hidden' });
+  ok('통합 검색 결과 → 이슈자산 펼쳐서', await page.locator('#rpBody details.rp-is[open]', { hasText: 'Shared Borrower' }).waitFor({ timeout: 3000 }).then(() => true, () => false)
+    && (await page.getAttribute('#rpTop [data-v="issue"]', 'aria-pressed')) === 'true');
+  await page.locator('#rpTop [data-v="sum"]').click();
   await page.locator(`${tabSel}[data-tab="dash"]`).click();
   await page.locator(vp.width < 760 ? '#dzNav .dz-pick select' : '#dzNav .dz-item').first().waitFor();
 

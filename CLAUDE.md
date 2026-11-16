@@ -5,16 +5,16 @@
 **DB는 2026년 미팅만 담는다(사용자 요청).** 2026-11-02 카톡 원문(2025-11-28~2026-10-27)으로 기존 미팅 223건에 `raw`(원문)를
 붙였다(정리본은 그대로, `legacyBody`). 2025-12 원문은 넣지 않는다. 아티팩트에서 직접 입력한 4건(10/20·21·28·29)은 카톡 원문이 없다.
 카톡 직급 약어: TJ=팀장, BJ=부장, CJ=차장, GJ=과장(검색 `SYN`에도 있음).
-앱 탭(2026-11-10 순서): 미팅노트·대시보드(엑셀 대시보드, `dash.enc.json`)·기관·인물·조직도·전략 수요판·리서치(구독 리포트 정리, `research.enc.json`).
+앱 탭(2026-11-16 순서): 미팅노트·대시보드(엑셀 대시보드, `dash.enc.json`)·기관·인물·조직도·전략 수요판·리서치(구독 리포트 정리, `research.enc.json`)·운용보고서(LP 관점 운용보고서 분석, `reports.enc.json`).
 자매 앱: KB GIS Market(`oneedong/KB-GIS-App`).
 
 ## 절대 규칙
 - 평문 데이터(복호화한 data.json, patch.json, 사용자가 준 미팅노트 원문 txt 등)는 저장소 밖(스크래치패드)에만 두고 커밋하지 않는다.
-  저장소에 들어가는 데이터는 암호문 `data.enc.json`·`dash.enc.json`·`research.enc.json` 셋뿐. 커밋 전 `git status`로 확인.
-  (`.gitignore`·CI 가 data/dash/patch/posts/research .json·txt·eml·zip·엑셀·csv·pdf 를 막는다. 사용자가 준 리포트 PDF 도 평문이다)
+  저장소에 들어가는 데이터는 암호문 `data.enc.json`·`dash.enc.json`·`research.enc.json`·`reports.enc.json` 넷뿐. 커밋 전 `git status`로 확인.
+  (`.gitignore`·CI 가 data/dash/patch/posts/research/reports .json·reports-src/·txt·eml·zip·엑셀·csv·pdf 를 막는다. 사용자가 준 리포트·운용보고서 PDF 도 평문이다)
 - 비밀번호를 파일·커밋·코드·로그·커밋 메시지에 남기지 않는다. 환경변수 `MEETING_DB_PASSWORD`로만 넘긴다
   (환경 설정에 있으면 그대로, 없으면 사용자에게 묻는다).
-- `tests/fixture.json`·`tests/dash-fixture.json`·`tests/research-fixture.json`은 가상 데이터만.
+- `tests/fixture.json`·`tests/dash-fixture.json`·`tests/research-fixture.json`·`tests/reports-fixture.json`은 가상 데이터만.
 - **원문은 그대로, 앞에는 요약정리(사용자 요청).** 원문 메시지는 `raw`에 한 글자도 고치지 않고(앱 '원문' 탭).
   `body`는 먼저 보이는 요약정리 — 기존 미팅처럼 섹션으로 나눈 요약(2026-11-05부터 새 미팅도). 원문에 없는 사실·숫자·해석 금지,
   숫자·고유명사·영문 용어는 원문 그대로. 화면은 요약정리를 섹션 순서대로 보여주고 강조를 덧붙이지 않는다.
@@ -89,6 +89,14 @@
   → `node scripts/vault.mjs encrypt <SP>/research.json research.enc.json --salt-from data.enc.json` → 커밋(`research: …`, 수치 쓰지 말 것) → push.
 - 화면은 `research.js`·`research.css`(지표 카드는 `Dash.blocks`, 차트는 작은 SVG 막대). '국내 LP 수요'는 `O`(기관 시그널)에서 그때그때 세고, 누르면 전략 수요판으로.
 - PDF 받기: 브라우저는 Blob 내려받기(파일 이름 영문), 안드로이드 앱은 `window.KBApp.savePdf`(→ 다운로드 폴더). 2026-11-10 첫 반영: Preqin Q3 2026 5종.
+
+## "운용보고서 업데이트" (사용자가 국내 재간접 펀드 운용보고서 PDF·GP 자료를 줌)
+앱 '운용보고서' 탭(2026-11-16 추가, 사용자 요청: claude.ai 'GIS LP 미팅노트' 아티팩트의 운용보고서 탭을 앱 카테고리로) =
+펀드별 10개 표준 항목(A 식별~J 거버넌스)·이슈자산(자산 단위: 사유·핵심 수치·경과·GP 대응·LP 확인 질문)·펀드 단위 이슈·공시 누락·수치 확인.
+형식·원칙·순서는 `docs/REPORTS.md`. 요점:
+- `reports_build.mjs <SP>/reports-src <SP>/reports.json` → `vault.mjs encrypt … reports.enc.json --salt-from data.enc.json` → 커밋(`reports: …`, 펀드명·수치 쓰지 말 것) → push.
+- 숫자는 보고서 그대로, 계산값은 '(산출)'. 기준일이 다르면 `asOfNote`. 수준·추이는 분석 판단(GP 등급 아님). 보고서를 미팅노트(시장정보)로 기록하지 않는다(사용자 요청).
+- 화면은 `reports.js`·`reports.css`(지표 카드는 `Dash.blocks`). 통합 검색에 펀드·이슈자산(`Reports.open({fund}|{issue})`). 휴대폰 펀드 상세는 `openDetail`(뒤로가기 → 들어온 보기).
 
 ## 화면 수정
 - `app.js`/`app.css`는 아티팩트 페이지(lp_meeting_db.html) 원본에서 저장 기능·약어 사전을 뺀 것. KB 노랑·회색 토큰.

@@ -1,0 +1,46 @@
+{
+ "title": "운용보고서",
+ "generatedAt": "2026-11-16",
+ "notice": "테스트용 가상 데이터입니다.",
+ "funds": [
+  {
+   "id": "fake-feeder-1q26", "order": 1, "short": "가상 재간접 1호", "manager": "샘플자산운용", "underlying": "Fake Credit Fund",
+   "fundName": "가상 글로벌 재간접 사모투자신탁 1호", "structure": "feeder", "asOf": "2026-03-31", "period": "1Q26",
+   "asOfNote": "가상 기준일 메모 — 역외 NAV 1분기 지연",
+   "A": {"off": "Fake Credit Fund LP", "gp": "Demo Partners", "structure": "재간접", "strategy": "가상 Direct Lending", "target": "Net 9%", "incept": "2024-01-01", "maturity": "2032-12-31"},
+   "B": {"commit": "USD 10,000,000", "deploy": "60.0%", "called": "USD 6,000,000", "unfunded": "USD 4,000,000", "recovered": "분배 USD 300,000"},
+   "C": {"nav": "USD 6,200,000", "dnav": "기준가 1,030원", "irr": "Net 8.1%", "tvpi": "1.05x", "moic": null, "dpi": "0.05x", "dist": null, "tnr": null},
+   "D": {"cos": "120개사", "firstlien": "95%", "floating": "98%", "lev": "5.0x", "ebitda": null, "cover": "1.8x", "yield": "10.1%", "sector": "소프트웨어 20%"},
+   "E": {"na": "1건", "wl": "2건"},
+   "F": {"redeem": "폐쇄형"}, "G": {"issue": "가상 이슈", "resolution": "가상 대응"}, "H": {"hedge": "100% 헤지", "fwd": null},
+   "I": {"offFee": "1.25%", "domFee": "20bp"}, "J": {"person": "변동 없음", "lpa": "위반 없음", "org": "변동 없음"},
+   "holdings": [],
+   "nonaccrual": [{"name": "Alpha Widgets", "ind": "가상 제조", "principal": "USD 1.0mn", "fv": "USD 0.4mn", "pct": "0.3%", "note": "가상 구조조정"}],
+   "watchlist": [{"name": "Shared Borrower LLC", "ind": "가상 헬스케어", "principal": "USD 2.0mn", "pct": "0.5%", "rating": 4, "tag": "신규"}],
+   "issues": [
+    {"asset": "가상 손상자산", "type": ["손상", "평가 하락"], "level": "high", "trend": "악화", "exposure": "비중 3%", "asOf": "2026-03-31",
+     "summary": "가상 요약 — 평가가 크게 하락", "metrics": ["MOIC 1.0x → 0.4x", "Net Debt/EBITDA 12x"],
+     "history": [{"d": "2025-12", "t": "가상 1.0x"}, {"d": "2026-03", "t": "가상 0.4x"}],
+     "gp": "가상 GP 대응", "question": "가상 LP 확인 질문", "related": "가상 관련 메모"},
+    {"asset": "Shared Borrower LLC", "type": ["GP Watchlist 등급 4"], "level": "mid", "trend": "신규", "exposure": "비중 0.5%",
+     "summary": "가상 워치리스트 편입", "metrics": ["USD 2.0mn"], "history": [], "gp": null, "question": "편입 사유", "related": null}
+   ],
+   "flags": [{"level": "mid", "title": "가상 펀드 단위 이슈", "target": "포트폴리오 전체", "detail": "가상 상세", "response": "가상 GP 응답", "question": "가상 질문"}],
+   "gaps": ["가상 공시 누락 하나"], "checks": ["가상 수치 확인 하나"], "derived": ["소진율 60.0% = 6 ÷ 10 (산출)"]
+  },
+  {
+   "id": "fake-multi-3q26", "order": 2, "short": "가상 멀티 2호", "manager": "데모운용", "underlying": "멀티에셋 2건",
+   "fundName": "가상 기업금융 사모투자신탁 2호", "structure": "multi", "asOf": "2026-09-30", "period": "3Q26", "asOfNote": null,
+   "A": {"off": "가상 멀티에셋", "gp": "여러 GP"}, "B": {"commit": "KRW 100억"}, "C": {"irr": "연 6.2%"},
+   "D": {}, "E": {}, "F": {}, "G": {}, "H": {}, "I": {}, "J": {},
+   "holdings": [
+    {"name": "Gamma Notes", "type": "Senior Notes", "size": "USD 3mn", "terms": "SOFR+500", "asOf": "2026-09-30", "level": "ok", "status": "정상 이자 수취"},
+    {"name": "Delta Loan", "type": "Term Loan", "size": "USD 2mn", "terms": "E+600", "asOf": "2026-06-30", "level": "concern", "status": "가상 실적 악화"}
+   ],
+   "nonaccrual": [],
+   "watchlist": [{"name": "Shared Borrower, LLC", "ind": "가상 헬스케어", "principal": "USD 1.0mn", "pct": "0.2%", "rating": null, "tag": null}],
+   "issues": [],
+   "flags": [], "gaps": [], "checks": [], "derived": []
+  }
+ ]
+}
