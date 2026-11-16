@@ -1395,9 +1395,10 @@ def v_seed_info(s, ctx):
         return next((c for t, c in H.items() if t.startswith(k)), None)
     F = {k: hc(t) for k, t in [("fd", "재간접 펀드명"), ("tg", "투자대상"), ("ap", "협의회 승인일"), ("cd", "약정일"), ("sd", "최초 설정일"),
                                ("md", "예탁원 기준 만기일"), ("ip", "투자기간"), ("cr", "월말 신용등급"), ("rv", "담당 심사역"), ("sl", "판매사"),
-                               ("co", "공동"), ("rt", "GIS 투자"), ("mm", "비고")]}
+                               ("co", "공동"), ("rt", "GIS 투자"), ("mm", "비고"), ("rg", "투자지역"), ("us", "미국·유럽"),
+                               ("rp", "최신 국문 운용보고서"), ("rl", "현지"), ("rd", "받은 날"), ("rn", "운용보고서 비고")]}
     if not F["fd"] or not F["rv"]: raise ValueError("펀드명·담당 심사역 열 없음")
-    rows, cnt = [], {}
+    rows, cnt, rrows = [], {}, []
     for r in s.rows(hr + 1):
         no = s.v(r, cB)
         if not (isinstance(no, int) or (isinstance(no, str) and no.strip().isdigit())) or s.v(r, F["fd"]) is None: continue
@@ -1417,6 +1418,16 @@ def v_seed_info(s, ctx):
               "sd": g("sd"), "md": g("md"), "ip": g("ip"), "ipd": s.v(r, F["ip"] + 1) if F.get("ip") else None,
               "rt": num(g("rt")), "mm": g("mm")}
         rows.append({"c": {k: v for k, v in c_.items() if v not in (None, "", "-")}})
+        if F.get("rp") and g("rp"):   # 투자지역·최신 국문 운용보고서(2026-11-16 추가 열)
+            rg, rp = str(g("rg") or ""), str(g("rp"))
+            us_, eu_ = any(w in rg for w in ("미국", "북미")), "유럽" in rg
+            rgc = "글로벌" if "글로벌" in rg else ("미국·유럽+국내" if "국내" in rg else ("미국·유럽" if us_ and eu_ else ("미국" if us_ else ("유럽" if eu_ else "기타"))))
+            m = re.match(r"(20\d\d) ([1-4])Q", rp)
+            rq = f"{m.group(1)} {m.group(2)}Q" if m else ("없음" if rp.startswith("없음") else "그 이전")
+            if m and (m.group(1), m.group(2)) < ("2026", "2"): rq = "그 이전"
+            if not m and re.match(r"2026-0[1-3]", rp): rq = "그 이전"
+            rrows.append({"c": {k: v for k, v in {"no": c_["no"], "fd": c_["fd"], "tg1": c_.get("tg1"), "rg": rg, "rgc": rgc, "us": g("us"),
+                                                 "rp": rp, "rq": rq, "rl": g("rl"), "rd": g("rd"), "rn": g("rn")}.items() if v not in (None, "", "-")}})
     if not rows: raise ValueError("펀드 행 없음")
     rows.sort(key=lambda x: x["c"]["no"])
     tone = {"대체투자심사부": "info", "기업금융심사부": "ok", "확인 필요": "warn"}
@@ -1429,7 +1440,16 @@ def v_seed_info(s, ctx):
             col("mm", "비고", d=1)]
     return [{"t": "kpis", "id": "k", "items": kp},
             {"t": "table", "id": "si", "title": "펀드별 심사부·담당", "sub": "심사부 = 당사 심사 담당 부서(소위원회 심의 건은 참석한 심사부) · 눌러서 일자·투자기간 보기",
-             "cols": cols, "rows": rows, "card": {"title": "fd", "sub": ["tg1"], "meta": ["who", "sl"], "chips": ["dp", "way"]}, "filters": ["dp", "way"]}]
+             "cols": cols, "rows": rows, "card": {"title": "fd", "sub": ["tg1"], "meta": ["who", "sl"], "chips": ["dp", "way"]}, "filters": ["dp", "way"]}] + (
+        [{"t": "kpis", "id": "kr", "items": [kpi("미국·유럽 포함", sum(1 for r in rrows if r["c"].get("us") == "O"), "n0", f"/ {len(rrows)}개")] +
+          [kpi(f"운용보고서 {q}", sum(1 for r in rrows if r["c"].get("rq") == q), "n0", "개") for q in ("2026 3Q", "2026 2Q", "그 이전", "없음")
+           if any(r["c"].get("rq") == q for r in rrows)]},
+         {"t": "table", "id": "sr", "title": "투자지역·최신 국문 운용보고서", "sub": "운용보고서 = 받은 국문 운용보고서 중 가장 최근 것의 기준 시기(현지 기준은 해외펀드 실적 시점) · 메일 확인 기준",
+          "cols": [col("no", "No", "n0"), col("fd", "펀드명"), col("rg", "투자지역"), col("rgc", "지역 구분", "tag"), col("rp", "최신 국문 운용보고서"),
+                   col("rq", "기준 분기", "tag", tone={"2026 3Q": "ok", "2026 2Q": "info", "그 이전": "warn", "없음": "bad"}),
+                   col("rl", "현지(역외) 기준"), col("rd", "받은 날", "date"), col("tg1", "투자대상", d=1), col("rn", "비고", d=1)],
+          "rows": sorted(rrows, key=lambda x: x["c"]["no"]), "card": {"title": "fd", "sub": ["rg"], "meta": ["rp", "rd"], "chips": ["rq", "rgc"]},
+          "filters": ["rgc", "rq"]}] if rrows else [])
 
 
 # ── 등록 ────────────────────────────────────────────────────────────────────
