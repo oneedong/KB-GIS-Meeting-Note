@@ -60,6 +60,8 @@ const Reports = (() => {
   const funds = () => (D ? D.funds : []);
   const fundBy = (id) => funds().find((f) => f.id === id);
   const latest = () => { const d = funds().map((f) => f.asOf || "").filter(Boolean).sort(); return d[d.length - 1] || ""; };
+  // 최신 기준일보다 한 분기 가까이(45일 넘게) 이전이면 '이전' 표시 — 9/29 결산과 9/30 분기말처럼 며칠 차이는 같은 분기로 본다
+  const isOld = (f, lt = latest()) => !!(f.asOf && lt && (Date.parse(lt) - Date.parse(f.asOf)) > 45 * 864e5);
   const ymd = (d) => String(d || "").replace(/^(\d{4})-(\d{2})-(\d{2})$/, (m, y, mo, dd) => `${y.slice(2)}.${+mo}.${+dd}`);
   const BACK = `<div class="backbar"><button class="btn sm" type="button" data-back>← 목록</button></div>`;
 
@@ -158,7 +160,7 @@ const Reports = (() => {
     ] }], $("#rpKpi"), "rp:sum");
   }
   function fundCard(f) {
-    const B = f.B || {}, C = f.C || {}, is = issuesOf(f), c = counts(is), fl = arr(f.flags), old = f.asOf && f.asOf < latest();
+    const B = f.B || {}, C = f.C || {}, is = issuesOf(f), c = counts(is), fl = arr(f.flags), old = isOld(f);
     const top = is[0], tf = fl.slice().sort((a, b) => lvo(a.level) - lvo(b.level))[0];
     const lead = top ? `${lvTag(top.level)}<b>${h(top.asset)}</b> ${trTag(top.trend)}<span>${h(top.summary || "")}</span>`
       : tf ? `${lvTag(tf.level)}<b>${h(tf.title)}</b><span>${h(tf.target || "")}</span>` : `<span class="rp-ok">보고서상 이슈자산 없음</span>`;
@@ -234,14 +236,14 @@ const Reports = (() => {
     if (wantDetail) { wantDetail = false; if (mob() && f && typeof openDetail === "function") openDetail(); }
   }
   function listItem(f) {
-    const is = issuesOf(f), c = counts(is), old = f.asOf && f.asOf < latest();
+    const is = issuesOf(f), c = counts(is), old = isOld(f);
     return `<button type="button" class="item noDate${f.id === sel ? " on" : ""}" data-fid="${h(f.id)}"><div style="min-width:0"><div class="ttl">${h(f.short)}</div>
       <div class="sub2">${h(f.manager || "")} → ${h(f.underlying || "")}</div>
       <div class="chips"><span class="chip${old ? " flag" : ""}">${h(f.period)} · ${h(ymd(f.asOf))}</span>${c.high ? `<span class="rp-lv rp-lv--high">높음 ${c.high}</span>` : ""}${c.mid ? `<span class="rp-lv rp-lv--mid">중간 ${c.mid}</span>` : ""}${is.length ? `<span class="chip">이슈 ${is.length}</span>` : ""}${arr(f.flags).length ? `<span class="chip">펀드 이슈 ${arr(f.flags).length}</span>` : ""}</div></div></button>`;
   }
   function fundHtml(f) {
     const A = f.A || {}, B = f.B || {}, C = f.C || {}, Dd = f.D || {}, E = f.E || {}, Fq = f.F || {}, G = f.G || {}, H = f.H || {}, I = f.I || {}, J = f.J || {};
-    const lt = latest(), old = f.asOf && lt && f.asOf < lt;
+    const lt = latest(), old = isOld(f, lt);
     const kv = (rows) => `<div class="kv rp-kv">${rows.map(([k, v]) => `<div><span>${h(k)}</span>${val(v)}</div>`).join("")}</div>`;
     const sec = (t, body, sub) => `<section class="sec rp-sec"><h3>${t}${sub ? ` <small>${sub}</small>` : ""}</h3>${body}</section>`;
     const hold = arr(f.holdings), fl = arr(f.flags), na = arr(f.nonaccrual), wl = arr(f.watchlist);
@@ -325,7 +327,7 @@ const Reports = (() => {
   }
   function special(id, f, lt) {
     const cc = (c) => ["high", "mid", "low"].filter((k) => c[k]).map((k) => `${lvTag(k)} <b>${c[k]}</b>`).join(" ");
-    if (id === "_asof") { const old = f.asOf && lt && f.asOf !== lt; return `<span class="chip${old ? " flag" : ""}">${h(f.period)} · ${h(f.asOf || "미기재")}</span>${has(f.asOfNote) ? `<div class="rp-sub">${h(f.asOfNote)}</div>` : ""}`; }
+    if (id === "_asof") { const old = isOld(f, lt); return `<span class="chip${old ? " flag" : ""}">${h(f.period)} · ${h(f.asOf || "미기재")}</span>${has(f.asOfNote) ? `<div class="rp-sub">${h(f.asOfNote)}</div>` : ""}`; }
     if (id === "_hold") { const x = arr(f.holdings); if (!x.length) return `<span class="ro">단일 피투자펀드</span>`; return `<b>${x.length}건</b><ul class="rp-hl">${x.map((y) => `<li><span class="rp-dot rp-dot--${h(y.level)}"></span>${h(y.name)}</li>`).join("")}</ul>`; }
     if (id === "_issues") { const is = issuesOf(f); if (!is.length) return `<span class="ro">없음</span>`; return `<div>${cc(counts(is))}</div><div class="rp-sub">${is.slice(0, 5).map((x) => h(x.asset)).join(" / ")}${is.length > 5 ? ` 외 ${is.length - 5}건` : ""}</div>`; }
     if (id === "_flags") { const fl = arr(f.flags); if (!fl.length) return `<span class="ro">없음</span>`; return `<div>${cc(counts(fl))}</div><div class="rp-sub">${fl.map((x) => h(x.title)).join(" / ")}</div>`; }
