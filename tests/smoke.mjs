@@ -34,12 +34,18 @@ execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', PJSO
 const LENC = join(ROOT, 'tests', '_lineup.enc.json');
 execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', join(ROOT, 'tests/lineup-fixture.json'), LENC, '--salt-from', ENC],
   { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
+// 가상 수수료 원장(tests/fees-fixture.json, fees_build.py 출력 형식)도 같은 비밀번호·salt 로. 맨 뒤 '수수료 원장' 점검 때만 내보낸다
+const FENC = join(ROOT, 'tests', '_fees.enc.json');
+execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', join(ROOT, 'tests/fees-fixture.json'), FENC, '--salt-from', ENC],
+  { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
+let serveFees = false;
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const server = createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p.endsWith('/')) p += 'index.html';
-  const file = p === '/data.enc.json' ? ENC : p === '/dash.enc.json' ? DENC : p === '/research.enc.json' ? RENC : p === '/reports.enc.json' ? PENC : p === '/lineup.enc.json' ? LENC : join(ROOT, p);
+  const file = p === '/data.enc.json' ? ENC : p === '/dash.enc.json' ? DENC : p === '/research.enc.json' ? RENC : p === '/reports.enc.json' ? PENC : p === '/lineup.enc.json' ? LENC
+    : p === '/fees.enc.json' ? (serveFees ? FENC : join(ROOT, 'tests', '_none')) : join(ROOT, p);
   if (!file.startsWith(ROOT) || !existsSync(file)) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
   res.end(readFileSync(file));
@@ -519,6 +525,56 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('콘솔 오류 없음' + (errors.length ? ': ' + errors.join(' | ') : ''), errors.length === 0);
   await ctx.close();
 }
+// 수수료 원장(fees.enc.json): 대시보드 탭에 '수수료 원장' 묶음으로 붙는다 — 엑셀 대시보드와 따로 열고, 없어도 대시보드는 그대로
+serveFees = true;
+for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', width: 1280, height: 860 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, serviceWorkers: 'block' });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error' && !/pretendard|ERR_|Failed to load resource/i.test(m.text())) errors.push(m.text()); });
+  page.route(/cdn\.jsdelivr\.net/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await page.goto(URL_);
+  await page.fill('#pw', PW); await page.click('#unlock'); await page.locator('#gate').waitFor({ state: 'hidden' });
+  await page.locator(vp.width < 760 ? '.bnav button[data-tab="dash"]' : '.tab[data-tab="dash"]').click();
+  await page.locator('#dzMain .kc').first().waitFor();
+  const pick = (name) => vp.width < 760 ? page.selectOption('#dzNav .dz-pick select', name) : page.locator(`.dz-item[data-s="${name}"]`).click();
+  const groups = await page.evaluate(() => [...document.querySelectorAll('#dzNav optgroup')].map((g) => g.label));
+  ok(`수수료 원장 묶음(${vp.name})`, groups.includes('수수료 원장') && (await page.locator('#dzNav option', { hasText: '입금 원장' }).count()) === 1);
+  await pick('수수료 원장 요약');
+  await page.locator('#dzMain h2', { hasText: '원장 요약' }).waitFor();
+  ok('원장 요약: 지표 카드·연도별 차트', (await page.locator('#dzBody .kc').count()) === 6 && (await page.textContent('#dzBody .kc')).includes('0.62')
+    && (await page.locator('#dzBody svg.ch').count()) === 1 && (await page.textContent('#dzMain .eyebrow')).includes('원장 2025-02-10 ~ 2026-07-01'));
+  await pick('외화 수수료 입금 원장 (2025~)');
+  await page.locator('#dzBody .tb-n').waitFor();
+  ok('입금 원장: 7건·통화별 외화 합계·원화 합계', (await page.textContent('#dzBody .tb-n')).startsWith('7건')
+    && (await page.textContent('#dzBody')).includes('USD 41,300.00 · EUR 2,000.00') && (await page.textContent('#dzBody')).includes('62,335,000'));
+  await page.fill('#dzBody .tb-q', 'Beta'); await page.waitForTimeout(300);
+  ok('입금 원장 찾기', (await page.textContent('#dzBody .tb-n')).startsWith('2건'));
+  await page.fill('#dzBody .tb-q', '');
+  await pick('정기수수료 연도별');
+  await page.locator('#dzBody .kc').first().waitFor();
+  const rec = await page.textContent('#dzBody');
+  ok('정기수수료: 올해 입금·올해 아직 없음 묶음', rec.includes('입금 중') && rec.includes('올해 아직 없음') && rec.includes('가상 Gamma Fund'));
+  await pick('영세율 신고기간별 대사');
+  await page.locator('#dzBody .kc').first().waitFor();
+  ok('신고기간별 대사: 건 없는 기간·메모', (await page.textContent('#dzBody')).includes('2025-2기 확정') && (await page.textContent('#dzBody')).includes('가상 기간 설명'));
+  await pick('수수료 원장 확인 필요');
+  await page.locator('#dzBody .kc').first().waitFor();
+  const ck = await page.textContent('#dzBody');
+  ok('확인 필요: 추정·회계부 차이 묶음', ck.includes('추정 값') && ck.includes('회계부 신고액과 다른 건') && ck.includes('-10,000') && ck.includes('가상 확인 메모'));
+  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-fees.png`), fullPage: vp.width < 760 });
+  if (vp.width >= 760) {   // 통합 검색이 원장 표도 찾는다
+    await page.click('#gsBtn'); await page.fill('#gsq', 'Epsilon');
+    await page.locator('#gsBody', { hasText: '입금 원장' }).waitFor({ timeout: 5000 }).catch(() => {});
+    ok('통합 검색: 수수료 원장 행도', (await page.textContent('#gsBody')).includes('입금 원장'));
+    await page.keyboard.press('Escape');
+  }
+  ok(`수수료 원장(${vp.name}) 오류 없음` + (errors.length ? ': ' + errors.join(' | ') : ''), errors.length === 0);
+  await ctx.close();
+}
+serveFees = false;
+
 // 설치 안내 페이지 — 기기별로 맞는 안내가 뜨는지
 const UAS = {
   ios: ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1', '#s-ios'],

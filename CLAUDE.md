@@ -5,16 +5,16 @@
 **DB는 2026년 미팅만 담는다(사용자 요청).** 2026-11-02 카톡 원문(2025-11-28~2026-10-27)으로 기존 미팅 223건에 `raw`(원문)를
 붙였다(정리본은 그대로, `legacyBody`). 2025-12 원문은 넣지 않는다. 아티팩트에서 직접 입력한 4건(10/20·21·28·29)은 카톡 원문이 없다.
 카톡 직급 약어: TJ=팀장, BJ=부장, CJ=차장, GJ=과장(검색 `SYN`에도 있음).
-앱 탭(2026-11-16 순서): 미팅노트·대시보드(엑셀 대시보드, `dash.enc.json`)·기관·인물·조직도·전략 수요판·리서치(구독 리포트 정리, `research.enc.json`)·운용보고서(LP 관점 운용보고서 분석, `reports.enc.json`)·라인업(해외대체 펀드 라인업 엑셀, `lineup.enc.json` — 2026-11-17 추가, 사용자 요청).
+앱 탭(2026-11-16 순서): 미팅노트·대시보드(엑셀 대시보드, `dash.enc.json` + 수수료 원장 `fees.enc.json` — 2026-11-17 추가, 사용자 요청)·기관·인물·조직도·전략 수요판·리서치(구독 리포트 정리, `research.enc.json`)·운용보고서(LP 관점 운용보고서 분석, `reports.enc.json`)·라인업(해외대체 펀드 라인업 엑셀, `lineup.enc.json` — 2026-11-17 추가, 사용자 요청).
 자매 앱: KB GIS Market(`oneedong/KB-GIS-App`).
 
 ## 절대 규칙
 - 평문 데이터(복호화한 data.json, patch.json, 사용자가 준 미팅노트 원문 txt 등)는 저장소 밖(스크래치패드)에만 두고 커밋하지 않는다.
-  저장소에 들어가는 데이터는 암호문 `data.enc.json`·`dash.enc.json`·`research.enc.json`·`reports.enc.json`·`lineup.enc.json` 다섯뿐. 커밋 전 `git status`로 확인.
-  (`.gitignore`·CI 가 data/dash/patch/posts/research/reports .json·reports-src/·txt·eml·zip·엑셀·csv·pdf 를 막는다. 사용자가 준 리포트·운용보고서 PDF 도 평문이다)
+  저장소에 들어가는 데이터는 암호문 `data.enc.json`·`dash.enc.json`·`fees.enc.json`·`research.enc.json`·`reports.enc.json`·`lineup.enc.json` 여섯뿐. 커밋 전 `git status`로 확인.
+  (`.gitignore`·CI 가 data/dash/fees/patch/posts/research/reports .json·reports-src/·txt·eml·zip·엑셀·csv·pdf 를 막는다. 사용자가 준 리포트·운용보고서 PDF 도 평문이다)
 - 비밀번호를 파일·커밋·코드·로그·커밋 메시지에 남기지 않는다. 환경변수 `MEETING_DB_PASSWORD`로만 넘긴다
   (환경 설정에 있으면 그대로, 없으면 사용자에게 묻는다).
-- `tests/fixture.json`·`tests/dash-fixture.json`·`tests/research-fixture.json`·`tests/reports-fixture.json`은 가상 데이터만.
+- `tests/fixture.json`·`tests/dash-fixture.json`·`tests/fees-fixture.json`·`tests/research-fixture.json`·`tests/reports-fixture.json`은 가상 데이터만.
 - **원문은 그대로, 앞에는 요약정리(사용자 요청).** 원문 메시지는 `raw`에 한 글자도 고치지 않고(앱 '원문' 탭).
   `body`는 먼저 보이는 요약정리 — 기존 미팅처럼 섹션으로 나눈 요약(2026-11-05부터 새 미팅도). 원문에 없는 사실·숫자·해석 금지,
   숫자·고유명사·영문 용어는 원문 그대로. 화면은 요약정리를 섹션 순서대로 보여주고 강조를 덧붙이지 않는다.
@@ -86,6 +86,14 @@
 - 'KPI 실적 요약'은 연도별로 정리(사용자 요청, `dash_views.kpi_by_year`): 연도별 한눈에(차트·표) → 연도 단추(`tabs` 블록: 그 해 지표 카드·제출 근거·
   그 해 PA·판매규모 목록) → 산출 기준. 표 제목의 'YYYY년'으로 연도를 나눈다. 절 번호(4.~11.)는 산출 기준 문장이 가리키므로 남긴다.
   엑셀 구조가 달라 묶지 못하면 경고 후 예전처럼 절 순서대로.
+
+## "수수료 원장 앱에 반영" (Project 'Back Office 업무연동'의 외화 수수료 원장 CSV가 바뀌었을 때)
+대시보드 탭 '수수료 원장' 묶음(2026-11-17 추가, 사용자 요청: '수수료 내역 증빙 자료' 대화의 수수료 내역·증빙을 앱에 촘촘하게) =
+원장 요약·입금 원장·운용사별·정기수수료 연도별·신고기간별 대사·확인 필요·정정 6쪽. 형식·순서는 `docs/FEES.md`. 요점:
+- 원본: Project 문서 `claude/외화수수료_원장_2017-2026.csv` + 화면 설명 `claude/외화수수료_원장_앱메모.json`(기관명·금액이 든 설명은 공개 코드에 두지 않고 여기에).
+- `python3 scripts/fees_build.py <SP>/원장.csv <SP>/fees.json --notes <SP>/앱메모.json`(NO·기간·외화×환율=원화 검증, 어긋나면 멈춤)
+  → `node scripts/vault.mjs encrypt <SP>/fees.json fees.enc.json --salt-from data.enc.json` → 커밋(`fees: 수수료 원장 MM/DD 기준`, 펀드명·금액 쓰지 말 것) → push.
+- 엑셀 대시보드와 따로 연다(dash.js `addExtra`: '실적·KPI' 묶음 바로 뒤) — 매일 대시보드를 다시 뽑아도 사라지지 않는다. 원장 글자·숫자는 그대로, 화면용 칸은 분류·운용사뿐.
 
 ## "리서치 업데이트" (사용자가 리포트 PDF 를 줌 — Preqin 분기 리포트 등)
 앱 '리서치' 탭 = 자산군별 정리(지표 카드·작은 차트·분기 동향·Preqin의 시각·KB GIS 시사점·국내 LP 수요) + 자산군마다 A4 1쪽 PDF 받기.

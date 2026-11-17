@@ -23,12 +23,22 @@ const Dash = (() => {
     if (D) return Promise.resolve(D);
     if (loadP) return loadP;
     state = "loading"; paint();
-    loadP = Vault.openExtra("dash.enc.json").then((r) => {
-      if (r.data) { D = r.data; state = "ready"; buildStyles(); index(); }
+    // fees.enc.json = 외화 수수료 원장(scripts/fees_build.py) — 엑셀과 따로 갱신되는 쪽 묶음. 없거나 못 열면 대시보드만
+    loadP = Promise.all([Vault.openExtra("dash.enc.json"), Vault.openExtra("fees.enc.json").catch(() => ({}))]).then(([r, f]) => {
+      if (r.data) { D = r.data; addExtra(f && f.data); state = "ready"; buildStyles(); index(); }
       else { state = "error"; err = r.error; }
       loadP = null; paint(); return D;
     });
     return loadP;
+  }
+  // 따로 만든 쪽 묶음(수수료 원장)을 '실적·KPI' 묶음 바로 뒤에 끼운다(없으면 맨 뒤). 같은 이름이 있으면 바꾼다
+  function addExtra(x) {
+    if (!x || !Array.isArray(x.sheets) || !x.sheets.length) return;
+    const names = new Set(x.sheets.map((s) => s.name));
+    const base = D.sheets.filter((s) => !names.has(s.name));
+    let at = -1; base.forEach((s, i) => { if (s.group === "실적·KPI") at = i; });
+    if (at < 0) at = base.length - 1;
+    D.sheets = base.slice(0, at + 1).concat(x.sheets, base.slice(at + 1));
   }
   // 다른 탭(기관 상세의 약정·수수료, 통합 검색)이 대시보드 데이터를 읽을 때. 없거나 못 열면 null
   function data() {
@@ -105,7 +115,7 @@ const Dash = (() => {
     const m = !canView ? "g" : (mode[sel] || "v");
     gridView = null;
     const title = isSum ? "대시보드 요약" : s.short;
-    const eyebrow = isSum ? `기준일 ${h(D.asof)} · ${h(D.generatedAt)} 업데이트` : `${h(s.group)} · 기준일 ${h(D.asof)}`;
+    const eyebrow = isSum ? `기준일 ${h(D.asof)} · ${h(D.generatedAt)} 업데이트` : `${h(s.group)} · ${s.asofl ? h(s.asofl) : `기준일 ${h(D.asof)}`}`;
     const meta = isSum ? `<div class="dz-meta"><span>USDKRW <b>${num(fx.usd, 2)}</b></span><span>EURKRW <b>${num(fx.eur, 2)}</b></span>
         ${ck.ok !== ck.n ? `<button type="button" class="ck ng" data-s="검증" title="${h((ck.fails || []).join(" / "))}">검증 ${ck.ok}/${ck.n} 확인 필요</button>` : ""}</div>` : "";   // 엑셀 정합성 검증은 어긋날 때만 보인다
     const seg = canView && canGrid ? `<div class="seg dz-seg" role="group" aria-label="보기 방식"><button type="button" data-m="v" aria-pressed="${m === "v"}">정리 화면</button><button type="button" data-m="g" aria-pressed="${m === "g"}">엑셀 원본</button></div>` : "";

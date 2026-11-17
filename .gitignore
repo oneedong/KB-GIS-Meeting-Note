@@ -22,6 +22,8 @@ reports.src.json
 reports-src/
 # 라인업: 펀드 라인업 엑셀에서 뽑은 평문 — 저장소에는 암호문 lineup.enc.json 만
 lineup.json
+# 수수료 원장: Project 원장 CSV에서 만든 평문 — 저장소에는 암호문 fees.enc.json 만
+fees.json
 *.pdf
 *.csv
 node_modules/

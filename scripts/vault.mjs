@@ -10,6 +10,7 @@
 //   node scripts/vault.mjs encrypt <SP>/research.json research.enc.json --salt-from data.enc.json   리서치(kind:"research")도 같은 방식
 //   node scripts/vault.mjs encrypt <SP>/reports.json reports.enc.json --salt-from data.enc.json     운용보고서(kind:"reports")도 같은 방식
 //   node scripts/vault.mjs encrypt <SP>/lineup.json lineup.enc.json --salt-from data.enc.json       라인업(kind:"lineup")도 같은 방식
+//   node scripts/vault.mjs encrypt <SP>/fees.json fees.enc.json --salt-from data.enc.json           수수료 원장(kind:"fees")도 같은 방식
 //
 // 비밀번호: 환경변수 MEETING_DB_PASSWORD, 없으면 터미널에서 입력받는다(화면에 안 보임).
 // 같은 비밀번호로 다시 암호화하면 기존 salt 를 그대로 써서, 휴대폰에 기억된 키가 계속 맞는다.
@@ -59,7 +60,7 @@ async function openFile(file, pw) {
   catch (e) { if (e && e.name === 'OperationError') { console.error('비밀번호가 맞지 않습니다.'); process.exit(1); } throw e; }
 }
 
-const counts = (j) => j.kind === 'lineup' ? `라인업 펀드 ${j.funds?.length ?? 0}개 · 기준일 ${j.asof || '-'} (${j.generatedAt || ''})` : j.kind === 'reports' ? `운용보고서 펀드 ${j.funds?.length ?? 0}개 (${j.generatedAt || ''})` : j.kind === 'research' ? `리서치 ${j.reports?.length ?? 0}개 · ${j.title || ''} ${j.period || ''} (${j.generatedAt || ''})` : j.kind === 'dashboard' ? `대시보드 시트 ${j.sheets?.length ?? 0}개 · 기준일 ${j.asof || '-'} (${j.generatedAt || ''})` : `미팅 ${j.meetings?.length ?? 0} · 기관 ${j.orgs?.length ?? 0} · 인물 ${j.people?.length ?? 0} (${j.generatedAt || '기준시각 없음'})`;
+const counts = (j) => j.kind === 'fees' ? `수수료 원장 ${j.n ?? 0}건 · 쪽 ${j.sheets?.length ?? 0}개 · ${(j.range || []).join(' ~ ')} (${j.generatedAt || ''})` : j.kind === 'lineup' ? `라인업 펀드 ${j.funds?.length ?? 0}개 · 기준일 ${j.asof || '-'} (${j.generatedAt || ''})` : j.kind === 'reports' ? `운용보고서 펀드 ${j.funds?.length ?? 0}개 (${j.generatedAt || ''})` : j.kind === 'research' ? `리서치 ${j.reports?.length ?? 0}개 · ${j.title || ''} ${j.period || ''} (${j.generatedAt || ''})` : j.kind === 'dashboard' ? `대시보드 시트 ${j.sheets?.length ?? 0}개 · 기준일 ${j.asof || '-'} (${j.generatedAt || ''})` : `미팅 ${j.meetings?.length ?? 0} · 기관 ${j.orgs?.length ?? 0} · 인물 ${j.people?.length ?? 0} (${j.generatedAt || '기준시각 없음'})`;
 const usage = () => { console.error('사용법: node scripts/vault.mjs decrypt|encrypt|check … (파일 머리 주석 참고)'); process.exit(2); };
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -82,6 +83,7 @@ if (cmd === 'check') {
   if (data.kind === 'dashboard') { if (!Array.isArray(data.sheets)) throw new Error('sheets 배열이 없습니다'); }
   else if (data.kind === 'research') { if (!Array.isArray(data.reports)) throw new Error('reports 배열이 없습니다'); }
   else if (data.kind === 'reports') { if (!Array.isArray(data.funds)) throw new Error('funds 배열이 없습니다'); }
+  else if (data.kind === 'fees') { if (!Array.isArray(data.sheets) || !data.sheets.length) throw new Error('sheets 배열이 없습니다'); }
   else if (data.kind === 'lineup') { if (!Array.isArray(data.funds) || !data.funds.length) throw new Error('funds 배열이 없습니다'); }
   else for (const k of ['meetings', 'orgs', 'people']) if (!Array.isArray(data[k])) throw new Error(`${k} 배열이 없습니다`);
   const pw = await askPassword('비밀번호: ');
