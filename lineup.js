@@ -3,7 +3,7 @@
  * 데이터: lineup.enc.json (미팅노트 DB와 같은 비밀번호·salt 로 잠근 사본. scripts/lineup_build.py → scripts/vault.mjs)
  *   { asof, title, source, acs[], notice[], funds[]: { no, fund, note?, gp, ac, type, strategy, target, geo, structure,
  *     size, ret, status, timeline, overview, details, track, lastmod('YY.MM.DD), lm(YYYY-MM-DD) } }
- * 셀 글자는 엑셀 그대로 보여준다(고치지 않음). 내용을 바꾸려면 엑셀을 고친 뒤 Claude에 라인업 업데이트를 요청한다.
+ * 셀 글자는 엑셀 그대로, 모든 칸을 누르지 않고 바로 보여준다(고치지 않음). 내용을 바꾸려면 엑셀을 고친 뒤 Claude에 라인업 업데이트를 요청한다.
  */
 const Lineup = (() => {
   const $ = (s, r = document) => r.querySelector(s);
@@ -12,7 +12,7 @@ const Lineup = (() => {
   const LS = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
   let D = null, state = "idle", err = "", loadP = null;
   let ac = LS.get("kbnote-lac", ""), st = "", q = "", recent = false;
-  const opened = new Set();
+  let focus = 0;   // 통합 검색에서 고른 펀드(그 줄로 이동해 잠깐 표시)
   const STATUS = ["모집 중", "상시 모집", "모집 예정", "모집 완료"];
   const TONE = { "모집 중": "s-go", "상시 모집": "s-done", "모집 예정": "s-watch", "모집 완료": "s-no" };
   const SHORT = { "Private Equity": "PE", "Private Credit": "Private Credit", "Real Estate": "Real Estate", "Infrastructure": "Infra", "Aviation": "Aviation", "Multi-Asset": "Multi-Asset" };
@@ -34,8 +34,8 @@ const Lineup = (() => {
     if (state === "error" && (err === "missing" || err === "mismatch")) return Promise.resolve(null);
     return ensure().catch(() => null);
   }
-  // 다른 화면(통합 검색 등)에서 펀드 하나를 펼쳐 보이게 한다
-  function open(no) { ac = ""; st = ""; q = ""; recent = false; opened.clear(); opened.add(Number(no)); }
+  // 다른 화면(통합 검색 등)에서 펀드 하나로 바로 가게 한다
+  function open(no) { ac = ""; st = ""; q = ""; recent = false; focus = Number(no); }
   function render() { if (!D && state !== "loading" && state !== "error") ensure(); paint(); }
 
   const dot = (iso) => (iso ? iso.replace(/-/g, ".") : "");
@@ -107,31 +107,32 @@ const Lineup = (() => {
     const list = filtered(true);
     $("#luCnt").textContent = `${list.length}개 펀드${q || st || recent || ac ? ` (전체 ${D.funds.length}개 중)` : ""}`;
     if (!list.length) { body.innerHTML = `<div class="empty">조건에 맞는 펀드가 없습니다.</div>`; return; }
-    const head = `<div class="lu-hd" aria-hidden="true"><span>No</span><span>펀드 · 운용사</span><span>목표규모</span><span>목표수익률</span><span>상태</span><span>모집 일정·현황</span><span>수정일</span></div>`;
+    const head = `<div class="lu-hd" aria-hidden="true"><span>No</span>${COLS.map(([, l]) => `<span>${l}</span>`).join("")}</div>`;
     body.innerHTML = D.acs.filter((a) => list.some((f) => f.ac === a)).map((a) => {
       const fs = list.filter((f) => f.ac === a);
       return `<section class="lu-sec"><h3>${h(a)} <small>${fs.length}개</small></h3>${head}${fs.map(card).join("")}</section>`;
     }).join("");
-    $$("details.lu-f", body).forEach((d) => d.addEventListener("toggle", () => { const k = Number(d.dataset.no); if (d.open) opened.add(k); else opened.delete(k); }));
-    const first = $("details.lu-f[open]", body);
-    if (first && opened.size === 1 && !q) first.scrollIntoView({ block: "center" });
+    const hit = focus && $(`.lu-f[data-no="${focus}"]`, body);
+    focus = 0;
+    if (hit) { hit.classList.add("lu-hit"); hit.scrollIntoView({ block: "center" }); setTimeout(() => hit.classList.remove("lu-hit"), 2600); }
   }
 
+  // 모든 칸을 바로 보여준다(사용자 요청 2026-11-17: 펀드를 눌러 펼치지 않고 다 보이게).
+  // 한 펀드 = 칸 하나씩(라벨 + 값). 넓은 PC(본문 1700px 이상)는 엑셀처럼 한 줄 표, 그 밖에는 카드(라벨 위·값 아래).
+  const COLS = [["nm", "펀드 · 운용사"], ["ts", "투자유형 · 전략"], ["target", "투자대상"], ["geo", "투자지역"], ["structure", "펀드구조"],
+    ["size", "목표규모"], ["ret", "목표수익률"], ["status", "상태"], ["timeline", "모집 일정·현황"], ["overview", "개요"], ["details", "비고"],
+    ["track", "주요 실적"], ["lastmod", "최종 수정일"]];
+  const pill = (f) => (f.status && f.status !== "-" ? `<em class="lu-pill ${TONE[f.status] || ""}">${h(f.status)}</em>` : `<span class="lu-na">-</span>`);
   function card(f) {
-    const rows = [["투자유형 · 전략", [f.type, f.strategy].filter((x) => x && x !== "-").join(" · ") || "-"], ["투자대상", f.target], ["투자지역", f.geo],
-      ["펀드구조", f.structure], ["개요", f.overview], ["비고", f.details], ["주요 실적", f.track]];   // 모집 일정은 펼치면 윗줄에 전부 보인다
-    return `<details class="lu-f" data-no="${f.no}"${opened.has(f.no) ? " open" : ""}>
-      <summary>
-        <span class="lu-no">${f.no}</span>
-        <span class="lu-nm"><b>${mark(f.fund)}</b>${f.note ? `<em>${mark(f.note)}</em>` : ""}<small>${mark(f.gp)}</small></span>
-        <span class="lu-sz"><i>목표규모</i>${val(f.size)}</span>
-        <span class="lu-rt"><i>목표수익률</i>${val(f.ret)}</span>
-        <span class="lu-st">${f.status && f.status !== "-" ? `<em class="lu-pill ${TONE[f.status] || ""}">${h(f.status)}</em>` : `<span class="lu-na">-</span>`}</span>
-        <span class="lu-tl"><i>모집 일정</i>${val(f.timeline)}</span>
-        <span class="lu-lm">${h(f.lastmod)}</span>
-      </summary>
-      <dl class="lu-d">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${val(v)}</dd>`).join("")}<dt>최종 수정일</dt><dd>${h(f.lastmod)}</dd></dl>
-    </details>`;
+    const v = { ts: [f.type, f.strategy].filter((x) => x && x !== "-").join(" · ") || "-" };
+    const cell = ([k, l]) => {
+      if (k === "nm") return `<div class="lu-c lu-nm"><div class="lu-nt"><b>${mark(f.fund)}</b>${f.note ? `<em>${mark(f.note)}</em>` : ""}<small>${mark(f.gp)}</small></div>`
+        + `<div class="lu-side">${pill(f)}<span class="lu-lm2">수정 ${h(f.lastmod)}</span></div></div>`;   // 카드 머리: 상태·수정일을 이름 옆에
+      if (k === "status") return `<div class="lu-c lu-st">${pill(f)}</div>`;
+      if (k === "lastmod") return `<div class="lu-c lu-lm">${h(f.lastmod)}</div>`;
+      return `<div class="lu-c lu-${k}"><i>${l}</i><span>${val(k in v ? v[k] : f[k])}</span></div>`;
+    };
+    return `<article class="lu-f" data-no="${f.no}"><div class="lu-c lu-no">${f.no}</div>${COLS.map(cell).join("")}</article>`;
   }
 
   return { render, data, open };

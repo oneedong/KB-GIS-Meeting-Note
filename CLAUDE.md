@@ -105,7 +105,8 @@
 형식·순서는 `docs/LINEUP.md`. 요점:
 - 엑셀부터 최신화(사용자 스킬 `kb-fund-lineup-update`, 펀드를 고치면 R열 최종 수정일도) → `python3 scripts/lineup_build.py <xlsx> <SP>/lineup.json`
   → `node scripts/vault.mjs encrypt <SP>/lineup.json lineup.enc.json --salt-from data.enc.json` → 커밋(`lineup: 라인업 MM/DD 기준`, 펀드명·수치 쓰지 말 것) → push.
-- 셀 글자는 엑셀 그대로 — 앱에서 문구를 다듬지 않는다. 화면은 `lineup.js`·`lineup.css`(지표 카드는 `Dash.blocks`). 통합 검색에 펀드(`Lineup.open(no)` → 그 펀드를 펼침).
+- 셀 글자는 엑셀 그대로 — 앱에서 문구를 다듬지 않는다. 화면은 `lineup.js`·`lineup.css`(지표 카드는 `Dash.blocks`). 통합 검색에 펀드(`Lineup.open(no)` → 그 펀드로 이동·표시).
+- 모든 칸을 누르지 않고 바로 보여준다(사용자 요청 2026-11-17: 펀드를 눌러 펼치지 않게). 넓은 PC(본문 1700px+)는 엑셀형 한 줄 표, 그 밖은 카드.
 
 ## 화면 수정
 - `app.js`/`app.css`는 아티팩트 페이지(lp_meeting_db.html) 원본에서 저장 기능·약어 사전을 뺀 것. KB 노랑·회색 토큰.

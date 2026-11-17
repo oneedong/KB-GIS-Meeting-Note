@@ -311,34 +311,44 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
     && (await page.getAttribute('#rpTop [data-v="issue"]', 'aria-pressed')) === 'true');
   await page.locator('#rpTop [data-v="sum"]').click();
 
-  // 라인업 탭(가상 라인업 4개): 자산군·상태·최근 수정·검색·펼치기
+  // 라인업 탭(가상 라인업 4개): 자산군·상태·최근 수정·검색, 모든 칸이 누르지 않고 바로 보임
   await page.locator(`${tabSel}[data-tab="lineup"]`).click();
-  await page.locator('#luBody details.lu-f').first().waitFor();
-  ok('라인업: 가상 펀드 4개·자산군 2개', (await page.locator('#luBody details.lu-f').count()) === 4 && (await page.locator('#luBody .lu-sec').count()) === 2);
+  await page.locator('#luBody .lu-f').first().waitFor();
+  ok('라인업: 가상 펀드 4개·자산군 2개', (await page.locator('#luBody .lu-f').count()) === 4 && (await page.locator('#luBody .lu-sec').count()) === 2);
   ok('라인업 지표 카드 4개', (await page.locator('#luKpi .kc').count()) === 4);
+  ok('라인업: 누르지 않아도 모든 칸(주요 실적·투자지역·비고)', await page.locator('#luBody .lu-f').first().locator('.lu-track').isVisible()
+    && await page.locator('#luBody .lu-f').first().locator('.lu-geo').isVisible() && await page.locator('#luBody .lu-f').first().locator('.lu-details').isVisible()
+    && (await page.locator('#luBody .lu-f').first().textContent()).includes('가상 1호 Net IRR 9%'));
+  ok('라인업: 펼치기 단추 없음', (await page.locator('#luBody details, #luBody summary').count()) === 0);
   await page.fill('#luq', '가상 인프라');
-  ok('라인업 검색(여러 단어 모두 포함·표시)', (await page.locator('#luBody details.lu-f').count()) === 1 && (await page.locator('#luBody mark').count()) >= 1);
+  ok('라인업 검색(여러 단어 모두 포함·표시)', (await page.locator('#luBody .lu-f').count()) === 1 && (await page.locator('#luBody mark').count()) >= 1);
   await page.fill('#luq', '');
   await page.locator('#luNew').click();
-  ok('라인업: 최근 수정만(6일 안)', (await page.locator('#luBody details.lu-f').count()) === 2);
+  ok('라인업: 최근 수정만(6일 안)', (await page.locator('#luBody .lu-f').count()) === 2);
   await page.locator('#luNew').click();
   await page.selectOption('#luSt', '모집 완료');
-  ok('라인업: 상태 거르기', (await page.locator('#luBody details.lu-f').count()) === 1);
+  ok('라인업: 상태 거르기', (await page.locator('#luBody .lu-f').count()) === 1);
   await page.selectOption('#luSt', '');
-  await page.locator('#luBody details.lu-f summary').first().click();
-  ok('라인업: 펼치면 상세', await page.locator('#luBody details.lu-f[open] .lu-d').isVisible() && (await page.textContent('#luBody details.lu-f[open] .lu-d')).includes('주요 실적'));
   await page.locator('.lu-seg button[data-ac="Infrastructure"]').click();
-  ok('라인업: 자산군 고르기', (await page.locator('#luBody details.lu-f').count()) === 1);
+  ok('라인업: 자산군 고르기', (await page.locator('#luBody .lu-f').count()) === 1);
   await page.locator('.lu-seg button[data-ac=""]').click();
   ok('라인업 가로 넘침 없음', await noX());
+  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-lineup.png`), fullPage: vp.width < 760 });
+  if (vp.width >= 1000) {   // 넓은 PC: 엑셀처럼 한 줄 = 펀드 하나(머리줄 + 모든 열)
+    await page.setViewportSize({ width: 1920, height: 1000 });
+    ok('라인업 넓은 PC: 한 줄 표(머리줄·열 14개)', await page.locator('#luBody .lu-hd').first().isVisible()
+      && (await page.locator('#luBody .lu-f').first().evaluate((e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)) === 14);
+    ok('라인업 넓은 PC 가로 넘침 없음', await noX());
+    await page.screenshot({ path: join(ROOT, 'tests/_1920-lineup.png') });
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+  }
   await page.click('#gsBtn');
   await page.fill('#gsq', 'Senior Loan');
   await page.locator('#gsBody [data-glu]').first().waitFor({ timeout: 5000 });
   ok('통합 검색: 라인업 펀드도', (await page.locator('#gsBody [data-glu]').count()) === 1);
   await page.locator('#gsBody [data-glu]').first().click();
   await page.locator('#gs').waitFor({ state: 'hidden' });
-  ok('통합 검색 결과 → 라인업 펀드 펼쳐서', await page.locator('#luBody details.lu-f[open]', { hasText: '가상 Senior Loan Fund II' }).waitFor({ timeout: 3000 }).then(() => true, () => false));
-  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-lineup.png`), fullPage: vp.width < 760 });
+  ok('통합 검색 결과 → 라인업 그 펀드로', await page.locator('#luBody .lu-f.lu-hit', { hasText: '가상 Senior Loan Fund II' }).waitFor({ timeout: 3000 }).then(() => true, () => false));
   await page.locator(`${tabSel}[data-tab="dash"]`).click();
   await page.locator(vp.width < 760 ? '#dzNav .dz-pick select' : '#dzNav .dz-item').first().waitFor();
 
