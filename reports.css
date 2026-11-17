@@ -10,6 +10,40 @@ body.rpmode .page{max-width:1500px}
 .rp-head h2{margin:2px 0 0;font:800 22px/1.25 var(--f-display)}
 .rp-head h2 small{font-size:13.5px;font-weight:600;color:var(--muted);margin-left:6px}
 .rp-seg{align-self:flex-start}
+/* 펀드 줄(전체 | 펀드 하나씩) */
+.rp-fpick{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.rp-fpick-l{font-size:12px;font-weight:700;color:var(--muted);margin-right:2px;flex:none}
+.rp-fchip{display:inline-flex;align-items:center;gap:6px;font:600 13px/1.4 var(--f-body);padding:6px 13px;border-radius:99px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;white-space:nowrap;flex:none}
+.rp-fchip:hover{border-color:var(--muted)}
+.rp-fchip small{font:700 11px var(--f-body);color:var(--muted)}
+.rp-fchip[aria-pressed="true"]{background:var(--kb-ink);border-color:var(--kb-ink);color:#fff}
+.rp-fchip[aria-pressed="true"] small{color:#fff;opacity:.75}
+.rp-fd{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
+.rp-fd--high{background:var(--r-high)}.rp-fd--mid{background:var(--r-mid)}
+/* 펀드 한 쪽 */
+.rp-one{min-width:0}
+.rp-pn{align-items:center}
+.rp-pn-n{font-size:12px;color:var(--muted);font-weight:600;padding:0 2px}
+.rp-jump{position:sticky;top:var(--stick,0px);z-index:4;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:9px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+.rp-jump::-webkit-scrollbar{display:none}
+.rp-jump button{flex:none;font:600 12.5px var(--f-body);padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:var(--soft);color:var(--fg);cursor:pointer;white-space:nowrap}
+.rp-jump button:hover{border-color:var(--kb-yellow)}
+.rp-sec,.rp-facts,.rp-notes{scroll-margin-top:120px}
+.rp-npl{display:grid;gap:3px;border:1px solid var(--line);border-left:4px solid var(--r-good);border-radius:10px;padding:10px 14px;font-size:13.5px;line-height:1.55;background:var(--panel)}
+.rp-npl>b{font:700 13px var(--f-display)}
+.rp-npl>b em{font-style:normal;margin-left:6px;color:var(--r-good)}
+.rp-npl--bad{border-left-color:var(--r-high);background:var(--r-high-bg)}.rp-npl--bad>b em{color:var(--r-high)}
+.rp-npl--warn{border-left-color:var(--r-mid);background:var(--r-mid-bg)}.rp-npl--warn>b em{color:var(--r-mid)}
+.rp-npl span{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px;overflow-wrap:anywhere}
+.rp-npl i{font-style:normal;font-size:12px;font-weight:700;color:var(--muted);padding-top:1px}
+.rp-ig-0{margin:0;font-size:13px;color:var(--muted);padding:2px 2px 6px}
+/* 이슈자산 — 펀드별 묶음 */
+.rp-ig{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.rp-ig-h{display:flex;gap:6px 10px;align-items:center;flex-wrap:wrap;padding:6px 2px 2px;border-bottom:2px solid var(--kb-yellow)}
+.rp-ig-h .link b{font:800 16px var(--f-display)}
+.rp-ig-c{font-size:12.5px;font-weight:700;color:var(--muted)}
+.rp-ig-c em{font-style:normal}.rp-ig-c em.h{color:var(--r-high)}.rp-ig-c em.m{color:var(--r-mid)}
+.rp-ig-s{font-size:12px;color:var(--muted);margin-left:auto}
 .rp-seg button{display:inline-flex;align-items:center;gap:6px}
 .rp-cnt{font:700 10.5px/1.5 var(--f-body);background:var(--r-high);color:var(--r-on);border-radius:99px;padding:0 6px}
 .rp-blk{display:flex;flex-direction:column;min-width:0}
@@ -205,8 +239,14 @@ button.rp-ft{cursor:pointer}button.rp-ft:hover{border-color:var(--kb-yellow)}
 @media (max-width:1100px) and (min-width:761px){.rp-is>summary,.rp-is.nf>summary{grid-template-columns:72px minmax(0,1fr) auto}.rp-is-x{grid-column:2/4}.rp-is-f{grid-column:3;grid-row:1}}
 @media (max-width:900px){.rp-alerts{grid-template-columns:minmax(0,1fr)}.rp-en-g,.rp-en-r.two{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){
-  #p-reports.detail .rp-split>.side,#p-reports.detail #rpTop{display:none}
-  #p-reports.detail .rp-split>.main{display:block}
+  #p-reports.detail .rp-head{display:none}
+  #rpTop{gap:8px}
+  .rp-fpick{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px}
+  .rp-fpick::-webkit-scrollbar{display:none}
+  .rp-fchip{padding:7px 13px}
+  .rp-jump{padding:8px 16px}
+  .rp-pn{width:100%}
+  .rp-ig-s{margin-left:0;flex-basis:100%}
   .rp-head h2{font-size:19px}.rp-head h2 small{display:block;margin:2px 0 0}
   .rp-seg{align-self:stretch}.rp-seg button{flex:1 0 auto;padding:9px 8px;font-size:13px;justify-content:center}
   .rp-fcards{grid-template-columns:minmax(0,1fr);gap:10px}

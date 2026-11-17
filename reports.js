@@ -3,8 +3,10 @@
  * 데이터: reports.enc.json (미팅노트 DB와 같은 비밀번호·salt 로 잠근 사본. scripts/reports_build.mjs → scripts/vault.mjs)
  *   funds[]: { id, short, manager, underlying, fundName, structure, asOf, period, asOfNote, A~J{}, holdings[], nonaccrual[], watchlist[],
  *              issues[](자산 단위), flags[](펀드 단위), gaps[], checks[], derived[] } — 형식은 docs/REPORTS.md
- * 보기: 요약(지표 카드·먼저 볼 것·펀드 카드) · 펀드별(목록/상세) · 이슈자산(펀드를 가로질러 같은 자산끼리) · 비교표 · 공시·확인
- *   PC·태블릿은 표·2단, 휴대폰은 카드·한 단(펀드 상세는 목록 → 상세, 뒤로가기로 목록).
+ * 맨 위 '펀드' 줄: 전체 | 펀드 하나씩(사용자 요청 2026-11-17: 각 펀드별로 보기).
+ *   전체 → 보기 단추: 요약(지표 카드·먼저 볼 것·펀드 카드) · 이슈자산(펀드별 묶음 | 수준순) · 비교표 · 공시·확인
+ *   펀드 하나 → 그 펀드 한 쪽(핵심 지표·이슈자산·펀드 이슈·편입자산·GP 공시·A~J·공시 누락, 바로가기 줄·이전/다음 펀드)
+ *   PC·태블릿은 표·2단, 휴대폰은 카드·한 단(펀드 쪽은 openDetail 기록 → 뒤로가기로 들어온 보기).
  */
 const Reports = (() => {
   const $ = (s, r = document) => r.querySelector(s);
@@ -12,11 +14,13 @@ const Reports = (() => {
   const h = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const LS = { get(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
   const mob = () => matchMedia("(max-width:760px)").matches;
-  const VIEWS = [["sum", "요약"], ["fund", "펀드별"], ["issue", "이슈자산"], ["cmp", "비교표"], ["disc", "공시·확인"]];
+  const VIEWS = [["sum", "요약"], ["issue", "이슈자산"], ["cmp", "비교표"], ["disc", "공시·확인"]];
   let D = null, state = "idle", err = "";
-  let view = LS.get("kbnote-rpview", "sum"), sel = LS.get("kbnote-rpsel", ""), wantDetail = false, wantIssue = "";
+  // scope = 보고 있는 펀드 id('' = 전체). 앱을 다시 열면 전체부터.
+  let view = LS.get("kbnote-rpview", "sum"), scope = "", wantDetail = false, wantIssue = "", grp = LS.get("kbnote-rpgrp", "fund");
   const F = { lv: "", tr: "", fund: "" }, OPEN = new Set(), PICK = new Set();
   if (!VIEWS.some((v) => v[0] === view)) view = "sum";
+  if (grp !== "fund" && grp !== "lv") grp = "fund";
 
   // ── 데이터 열기 ─────────────────────────────────────────
   let loadP = null;
@@ -37,11 +41,10 @@ const Reports = (() => {
     if (state === "error" && (err === "missing" || err === "mismatch")) return Promise.resolve(null);
     return ensure().catch(() => null);
   }
-  // 다른 탭에서 열기: { fund: id } → 그 펀드 상세, { issue: key } → 이슈자산에서 펼쳐서
+  // 다른 탭에서 열기: { fund: id } → 그 펀드 쪽, { issue: key } → 전체 · 이슈자산에서 펼쳐서
   function open(o) {
-    if (o && o.fund) { view = "fund"; sel = o.fund; wantDetail = true; LS.set("kbnote-rpsel", sel); }
-    if (o && o.issue) { view = "issue"; F.lv = F.tr = F.fund = ""; OPEN.add(o.issue); wantIssue = o.issue; }
-    LS.set("kbnote-rpview", view);
+    if (o && o.fund) { scope = o.fund; wantDetail = true; backView = ""; }
+    if (o && o.issue) { scope = ""; view = "issue"; F.lv = F.tr = F.fund = ""; OPEN.add(o.issue); wantIssue = o.issue; LS.set("kbnote-rpview", view); }
   }
   function render() { if (!D && state !== "loading" && state !== "error") ensure(); paint(); }
 
@@ -63,7 +66,8 @@ const Reports = (() => {
   // 최신 기준일보다 한 분기 가까이(45일 넘게) 이전이면 '이전' 표시 — 9/29 결산과 9/30 분기말처럼 며칠 차이는 같은 분기로 본다
   const isOld = (f, lt = latest()) => !!(f.asOf && lt && (Date.parse(lt) - Date.parse(f.asOf)) > 45 * 864e5);
   const ymd = (d) => String(d || "").replace(/^(\d{4})-(\d{2})-(\d{2})$/, (m, y, mo, dd) => `${y.slice(2)}.${+mo}.${+dd}`);
-  const BACK = `<div class="backbar"><button class="btn sm" type="button" data-back>← 목록</button></div>`;
+  const BACK = `<div class="backbar"><button class="btn sm" type="button" data-back>← 전체</button></div>`;
+  const dotOf = (f) => { const c = counts(issuesOf(f)); return c.high ? "high" : c.mid ? "mid" : ""; };
 
   // 펀드의 이슈자산: 명시한 issues 가 있으면 그것, 없는 자산은 GP 공시(Non-accrual·Watchlist)·편입자산 우려에서 기본값으로 채운다
   function issuesOf(f) {
@@ -74,6 +78,11 @@ const Reports = (() => {
     arr(f.watchlist).forEach((w) => { const r = Number(w.rating); add({ asset: w.name, type: ["GP Watchlist" + (r >= 3 && r <= 5 ? " 등급 " + r : "")], level: "low", trend: w.tag === "신규" ? "신규" : "비교불가", exposure: has(w.pct) ? "비중 " + w.pct : "", metrics: [w.principal].filter(has), summary: w.ind || "" }); });
     if (!explicit) arr(f.holdings).forEach((x) => { if (x.level !== "concern" && x.level !== "watch") return; add({ asset: x.name, type: ["편입자산 " + HOLD[x.level]], level: x.level === "concern" ? "mid" : "low", trend: "비교불가", exposure: x.size || "", metrics: [x.terms].filter(has), summary: x.status || "" }); });
     return list.sort((a, b) => lvo(a.level) - lvo(b.level) || (TO[a.trend] ?? 4) - (TO[b.trend] ?? 4));
+  }
+  // 펀드 하나의 이슈자산 한 건 → 카드(같은 자산이 다른 펀드에도 있으면 also 에 그 펀드 이름)
+  function asCard(x) {
+    const key = norm(x.asset), also = funds().filter((o) => o.id !== x.fid && issuesOf(o).some((y) => norm(y.asset) === key)).map((o) => o.short);
+    return { key, k: key + "@" + x.fid, name: x.asset, level: x.level, trend: x.trend || "비교불가", funds: [x.fund], entries: [x], also };
   }
   // 펀드를 가로질러 같은 자산끼리 묶기(여러 펀드에 같은 차주가 나오면 '공통')
   function groups() {
@@ -104,15 +113,23 @@ const Reports = (() => {
       if (state === "error") { const b = document.createElement("button"); b.className = "btn sm"; b.textContent = "다시 시도"; b.onclick = () => { state = "idle"; ensure(); }; body.firstChild.append(document.createElement("br"), b); }
       return;
     }
-    if (view !== "fund" && sec.classList.contains("detail")) sec.classList.remove("detail");
+    if (scope && !fundBy(scope)) scope = "";
+    if (!scope && sec.classList.contains("detail")) sec.classList.remove("detail");
     const g = groups(), c = counts(g), urgent = c.high + c.mid;
     const ds = [...new Set(funds().map((f) => f.asOf))].sort();
     top.innerHTML = `<div class="rp-head"><div class="t"><div class="eyebrow">운용보고서 · LP 관점 10개 표준 항목 · ${h(D.generatedAt || "")} 정리</div>
         <h2>${h(D.title || "운용보고서")} <small>펀드 ${funds().length}개 · 기준일 ${h(ymd(ds[0]))}${ds.length > 1 ? " ~ " + h(ymd(ds[ds.length - 1])) : ""}</small></h2></div></div>
-      <div class="seg yseg rp-seg" role="group" aria-label="운용보고서 보기">${VIEWS.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${view === k}">${l}${k === "issue" && urgent ? `<span class="rp-cnt">${urgent}</span>` : ""}</button>`).join("")}</div>`;
+      <div class="rp-fpick" role="group" aria-label="펀드 고르기"><span class="rp-fpick-l">펀드</span>
+        <button type="button" class="rp-fchip" data-scope="" aria-pressed="${!scope}">전체 <small>${funds().length}</small></button>${funds().map((f) => { const d = dotOf(f);
+          return `<button type="button" class="rp-fchip" data-scope="${h(f.id)}" aria-pressed="${scope === f.id}" title="${h(f.fundName || f.short)}">${d ? `<i class="rp-fd rp-fd--${d}"></i>` : ""}${h(f.short)}</button>`; }).join("")}</div>
+      ${scope ? "" : `<div class="seg yseg rp-seg" role="group" aria-label="운용보고서 보기">${VIEWS.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${view === k}">${l}${k === "issue" && urgent ? `<span class="rp-cnt">${urgent}</span>` : ""}</button>`).join("")}</div>`}`;
     $$(".rp-seg [data-v]", top).forEach((b) => b.onclick = () => { view = b.dataset.v; LS.set("kbnote-rpview", view); paint(); window.scrollTo({ top: 0 }); });
-    ({ sum: paintSum, fund: paintFund, issue: paintIssue, cmp: paintCmp, disc: paintDisc })[view](body, g);
+    $$("[data-scope]", top).forEach((b) => b.onclick = () => (b.dataset.scope ? goFund(b.dataset.scope) : goAll()));
+    if (scope) paintOne(body, fundBy(scope));
+    else ({ sum: paintSum, issue: paintIssue, cmp: paintCmp, disc: paintDisc })[view](body, g);
     wire(body);
+    const on = top.querySelector('.rp-fchip[aria-pressed="true"]'), row = top.querySelector(".rp-fpick");
+    if (on && row && row.scrollWidth > row.clientWidth) row.scrollLeft = Math.max(0, on.offsetLeft - row.clientWidth / 2 + on.offsetWidth / 2);
   }
 
   // 공통 클릭: 펀드로·이슈로·보기 전환·기관으로
@@ -121,23 +138,28 @@ const Reports = (() => {
     $$("[data-issue]", el).forEach((b) => b.onclick = (e) => { e.preventDefault(); open({ issue: b.dataset.issue }); paint(); });
     $$("[data-gv]", el).forEach((b) => b.onclick = () => { view = b.dataset.gv; LS.set("kbnote-rpview", view); paint(); window.scrollTo({ top: 0 }); });
     $$("[data-org]", el).forEach((b) => b.onclick = () => { if (typeof gotoOrg === "function") gotoOrg(b.dataset.org); });
-    $$("details.rp-is", el).forEach((d) => d.addEventListener("toggle", () => { if (d.open) OPEN.add(d.dataset.k); else OPEN.delete(d.dataset.k); }));
+    $$("details.rp-is", el).forEach((d) => d.addEventListener("toggle", () => { if (d.open) OPEN.add(d.dataset.k); else { OPEN.delete(d.dataset.k); OPEN.delete(d.dataset.base); } }));
     if (wantIssue) {
-      const t = el.querySelector(`details.rp-is[data-k="${CSS.escape(wantIssue)}"]`); wantIssue = "";
+      const t = el.querySelector(`details.rp-is[data-base="${CSS.escape(wantIssue)}"]`); wantIssue = "";
       if (t) requestAnimationFrame(() => t.scrollIntoView({ block: "start" }));
     }
   }
-  // 휴대폰: 요약·이슈자산 등에서 펀드를 열면, 뒤로가기(← 목록·안드로이드 뒤로)로 그 보기로 돌아간다
+  // 휴대폰: 펀드 쪽은 openDetail 로 기록을 쌓는다 → 뒤로가기(← 전체·안드로이드 뒤로)로 들어온 보기·스크롤 자리로
   let backView = "", backY = 0;
   window.addEventListener("popstate", () => setTimeout(() => {
     const sec = document.querySelector("#p-reports");
-    if (!backView || !sec || sec.hidden || sec.classList.contains("detail")) return;
-    view = backView; backView = ""; LS.set("kbnote-rpview", view); paint(); requestAnimationFrame(() => window.scrollTo({ top: backY }));
+    if (!scope || !sec || sec.hidden || sec.classList.contains("detail") || !mob()) return;
+    scope = ""; if (backView) { view = backView; LS.set("kbnote-rpview", view); } backView = ""; paint(); requestAnimationFrame(() => window.scrollTo({ top: backY }));
   }, 0));
   function goFund(id) {
-    if (mob() && view !== "fund") { backView = view; backY = window.scrollY; } else backView = "";
-    sel = id; view = "fund"; LS.set("kbnote-rpsel", id); LS.set("kbnote-rpview", view); wantDetail = true; paint();
-    if (!mob()) window.scrollTo({ top: 0 });
+    if (!scope) { backView = view; backY = window.scrollY; }
+    scope = id; wantDetail = true; paint(); window.scrollTo({ top: 0 });
+  }
+  function goAll() {
+    const sec = $("#p-reports");
+    if (sec.classList.contains("detail") && typeof closeDetail === "function") closeDetail();   // 쌓아 둔 기록도 되돌림
+    scope = ""; if (backView) { view = backView; LS.set("kbnote-rpview", view); } backView = ""; paint();
+    const y = backY; requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: y })));
   }
 
   // ── 요약 ────────────────────────────────────────────────
@@ -146,7 +168,7 @@ const Reports = (() => {
     const worse = g.filter((x) => x.trend === "악화"), gaps = funds().reduce((a, f) => a + arr(f.gaps).length, 0);
     const ds = [...new Set(funds().map((f) => f.asOf))].sort();
     el.innerHTML = `<div id="rpKpi"></div>${alerts(g)}
-      <section class="rp-blk"><div class="bh"><h3>펀드 한눈에 <small>누르면 펀드 상세</small></h3></div><div class="rp-fcards">${funds().map(fundCard).join("")}</div></section>
+      <section class="rp-blk"><div class="bh"><h3>펀드 한눈에 <small>누르면 그 펀드 쪽 — 맨 위 펀드 줄로도 고를 수 있습니다</small></h3></div><div class="rp-fcards">${funds().map(fundCard).join("")}</div></section>
       ${g.length ? `<section class="rp-blk"><div class="bh"><h3>주요 이슈자산 <small>높음·중간 ${c.high + c.mid}건 · 전체 ${g.length}건</small></h3><button type="button" class="btn sm" data-gv="issue">이슈자산 전체 보기</button></div>
         <div class="rp-ilist">${g.filter((x) => x.level !== "low").map((x) => issueCard(x, true)).join("") || `<div class="empty">높음·중간 수준 이슈자산이 없습니다.</div>`}</div></section>` : ""}
       ${foot()}`;
@@ -188,12 +210,13 @@ const Reports = (() => {
   const foot = () => `<p class="basis rp-foot">${h(D.notice || "")} 수준(높음·중간·참고)과 추이(악화·신규·유지·개선)는 보고서 수치를 근거로 한 분석 판단이며 GP의 공식 등급이 아닙니다.<br>새 운용보고서는 Claude에 PDF를 주고 “운용보고서 업데이트해줘”라고 하면 이 탭에 반영됩니다.</p>`;
 
   // ── 이슈자산 카드(요약·펀드 상세·이슈자산 보기에서 같이 씀) ──
+  // gr.k = 펼침 기억 키(펀드별 묶음은 '자산@펀드'), gr.key = 자산 키(통합 검색·'자세히'로 열 때), gr.also = 같은 자산이 나오는 다른 펀드
   function issueCard(gr, showFunds) {
-    const e = gr.entries[0], types = [...new Set(gr.entries.flatMap((x) => arr(x.type)))], open = OPEN.has(gr.key);
+    const e = gr.entries[0], types = [...new Set(gr.entries.flatMap((x) => arr(x.type)))], k = gr.k || gr.key, open = OPEN.has(k) || OPEN.has(gr.key);
     const metric = arr(e.metrics)[0];
-    return `<details class="rp-is rp-is--${h(gr.level)}${showFunds ? "" : " nf"}" data-k="${h(gr.key)}"${open ? " open" : ""}>
+    return `<details class="rp-is rp-is--${h(gr.level)}${showFunds ? "" : " nf"}" data-k="${h(k)}" data-base="${h(gr.key)}"${open ? " open" : ""}>
       <summary><span class="rp-is-l">${lvTag(gr.level)}${trTag(gr.trend)}</span>
-        <span class="rp-is-n"><b>${h(gr.name)}</b><span class="rp-is-t">${types.map((t) => `<span class="chip">${h(t)}</span>`).join("")}</span></span>
+        <span class="rp-is-n"><b>${h(gr.name)}</b><span class="rp-is-t">${types.map((t) => `<span class="chip">${h(t)}</span>`).join("")}${!showFunds && gr.also && gr.also.length ? `<span class="rp-sh" title="${h(gr.also.join(", "))}에도 있음">공통 · ${h(gr.also.join(", "))}</span>` : ""}</span></span>
         <span class="rp-is-x">${h(e.summary || "")}${has(metric) ? `<em>${h(metric)}</em>` : ""}</span>
         ${showFunds ? `<span class="rp-is-f">${gr.funds.map((f) => `<span class="rp-ft">${h(f)}</span>`).join("")}${gr.funds.length > 1 ? `<span class="rp-sh">공통</span>` : ""}</span>` : ""}
       </summary>
@@ -220,56 +243,58 @@ const Reports = (() => {
       <div class="rp-en-r two"><div class="rp-box"><b>GP 대응 <small>보고서 기재</small></b>${h(x.response || "보고서상 GP 코멘트 없음")}</div><div class="rp-box q"><b>LP 확인 질문</b>${h(x.question || "—")}</div></div></div>`;
   }
 
-  // ── 펀드별(목록 / 상세) ───────────────────────────────────
-  let fq = "";
-  function paintFund(el) {
-    const list = funds().filter((f) => !fq || [f.short, f.fundName, f.manager, f.underlying, (f.A || {}).off, (f.A || {}).gp].join(" ").toLowerCase().includes(fq.toLowerCase()));
-    let f = fundBy(sel);
-    if (!f && !mob()) { f = list[0] || funds()[0]; if (f) sel = f.id; }   // PC: 빈 칸 대신 맨 위 펀드
-    el.innerHTML = `<div class="split rp-split"><aside class="side">
-        <div class="filters"><input id="rpq" class="full" type="search" placeholder="펀드·운용사·투자대상 검색" value="${h(fq)}"></div>
-        <div class="count"><span>${list.length}개 / 전체 ${funds().length}개</span></div>
-        <div class="list" id="rpList">${list.length ? list.map(listItem).join("") : `<div class="empty">조건에 맞는 펀드가 없습니다.</div>`}</div></aside>
-      <main class="main" id="rpMain">${f ? BACK + fundHtml(f) : `<div class="empty">왼쪽에서 펀드를 선택하세요.</div>`}</main></div>`;
-    const q = $("#rpq", el); q.oninput = () => { fq = q.value; const pos = q.selectionStart; paintFund(el); wire(el); const n = $("#rpq", el); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} };
-    $$("#rpList [data-fid]", el).forEach((b) => b.onclick = () => { sel = b.dataset.fid; LS.set("kbnote-rpsel", sel); wantDetail = true; paint(); if (!mob() && innerWidth <= 900) $("#rpMain").scrollIntoView(); });
-    if (wantDetail) { wantDetail = false; if (mob() && f && typeof openDetail === "function") openDetail(); }
+  // ── 펀드 한 쪽(맨 위 펀드 줄에서 고른 펀드) ──────────────────
+  function paintOne(el, f) {
+    const all = funds(), i = all.indexOf(f), prev = all[i - 1], next = all[i + 1];
+    el.innerHTML = `<article class="main rp-one" id="rpMain">${BACK}${fundHtml(f, { prev, next, i, n: all.length })}</article>`;
+    $$("[data-jump]", el).forEach((b) => b.onclick = () => {
+      const t = el.querySelector("#rpj-" + b.dataset.jump); if (!t) return;
+      const bar = el.querySelector(".rp-jump"), off = (typeof stickTop === "function" ? stickTop() : 0) + (bar ? bar.offsetHeight : 0) + 8;
+      window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - off, behavior: "smooth" });
+    });
+    if (wantDetail) { wantDetail = false; if (mob() && typeof openDetail === "function") openDetail(); }
   }
-  function listItem(f) {
-    const is = issuesOf(f), c = counts(is), old = isOld(f);
-    return `<button type="button" class="item noDate${f.id === sel ? " on" : ""}" data-fid="${h(f.id)}"><div style="min-width:0"><div class="ttl">${h(f.short)}</div>
-      <div class="sub2">${h(f.manager || "")} → ${h(f.underlying || "")}</div>
-      <div class="chips"><span class="chip${old ? " flag" : ""}">${h(f.period)} · ${h(ymd(f.asOf))}</span>${c.high ? `<span class="rp-lv rp-lv--high">높음 ${c.high}</span>` : ""}${c.mid ? `<span class="rp-lv rp-lv--mid">중간 ${c.mid}</span>` : ""}${is.length ? `<span class="chip">이슈 ${is.length}</span>` : ""}${arr(f.flags).length ? `<span class="chip">펀드 이슈 ${arr(f.flags).length}</span>` : ""}</div></div></button>`;
-  }
-  function fundHtml(f) {
+  function fundHtml(f, nav = {}) {
     const A = f.A || {}, B = f.B || {}, C = f.C || {}, Dd = f.D || {}, E = f.E || {}, Fq = f.F || {}, G = f.G || {}, H = f.H || {}, I = f.I || {}, J = f.J || {};
     const lt = latest(), old = isOld(f, lt);
     const kv = (rows) => `<div class="kv rp-kv">${rows.map(([k, v]) => `<div><span>${h(k)}</span>${val(v)}</div>`).join("")}</div>`;
-    const sec = (t, body, sub) => `<section class="sec rp-sec"><h3>${t}${sub ? ` <small>${sub}</small>` : ""}</h3>${body}</section>`;
+    const sec = (t, body, sub, id) => `<section class="sec rp-sec"${id ? ` id="rpj-${id}"` : ""}><h3>${t}${sub ? ` <small>${sub}</small>` : ""}</h3>${body}</section>`;
     const hold = arr(f.holdings), fl = arr(f.flags), na = arr(f.nonaccrual), wl = arr(f.watchlist);
-    const iss = issuesOf(f).map((x) => ({ key: norm(x.asset), name: x.asset, level: x.level, trend: x.trend || "비교불가", funds: [x.fund], entries: [x] }));
+    const iss = issuesOf(f).map((x) => asCard(x));
     const fact = (l, v) => `<div class="rp-fact"><span>${l}</span><b>${val(v)}</b></div>`;
     const org = typeof orgOf === "function" && f.manager && orgOf(f.manager);
     const lists = (t, l, cls) => `<div class="rp-note${cls ? " " + cls : ""}"><b>${t} <small>${arr(l).length}</small></b>${arr(l).length ? `<ul>${arr(l).map((x) => `<li>${h(x)}</li>`).join("")}</ul>` : `<p class="ro">없음</p>`}</div>`;
     return `<div class="head"><div class="t"><div class="eyebrow">${h(f.manager || "")} · ${f.structure === "multi" ? "멀티에셋" : "재간접"} · ${h(f.period)} (${h(f.asOf)})</div>
         <h2>${h(f.short)}</h2><div class="sub2 rp-fname">${h(f.fundName || "")}</div>
         <div class="chips">${old ? `<span class="chip flag">최신 기준일(${h(ymd(lt))})보다 이전</span>` : ""}${f.fileName ? `<span class="chip">${h(f.fileName)}</span>` : ""}</div></div>
-        ${org ? `<div class="actions"><button type="button" class="btn sm" data-org="${h(f.manager)}">기관 보기</button></div>` : ""}</div>
+        <div class="actions rp-pn">${org ? `<button type="button" class="btn sm" data-org="${h(f.manager)}">기관 보기</button>` : ""}
+          ${nav.n ? `<button type="button" class="btn sm" ${nav.prev ? `data-fund="${h(nav.prev.id)}" title="${h(nav.prev.short)}"` : "disabled"}>◀ 이전</button><span class="rp-pn-n">${nav.i + 1} / ${nav.n}</span><button type="button" class="btn sm" ${nav.next ? `data-fund="${h(nav.next.id)}" title="${h(nav.next.short)}"` : "disabled"}>다음 ▶</button>` : ""}</div></div>
+      <nav class="rp-jump" aria-label="이 펀드 바로가기">${[["facts", "핵심 지표"], iss.length && ["iss", `이슈자산 ${iss.length}`], fl.length && ["fl", `펀드 이슈 ${fl.length}`], hold.length && ["hold", `편입자산 ${hold.length}`],
+        (na.length || wl.length) && ["gp", "GP 공시"], ["a", "A~J 항목"], ["notes", `공시 누락 ${arr(f.gaps).length} · 확인 ${arr(f.checks).length}`]].filter(Boolean).map(([k, l]) => `<button type="button" data-jump="${k}">${l}</button>`).join("")}</nav>
       <div class="body rp-body">
         ${has(f.asOfNote) ? `<div class="warnbox"><b>기준일</b> ${h(f.asOfNote)}</div>` : ""}
-        <div class="rp-facts">${fact("약정", B.commit)}${fact("소진율", B.deploy)}${fact("누적 출자", B.called)}${fact("미인출 약정", B.unfunded)}${fact("평가액 · NAV", C.nav)}${fact("기준가 · 순자산", C.dnav)}${fact("IRR", C.irr)}${fact("TVPI · MOIC · DPI", rj(C.tvpi, C.moic, C.dpi))}</div>
-        ${iss.length ? sec(`이슈자산 ${iss.length}건`, `<div class="rp-ilist">${iss.map((x) => issueCard(x, false)).join("")}</div>`, "누르면 핵심 수치·경과·GP 대응·LP 확인 질문") : ""}
-        ${fl.length ? sec(`펀드 단위 이슈 ${fl.length}건`, `<div class="rp-fls">${fl.map((x) => flagCard(x, false)).join("")}</div>`) : ""}
-        ${hold.length ? sec(`편입자산 ${hold.length}건`, holdHtml(hold)) : ""}
-        ${na.length || wl.length ? sec("GP 공시 · Non-accrual · Watchlist", gpHtml(na.map((n) => ({ ...n, na: 1 })).concat(wl), false), "GP가 공시한 그대로") : ""}
-        ${sec("A · 펀드 개요", kv([["투자대상", A.off], ["GP · 운용사", A.gp], ["구조", A.structure], ["투자전략", A.strategy], ["목표수익률", A.target], ["설정 · 만기", rj(A.incept, A.maturity)]]))}
+        ${nplHtml(f)}
+        <div class="rp-facts" id="rpj-facts">${fact("약정", B.commit)}${fact("소진율", B.deploy)}${fact("누적 출자", B.called)}${fact("미인출 약정", B.unfunded)}${fact("평가액 · NAV", C.nav)}${fact("기준가 · 순자산", C.dnav)}${fact("IRR", C.irr)}${fact("TVPI · MOIC · DPI", rj(C.tvpi, C.moic, C.dpi))}</div>
+        ${iss.length ? sec(`이슈자산 ${iss.length}건`, `<div class="rp-ilist">${iss.map((x) => issueCard(x, false)).join("")}</div>`, "누르면 핵심 수치·경과·GP 대응·LP 확인 질문", "iss") : ""}
+        ${fl.length ? sec(`펀드 단위 이슈 ${fl.length}건`, `<div class="rp-fls">${fl.map((x) => flagCard(x, false)).join("")}</div>`, "", "fl") : ""}
+        ${hold.length ? sec(`편입자산 ${hold.length}건`, holdHtml(hold), "", "hold") : ""}
+        ${na.length || wl.length ? sec("GP 공시 · Non-accrual · Watchlist", gpHtml(na.map((n) => ({ ...n, na: 1 })).concat(wl), false), "GP가 공시한 그대로", "gp") : ""}
+        ${sec("A · 펀드 개요", kv([["투자대상", A.off], ["GP · 운용사", A.gp], ["구조", A.structure], ["투자전략", A.strategy], ["목표수익률", A.target], ["설정 · 만기", rj(A.incept, A.maturity)]]), "", "a")}
         ${sec("B · C 약정 · 성과", kv([["약정 · 소진율", rj(B.commit, B.deploy)], ["누적 출자", B.called], ["미인출 약정", B.unfunded], ["누적 분배 · 회수", B.recovered], ["NAV · 기준가", rj(C.nav, C.dnav)], ["IRR", C.irr], ["TVPI · MOIC · DPI", rj(C.tvpi, C.moic, C.dpi)], ["분배율", C.dist], ["Total Net Return", C.tnr]]))}
         ${sec("D · E 포트폴리오 건전성", kv([["투자기업", Dd.cos], ["First Lien / Floating", [Dd.firstlien, Dd.floating].filter(has).join(" / ")], ["Leverage · LTV", Dd.lev], ["EBITDA · 이자보상", rj(Dd.ebitda, Dd.cover)], ["Yield · Spread", Dd.yield], ["섹터 · 분산", Dd.sector], ["Non-accrual", E.na], ["GP Watchlist", E.wl]]))}
         ${sec("F · G 유동성 · 이슈 대응", kv([["환매 · 유동성", Fq.redeem], ["주요 이슈", G.issue], ["GP 대응", G.resolution]]))}
         ${sec("H · I · J 환헤지 · 보수 · 거버넌스", kv([["환헤지", rj(H.hedge, H.fwd)], ["역외 · 하위 GP 보수", I.offFee], ["국내 보수", I.domFee], ["Key Person", J.person], ["LPA 위반 여부", J.lpa], ["조직 · 전략 변경", J.org]]))}
-        <div class="rp-notes">${lists("공시 누락", f.gaps, "gap")}${lists("수치 확인 · 표기 오류", f.checks, "chk")}${lists("산출 근거", f.derived)}</div>
+        <div class="rp-notes" id="rpj-notes">${lists("공시 누락", f.gaps, "gap")}${lists("수치 확인 · 표기 오류", f.checks, "chk")}${lists("산출 근거", f.derived)}</div>
         <p class="basis">Claude 정리${f.updatedAt ? ` · 최종 수정 ${h(f.updatedAt)}` : ""} · "(산출)"은 보고서 수치로 계산한 값입니다.</p>
       </div>`;
+  }
+  // 부실 여부를 먼저: Non-accrual·Watchlist(GP 공시) + 이슈자산 높음·중간 건수 — '부실자산 있나?'에 바로 답하는 줄
+  function nplHtml(f) {
+    const E = f.E || {}, na = arr(f.nonaccrual).length, wl = arr(f.watchlist).length, c = counts(issuesOf(f));
+    const tone = na || c.high ? "bad" : c.mid ? "warn" : "ok";
+    const head = na ? `Non-accrual ${na}건` : c.high ? `이슈자산 높음 ${c.high}건` : c.mid ? `이슈자산 중간 ${c.mid}건` : "부실자산 없음";
+    return `<div class="rp-npl rp-npl--${tone}"><b>부실 · Watchlist <em>${h(head)}${wl ? ` · GP Watchlist ${wl}건` : ""}</em></b>
+      <span><i>부실</i>${val(E.na)}</span><span><i>Watchlist</i>${val(E.wl)}</span></div>`;
   }
   function holdHtml(hold) {
     if (mob()) return `<div class="rp-hc">${hold.map((x) => `<div class="rp-hci rp-hci--${h(x.level)}"><div class="rp-hci-h"><span class="rp-dot rp-dot--${h(x.level)}"></span><b>${h(x.name)}</b><span class="rp-hst">${h(HOLD[x.level] || "")}</span></div>
@@ -291,19 +316,28 @@ const Reports = (() => {
   function paintIssue(el, all) {
     const cnt = (k, v) => all.filter((g) => g[k] === v).length;
     const list = all.filter((g) => (!F.lv || g.level === F.lv) && (!F.tr || g.trend === F.tr) && (!F.fund || g.entries.some((e) => e.fid === F.fund)));
+    // 펀드별 묶음: 펀드 순서대로, 그 펀드의 이슈자산(수준·추이 필터 적용)
+    const byFund = funds().filter((f) => !F.fund || f.id === F.fund).map((f) => ({ f, cards: issuesOf(f).filter((x) => (!F.lv || x.level === F.lv) && (!F.tr || (x.trend || "비교불가") === F.tr)).map(asCard) })).filter((b) => b.cards.length || (!F.lv && !F.tr));
+    const cardsShown = grp === "fund" ? byFund.flatMap((b) => b.cards) : list;
     const seg = (key, opts, label) => `<div class="seg sm rp-fseg" role="group" aria-label="${label}">${opts.map(([v, l]) => `<button type="button" data-f="${key}" data-fv="${h(v)}" aria-pressed="${F[key] === v}">${l}</button>`).join("")}</div>`;
     const gp = funds().flatMap((f) => arr(f.nonaccrual).map((n) => ({ ...n, fund: f.short, fid: f.id, na: 1 })).concat(arr(f.watchlist).map((w) => ({ ...w, fund: f.short, fid: f.id }))))
       .sort((a, b) => (b.na ? 9 : Number(b.rating) || 3) - (a.na ? 9 : Number(a.rating) || 3));
     el.innerHTML = `<div class="rp-isum"><span>이슈자산 <b>${all.length}</b>건</span>${["high", "mid", "low"].map((l) => `<span>${lvTag(l)} <b>${cnt("level", l)}</b></span>`).join("")}<span class="rp-isum-t">${["악화", "신규", "유지", "개선"].map((t) => `${trTag(t)} <b>${cnt("trend", t)}</b>`).join(" ")}</span></div>
-      <div class="rp-fbar">${seg("lv", [["", "전체"], ["high", "높음"], ["mid", "중간"], ["low", "참고"]], "수준")}${seg("tr", [["", "전체 추이"], ["악화", "악화"], ["신규", "신규"], ["유지", "유지"], ["개선", "개선"]], "추이")}
+      <div class="rp-fbar"><div class="seg sm rp-fseg" role="group" aria-label="묶기">${[["fund", "펀드별"], ["lv", "수준순"]].map(([v, l]) => `<button type="button" data-ig="${v}" aria-pressed="${grp === v}">${l}</button>`).join("")}</div>${seg("lv", [["", "전체"], ["high", "높음"], ["mid", "중간"], ["low", "참고"]], "수준")}${seg("tr", [["", "전체 추이"], ["악화", "악화"], ["신규", "신규"], ["유지", "유지"], ["개선", "개선"]], "추이")}
         <select id="rpIf" aria-label="펀드"><option value="">펀드 전체</option>${funds().map((f) => `<option value="${h(f.id)}"${F.fund === f.id ? " selected" : ""}>${h(f.short)}</option>`).join("")}</select>
-        <span class="rp-fbar-a"><button type="button" class="btn sm" id="rpOpenAll">${list.length && list.every((g) => OPEN.has(g.key)) ? "모두 접기" : "모두 펼치기"}</button></span></div>
-      ${list.length ? `<div class="rp-ilist">${list.map((g) => issueCard(g, true)).join("")}</div>` : `<div class="empty">조건에 맞는 이슈자산이 없습니다. 필터를 바꿔 보세요.</div>`}
+        <span class="rp-fbar-a"><button type="button" class="btn sm" id="rpOpenAll">${cardsShown.length && cardsShown.every((g) => OPEN.has(g.k || g.key)) ? "모두 접기" : "모두 펼치기"}</button></span></div>
+      ${!cardsShown.length ? `<div class="empty">조건에 맞는 이슈자산이 없습니다. 필터를 바꿔 보세요.</div>`
+        : grp === "fund" ? byFund.map(({ f, cards }) => { const c = counts(cards);
+            return `<section class="rp-ig"><div class="rp-ig-h"><button type="button" class="link" data-fund="${h(f.id)}"><b>${h(f.short)}</b></button><span class="chip${isOld(f) ? " flag" : ""}">${h(f.period)} · ${h(ymd(f.asOf))}</span>
+              <span class="rp-ig-c">${cards.length}건${c.high ? ` · <em class="h">높음 ${c.high}</em>` : ""}${c.mid ? ` · <em class="m">중간 ${c.mid}</em>` : ""}</span><span class="rp-ig-s">${h(f.manager || "")} → ${h(f.underlying || "")}</span></div>
+              ${cards.length ? `<div class="rp-ilist">${cards.map((x) => issueCard(x, false)).join("")}</div>` : `<p class="rp-ig-0">보고서상 이슈자산 없음 · 부실: ${val((f.E || {}).na)}</p>`}</section>`; }).join("")
+        : `<div class="rp-ilist">${list.map((g) => issueCard(g, true)).join("")}</div>`}
       ${gp.length ? `<section class="rp-blk"><div class="bh"><h3>GP 공시 원장 <small>Non-accrual · Watchlist — GP가 공시한 그대로, 등급 없이 Watchlist로만 공시한 차주는 W</small></h3></div>${gpHtml(gp, true)}</section>` : ""}
       ${foot()}`;
     $$("[data-f]", el).forEach((b) => b.onclick = () => { F[b.dataset.f] = b.dataset.fv; paint(); });
     $("#rpIf", el).onchange = (e) => { F.fund = e.target.value; paint(); };
-    $("#rpOpenAll", el).onclick = () => { const all2 = list.every((g) => OPEN.has(g.key)); list.forEach((g) => (all2 ? OPEN.delete(g.key) : OPEN.add(g.key))); paint(); };
+    $$("[data-ig]", el).forEach((b) => b.onclick = () => { grp = b.dataset.ig; LS.set("kbnote-rpgrp", grp); paint(); });
+    $("#rpOpenAll", el).onclick = () => { const all2 = cardsShown.every((g) => OPEN.has(g.k || g.key)); cardsShown.forEach((g) => { if (all2) { OPEN.delete(g.k || g.key); OPEN.delete(g.key); } else OPEN.add(g.k || g.key); }); paint(); };
   }
 
   // ── 비교표 ─────────────────────────────────────────────

@@ -249,23 +249,41 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-reports.png`), fullPage: vp.width < 760 });
   await page.locator('#rpBody .rp-fc[data-fund="fake-feeder-1q26"]').click();
   await page.locator('#rpMain h2').waitFor({ state: 'visible' });
-  ok('운용보고서: 펀드 카드 → 펀드 상세(핵심 지표·이슈자산·A~J)', (await page.textContent('#rpMain h2')) === '가상 재간접 1호' && (await page.locator('#rpMain .rp-fact').count()) === 8
-    && (await page.locator('#rpMain details.rp-is').count()) === 3 && (await page.textContent('#rpMain')).includes('H · I · J'));
+  ok('운용보고서: 펀드 카드 → 그 펀드 쪽(핵심 지표·이슈자산·A~J·바로가기)', (await page.textContent('#rpMain h2')) === '가상 재간접 1호' && (await page.locator('#rpMain .rp-fact').count()) === 8
+    && (await page.locator('#rpMain details.rp-is').count()) === 3 && (await page.textContent('#rpMain')).includes('H · I · J') && (await page.locator('#rpMain .rp-jump button').count()) >= 5);
+  ok('운용보고서: 펀드 줄에서 그 펀드 선택·보기 단추 숨김', (await page.getAttribute('#rpTop .rp-fchip[data-scope="fake-feeder-1q26"]', 'aria-pressed')) === 'true' && (await page.locator('#rpTop .rp-seg').count()) === 0
+    && (await page.locator('#rpTop .rp-fchip').count()) === 3);
+  ok('운용보고서: 펀드 쪽 이슈자산에 다른 펀드에도 있는 자산 표시', (await page.locator('#rpMain .rp-is .rp-sh').count()) === 1);
+  ok('운용보고서: 펀드 쪽 맨 위 부실·Watchlist 줄', (await page.textContent('#rpMain .rp-npl')).includes('Non-accrual 1건') && (await page.locator('#rpMain .rp-npl--bad').count()) === 1);
+  await page.locator('#rpMain [data-jump="a"]').click();
+  ok('운용보고서: 바로가기(A~J)', await page.waitForFunction(() => { const r = document.querySelector('#rpj-a').getBoundingClientRect(); return r.top < innerHeight / 2 && r.top > 0; }, null, { timeout: 3000 }).then(() => true, () => false));
+  await page.locator('#rpMain .rp-pn [data-fund="fake-multi-3q26"]').click();
+  ok('운용보고서: 다음 펀드 ▶', (await page.textContent('#rpMain h2')) === '가상 멀티 2호' && (await page.getAttribute('#rpTop .rp-fchip[data-scope="fake-multi-3q26"]', 'aria-pressed')) === 'true');
+  ok('운용보고서 펀드 쪽 가로 넘침 없음', await noX());
+  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-reports-fund.png`), fullPage: vp.width < 760 });
   if (vp.width < 760) {
-    ok('운용보고서(휴대폰): 상세만 보임', await page.locator('#p-reports').evaluate((e) => e.classList.contains('detail')) && !(await page.locator('#rpList').isVisible()));
+    ok('운용보고서(휴대폰): 펀드 쪽은 기록을 쌓음', await page.locator('#p-reports').evaluate((e) => e.classList.contains('detail')));
     await page.goBack();
     ok('운용보고서(휴대폰): 뒤로가기 → 요약으로', await page.waitForFunction(() => !document.querySelector('#p-reports').classList.contains('detail') && !!document.querySelector('#rpBody .rp-fc'), null, { timeout: 3000 }).then(() => true, () => false));
-  } else ok('운용보고서(PC): 목록과 상세 함께', await page.locator('#rpList .item.on').isVisible() && (await page.locator('#rpList .item').count()) === 2);
-  ok('운용보고서 상세 가로 넘침 없음', await noX());
+    await page.locator('#rpTop .rp-fchip[data-scope="fake-multi-3q26"]').click();
+    await page.locator('#rpMain [data-back]').click();
+    ok('운용보고서(휴대폰): 펀드 줄 → 펀드 쪽 → ← 전체', await page.waitForFunction(() => !document.querySelector('#p-reports').classList.contains('detail') && !!document.querySelector('#rpBody .rp-fc'), null, { timeout: 3000 }).then(() => true, () => false));
+  } else {
+    await page.locator('#rpTop .rp-fchip[data-scope=""]').click();
+    ok('운용보고서(PC): 펀드 줄 전체 → 요약', (await page.locator('#rpBody .rp-fc').count()) === 2 && (await page.locator('#rpTop .rp-seg').count()) === 1);
+  }
   await page.locator('#rpTop [data-v="issue"]').click();
   await page.locator('#rpBody details.rp-is').first().waitFor();
-  ok('운용보고서: 이슈자산(펀드를 가로질러 같은 자산 한 줄·공통 표시)', (await page.locator('#rpBody details.rp-is').count()) === 4 && (await page.locator('#rpBody .rp-is .rp-sh').count()) === 1
-    && (await page.textContent('#rpTop [data-v="issue"]')).includes('4'));
+  ok('운용보고서: 이슈자산 펀드별 묶음(기본) — 펀드 2묶음·공통 자산 표시', (await page.locator('#rpBody .rp-ig').count()) === 2 && (await page.locator('#rpBody details.rp-is').count()) === 5
+    && (await page.locator('#rpBody .rp-is .rp-sh').count()) === 2 && (await page.textContent('#rpTop [data-v="issue"]')).includes('4'));
+  await page.locator('#rpBody [data-ig="lv"]').click();
+  ok('운용보고서: 이슈자산 수준순(펀드를 가로질러 같은 자산 한 줄)', (await page.locator('#rpBody details.rp-is').count()) === 4 && (await page.locator('#rpBody .rp-is .rp-sh').count()) === 1 && (await page.locator('#rpBody .rp-ig').count()) === 0);
   await page.locator('#rpBody details.rp-is >> nth=0 >> summary').click();
   ok('운용보고서: 이슈자산 펼치기(핵심 수치·경과·GP 대응·LP 확인 질문)', (await page.textContent('#rpBody details.rp-is[open]')).includes('가상 LP 확인 질문') && (await page.locator('#rpBody details.rp-is[open] .rp-hist li').count()) === 2);
   await page.locator('#rpBody [data-f="lv"][data-fv="high"]').click();
   ok('운용보고서: 수준 필터(높음)', (await page.locator('#rpBody details.rp-is').count()) === 1);
   await page.locator('#rpBody [data-f="lv"][data-fv=""]').click();
+  await page.locator('#rpBody [data-ig="fund"]').click();
   ok('운용보고서 이슈자산 가로 넘침 없음', await noX());
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-reports-issue.png`), fullPage: vp.width < 760 });
   await page.locator('#rpTop [data-v="cmp"]').click();
@@ -284,7 +302,8 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('통합 검색: 운용보고서 이슈자산도', (await page.locator('#gsBody [data-grp]').count()) === 1 && (await page.textContent('#gsBody')).includes('운용보고서'));
   await page.locator('#gsBody [data-grp]').first().click();
   await page.locator('#gs').waitFor({ state: 'hidden' });
-  ok('통합 검색 결과 → 이슈자산 펼쳐서', await page.locator('#rpBody details.rp-is[open]', { hasText: 'Shared Borrower' }).waitFor({ timeout: 3000 }).then(() => true, () => false)
+  ok('통합 검색 결과 → 이슈자산 펼쳐서(펀드별 묶음이면 그 자산이 나오는 펀드마다)', await page.locator('#rpBody details.rp-is[open]', { hasText: 'Shared Borrower' }).first().waitFor({ timeout: 3000 }).then(() => true, () => false)
+    && (await page.locator('#rpBody details.rp-is[open]', { hasText: 'Shared Borrower' }).count()) === 2
     && (await page.getAttribute('#rpTop [data-v="issue"]', 'aria-pressed')) === 'true');
   await page.locator('#rpTop [data-v="sum"]').click();
   await page.locator(`${tabSel}[data-tab="dash"]`).click();

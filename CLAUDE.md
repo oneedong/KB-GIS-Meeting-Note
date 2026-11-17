@@ -96,7 +96,9 @@
 형식·원칙·순서는 `docs/REPORTS.md`. 요점:
 - `reports_build.mjs <SP>/reports-src <SP>/reports.json` → `vault.mjs encrypt … reports.enc.json --salt-from data.enc.json` → 커밋(`reports: …`, 펀드명·수치 쓰지 말 것) → push.
 - 숫자는 보고서 그대로, 계산값은 '(산출)'. 기준일이 다르면 `asOfNote`. 수준·추이는 분석 판단(GP 등급 아님). 보고서를 미팅노트(시장정보)로 기록하지 않는다(사용자 요청).
-- 화면은 `reports.js`·`reports.css`(지표 카드는 `Dash.blocks`). 통합 검색에 펀드·이슈자산(`Reports.open({fund}|{issue})`). 휴대폰 펀드 상세는 `openDetail`(뒤로가기 → 들어온 보기).
+- 화면은 `reports.js`·`reports.css`(지표 카드는 `Dash.blocks`). 통합 검색에 펀드·이슈자산(`Reports.open({fund}|{issue})`).
+  맨 위 '펀드' 줄(2026-11-17, 사용자 요청: 각 펀드별로 보기): 전체 → 요약·이슈자산·비교표·공시·확인 / 펀드 하나 → 그 펀드 한 쪽(부실·Watchlist 줄·핵심 지표·바로가기·이전/다음).
+  이슈자산 보기는 '펀드별' 묶음이 기본(수준순 전환, `kbnote-rpgrp`). 휴대폰 펀드 쪽은 `openDetail`(뒤로가기 → 들어온 보기). '부실' 칸(E.na)은 부실 여부를 한 줄로 답하게 쓴다(없으면 '없음 — 근거').
 
 ## 화면 수정
 - `app.js`/`app.css`는 아티팩트 페이지(lp_meeting_db.html) 원본에서 저장 기능·약어 사전을 뺀 것. KB 노랑·회색 토큰.
