@@ -293,22 +293,40 @@ def _add_col(b, col, after):
     i = next((n + 1 for n, c in enumerate(b["cols"]) if c["k"] == after), len(b["cols"]))
     b["cols"].insert(i, col)
 
+def _cm_by_fund(cm):
+    """약정내역(2022~)을 펀드(약칭+운용사)별 묶음으로(사용자 요청 2026-11-17: 각 펀드별로 나열·펀드별 합계).
+    묶음 순서 = 엑셀에서 그 펀드가 처음 나온 순서, 묶음 안은 엑셀 순서. 합계 줄은 앱이 보이는 행으로 그때그때 계산(secsum)."""
+    rows = cm.pop("rows", None) or [r for sec in cm.get("secs") or [] for r in sec["rows"]]
+    secs, by = [], {}
+    for r in rows:
+        c = r["c"]; k = (_nk(c.get("ab") or c.get("fn")), _nk(c.get("gp")))
+        if k not in by:
+            ab = c.get("ab") or c.get("fn") or "(펀드 미기재)"
+            sub = " · ".join(str(x) for x in (c.get("gp"), c.get("fn") if c.get("fn") and _nk(c.get("fn")) != _nk(ab) else None) if x)
+            by[k] = {"h": str(ab), "s": sub, "rows": []}; secs.append(by[k])
+        by[k]["rows"].append(r)
+    cm["secs"], cm["secsum"] = secs, 1
+    for c in cm["cols"]:
+        if c["k"] == "am": c["sumc"] = 1                                   # 총약정금액은 통화별로 더한다
+
 def _org_fees(d):
     cm = _table(d, "cm")
     if not cm: return
+    _cm_by_fund(cm)
+    cmrows = [r for sec in cm["secs"] for r in sec["rows"]]
     fy = [c["k"] for c in cm["cols"] if re.match(r"^f\d{4}$", c["k"])]
     fee = lambda c: sum(v for v in (c.get(k) for k in fy) if isinstance(v, (int, float)))
     for c in cm["cols"]:
         if c["k"] == "am": c.pop("d", None)                               # 총약정금액(통화 함께)은 늘 보인다
-    for r in cm["rows"]:
+    for r in cmrows:
         r["c"]["ft"] = fee(r["c"])                                        # 없으면 0 → 앱에 '-'(빈칸 대신)
     _add_col(cm, {"k": "ft", "l": FEE_L, "f": "usd", "sum": 1}, "am")
     if cm.get("pick") and isinstance(cm["pick"].get("cols"), dict): cm["pick"]["cols"]["전체"] = ["ft"]
     for f in cm.get("foot") or []:
         f["c"].pop("ft", None); t = fee(f["c"])
         if t: f["c"]["ft"] = t
-    cm["sub"] = "전체 = 총약정금액·수수료 합계(2022~) · 연도를 고르면 그 해 USD 환산·수수료·수수료율"
-    rows = [(r["c"], _keys(r["c"].get("lp")), fee(r["c"])) for r in cm["rows"]]
+    cm["sub"] = "펀드별 묶음·합계 · 전체 = 총약정금액·수수료 합계(2022~) · 연도를 고르면 그 해 USD 환산·수수료·수수료율"
+    rows = [(r["c"], _keys(r["c"].get("lp")), fee(r["c"])) for r in cmrows]
     rows2 = [(x, _keys_lp(x.get("lp")), f) for x, _, f in rows]   # 바로 안 맞을 때만 쓰는 넓힌 표기
 
     og = _table(d, "og")

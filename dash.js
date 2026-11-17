@@ -473,11 +473,18 @@ const Dash = (() => {
     const ss = $("select[data-sort]", tb); if (ss) ss.onchange = () => { const [k, d] = ss.value.split("|"); st.sort = k ? { k, d: +d } : null; draw(); };
     const xb = $(".tb-x", tb); if (xb) xb.onclick = () => { st.q = ""; st.f = {}; draw(); };
   }
-  function sums(b, st, secs, cols) {
-    const rows = secs.flatMap((s) => s.rows);
+  function sums(b, st, secs, cols, label) {
+    const rows = secs.flatMap((s) => s.rows), txt = {};
     const c = {}; cols.filter((x) => x.sum).forEach((x) => { c[x.k] = rows.reduce((a, r) => a + (typeof r.c[x.k] === "number" ? r.c[x.k] : 0), 0); });
-    return { l: `선택한 ${rows.length}건 합계`, c, calc: 1 };
+    // sumc: 통화가 행마다 다른 금액(총약정금액) — 통화별로 더해 한 통화면 그대로, 여럿이면 'USD … · EUR …'
+    cols.filter((x) => x.sumc).forEach((x) => {
+      const ck = x.ck || "cy", by = new Map(); rows.forEach((r) => { const v = r.c[x.k]; if (typeof v === "number") by.set(r.c[ck] || "", (by.get(r.c[ck] || "") || 0) + v); });
+      if (by.size === 1) { const [[cy, v]] = [...by]; c[x.k] = v; c[ck] = cy; }
+      else if (by.size > 1) txt[x.k] = [...by].map(([cy, v]) => `${cy} ${num(v, 2)}`).join(" · ");
+    });
+    return { l: label || `선택한 ${rows.length}건 합계`, c, txt, calc: 1 };
   }
+  const fcell = (c, f, unit) => f.txt && f.txt[c.k] ? h(f.txt[c.k]) : cell(c, f.c, unit);   // 합계 줄 칸(여러 통화 글자 포함)
   const filtered = (st) => !!(st.q || Object.values(st.f || {}).some((v) => v));
   const expandable = (b, st, r) => (r.x && r.x.length) || detCols(b, st).some((c) => r.c[c.k] != null && r.c[c.k] !== "");
 
@@ -492,16 +499,18 @@ const Dash = (() => {
       if (ex && open) out += `<tr class="xrow"><td colspan="${nc}">${detailHtml(b, st, r, dc)}</td></tr>`;
       return out;
     };
-    const footRow = (f, cls) => `<tr class="${cls}">${cols.map((c, i) => `<td class="${isNum(c) ? "n" : ""}">${i === 0 ? h(f.l) : (f.c[c.k] != null && f.c[c.k] !== "" && c.f !== "tag" ? cell(c, f.c) : (c.f === "months" && f.c.mo ? months(f.c.mo) : ""))}</td>`).join("")}</tr>`;
+    const footRow = (f, cls) => `<tr class="${cls}">${cols.map((c, i) => `<td class="${isNum(c) ? "n" : ""}">${i === 0 ? h(f.l) : ((f.c[c.k] != null && f.c[c.k] !== "" || f.txt && f.txt[c.k]) && c.f !== "tag" ? fcell(c, f) : (c.f === "months" && f.c.mo ? months(f.c.mo) : ""))}</td>`).join("")}</tr>`;
     const fl = filtered(st);
     let body = "";
     secs.forEach((s) => {
-      if (!s.rows.length && (fl || !s.h)) return;
-      if (s.h) body += `<tr class="sec"><th colspan="${nc}"><b>${h(s.h)}</b>${s.s ? `<span>${h(s.s)}</span>` : ""}</th></tr>`;
+      if (!s.rows.length && (fl || !s.h || b.secsum)) return;
+      if (s.h) body += `<tr class="sec"><th colspan="${nc}"><b>${h(s.h)}</b>${s.s ? `<span>${h(s.s)}</span>` : ""}${b.secsum ? `<span class="sec-n">${s.rows.length}건</span>` : ""}</th></tr>`;
       body += s.rows.map(row).join("");
-      if (!fl && !sk) (s.foot || []).forEach((f) => { body += footRow(f, "sf"); });
+      if (b.secsum && s.rows.length > 1) body += footRow(sums(b, st, [s], cols, `${s.h} 합계`), "sf ss");   // 펀드별 합계(보이는 행)
+      else if (!fl && !sk) (s.foot || []).forEach((f) => { body += footRow(f, "sf"); });
     });
-    const tf = fl ? (cols.some((c) => c.sum) ? [sums(b, st, secs, cols)] : []) : (b.foot || []);
+    const tf = b.secsum ? [sums(b, st, secs, cols, `${fl ? "선택한" : "전체"} ${secs.reduce((a, s) => a + s.rows.length, 0)}건 합계`)]
+      : fl ? (cols.some((c) => c.sum) ? [sums(b, st, secs, cols)] : []) : (b.foot || []);
     const tall = secs.reduce((a, s) => a + s.rows.length, 0) > 24;
     return `<div class="dtw${tall ? " tall" : ""}"><table class="dt"><thead><tr>${th}</tr></thead><tbody>${body}</tbody>${tf.length ? `<tfoot>${tf.map((f) => footRow(f, "tf")).join("")}</tfoot>` : ""}</table></div>`;
   }
@@ -544,18 +553,21 @@ const Dash = (() => {
         ${ex && open ? `<div class="cd-x">${detailHtml(b, st, r, detCols(b, st), skip)}</div>` : ""}${ex ? `<span class="cd-more">${open ? "접기" : "자세히"}</span>` : ""}</article>`;
     };
     const footCard = (f, cls) => {
-      const vs = cols.filter((c) => f.c[c.k] != null && f.c[c.k] !== "" && c.f !== "tag" && c.f !== "text" && c.k !== tk).map((c) => `<div${c.f === "months" ? ' class="w"' : ""}><dt>${h(c.l)}</dt><dd class="n">${cell(c, f.c, true)}</dd></div>`).join("");
+      const vs = cols.filter((c) => ((f.c[c.k] != null && f.c[c.k] !== "") || (f.txt && f.txt[c.k])) && c.f !== "tag" && c.f !== "text" && c.k !== tk && (!f.calc || vc.has(c.k))).map((c) => `<div${c.f === "months" ? ' class="w"' : ""}><dt>${h(c.l)}</dt><dd class="n">${fcell(c, f, true)}</dd></div>`).join("");
       return `<div class="cd-ft ${cls}"><b>${h(f.l)}</b>${vs ? `<dl>${vs}</dl>` : ""}</div>`;
     };
     const fl = filtered(st), sk = st.sort && st.sort.k;
     let out = "";
+    const sc = b.cols.filter((c) => vc.has(c.k));
     secs.forEach((s) => {
-      if (!s.rows.length && (fl || !s.h)) return;
-      if (s.h) out += `<div class="sec-h"><b>${h(s.h)}</b>${s.s ? `<span>${h(s.s)}</span>` : ""}</div>`;
+      if (!s.rows.length && (fl || !s.h || b.secsum)) return;
+      if (s.h) out += `<div class="sec-h"><b>${h(s.h)}</b>${s.s ? `<span>${h(s.s)}</span>` : ""}${b.secsum ? `<span class="sec-n">${s.rows.length}건</span>` : ""}</div>`;
       out += s.rows.map(card).join("");
-      if (!fl && !sk) (s.foot || []).forEach((f) => { out += footCard(f, "sf"); });
+      if (b.secsum && s.rows.length > 1) out += footCard(sums(b, st, [s], sc, `${s.h} 합계`), "sf ss");   // 펀드별 합계(보이는 행)
+      else if (!fl && !sk) (s.foot || []).forEach((f) => { out += footCard(f, "sf"); });
     });
-    const tf = fl ? (cols.some((c) => c.sum) ? [sums(b, st, secs, visCols(b, st))] : []) : (b.foot || []);
+    const tf = b.secsum ? [sums(b, st, secs, sc, `${fl ? "선택한" : "전체"} ${secs.reduce((a, s) => a + s.rows.length, 0)}건 합계`)]
+      : fl ? (cols.some((c) => c.sum) ? [sums(b, st, secs, visCols(b, st))] : []) : (b.foot || []);
     out += tf.map((f) => footCard(f, "tf")).join("");
     return `<div class="cards">${out}</div>`;
   }

@@ -426,7 +426,7 @@ let DZ=null;
 function dzTable(D,id){let f=null;D.sheets.forEach(s=>Dash.walk(s.view||[],b=>{if(!f&&b.t==="table"&&b.id===id)f={s,b}}));return f}
 function dzIndex(D){const og=dzTable(D,"og"),cm=dzTable(D,"cm"),com=[],fee=[],fy=[];
   if(og)(og.b.secs||[]).forEach(sec=>{const lbl=String(sec.h||"").replace(/^\d+\.\s*/,"");sec.rows.forEach(r=>com.push({lbl,k:nameKeys(lbl),c:r.c}))});
-  if(cm){cm.b.cols.forEach(c=>{const m=/^f(\d{4})$/.exec(c.k);if(m)fy.push(m[1])});(cm.b.rows||[]).forEach(r=>fee.push({lbl:String(r.c.lp??""),k:lpKeys(r.c.lp),c:r.c}))}
+  if(cm){cm.b.cols.forEach(c=>{const m=/^f(\d{4})$/.exec(c.k);if(m)fy.push(m[1])});(cm.b.secs?cm.b.secs.flatMap(x=>x.rows):cm.b.rows||[]).forEach(r=>fee.push({lbl:String(r.c.lp??""),k:lpKeys(r.c.lp),c:r.c}))}
   return {asof:D.asof,usd:(D.fx||{}).usd||0,com,fee,fy:fy.sort().reverse(),og:og&&og.s.name,cm:cm&&cm.s.name}}
 function dzOf(o){if(!DZ)return null;const K=orgKeys(o),gp=o.type==="GP",mine=x=>gp?K.has(nk(x.c.gp)):x.k.some(k=>K.has(k));
   const com=DZ.com.filter(mine),fee=DZ.fee.filter(mine);if(!com.length&&!fee.length)return null;

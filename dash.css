@@ -333,3 +333,10 @@ body.dashmode .page{max-width:var(--page-max)}   /* 2026-11-17 PC 넓게: 공통
   .tb-sel select{padding:8px 8px;font-size:13.5px;min-height:36px}
   .dz-item{padding-block:9px}
 }
+
+/* 펀드별 묶음(약정내역 2022~, secsum): 머리 오른쪽 건수, 묶음 끝 합계 줄(사용자 요청 2026-11-17) */
+.dt tr.sec th .sec-n{float:right;margin-left:12px;font:600 11.5px var(--f-body);color:var(--muted)}
+.sec-h .sec-n{margin-left:auto;font:600 11.5px var(--f-body);color:var(--muted);white-space:nowrap}
+.sec-h:has(.sec-n){flex-wrap:wrap;row-gap:0}.sec-h:has(.sec-n)>b{flex:none;max-width:100%}
+.dt tr.sf.ss td{font-weight:700;background:var(--sel)}
+.cd-ft.ss{background:var(--sel)}

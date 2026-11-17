@@ -133,8 +133,11 @@ ok('CSP 해시 맞음', (() => { try { execFileSync(process.execPath, [join(ROOT
   execFileSync('python3', [join(ROOT, 'scripts/dash_curate.py'), f], { stdio: 'pipe' });   // 두 번 돌려도 같게
   const c = JSON.parse(readFileSync(f, 'utf8')), T = (re) => c.sheets.find((x) => re.test(x.name)).view[0];
   const cm = T(/^약정내역/), og = T(/^기관별 약정/), s5 = T(/^약정 통계/), cmc = cm.cols.map((x) => x.k);
+  const cmr = cm.secs.flatMap((x) => x.rows);
   ok('약정내역(2022~) 전체에 총약정금액·수수료 합계', !cm.cols.find((x) => x.k === 'am').d && cmc.indexOf('ft') === cmc.indexOf('am') + 1 && cm.pick.cols['전체'].join() === 'ft'
-    && cm.rows.map((r) => r.c.ft).join() === '1500,0,200,50' && cm.foot[0].c.ft === 1750);
+    && cmr.map((r) => r.c.ft).join() === '1500,200,0,50' && cm.foot[0].c.ft === 1750);
+  ok('약정내역(2022~) 펀드별 묶음(처음 나온 순서·합계는 앱이 계산)', cm.secsum === 1 && !cm.rows && cm.secs.map((x) => `${x.h}:${x.rows.length}`).join() === 'F1:2,F2:1,F9:1'
+    && cm.secs[0].s === 'G1' && cm.cols.find((x) => x.k === 'am').sumc === 1);
   const ogr = og.secs.map((x) => x.rows.map((r) => r.c.fe).join('/')).join(';');
   ok('기관별 약정: 행마다 수수료(괄호·부서 꼬리 표기 맞춤), 묶음 머리 합계', ogr === '1500/0;200' && og.secs[0].s === '2건 · USD 30.00M · 수수료 USD 1,500.00'
     && og.foot[0].c.fe === 1700 && og.card.meta.includes('fe') && (og.notes || []).some((n) => n.includes('USD 50.00')));
@@ -474,6 +477,11 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator('#dzMain .tb-q').first().waitFor();
   ok('대시보드에서 보기 → 그 기관으로 거른 시트', (await page.textContent('#dzMain h2')) === '가상 기관별 약정' && (await page.inputValue('#dzBody .tb-q >> nth=0')) === '샘공'
     && (await page.textContent('#dzBody .tb-n >> nth=0')).startsWith('2건'));
+  await page.fill('#dzBody .tb-q >> nth=1', '');
+  await page.locator('#dzBody .tb-n >> nth=1', { hasText: '4건' }).waitFor({ timeout: 3000 });
+  const fs2 = await page.locator('#dzBody tr.sf.ss, #dzBody .cd-ft.ss').allInnerTexts();
+  ok('약정내역 펀드별 묶음 + 펀드 합계 줄(약정 통화별·수수료)', fs2.length === 1 && /Sample Fund I 합계/.test(fs2[0]) && fs2[0].includes('USD 7,000,000.00') && fs2[0].includes('4,500.00')
+    && (await page.locator('#dzBody tr.sec .sec-n, #dzBody .sec-h .sec-n').count()) === 3);
   await page.locator(`${tabSel}[data-tab="meetings"]`).click();
   await page.locator('#mStarOnly').click();
   ok('관심 모아보기(관심 기관 + 관심 미팅)', (await page.locator('#mList .so').count()) === 1 && (await page.locator('#mList .item').count()) === 1);
