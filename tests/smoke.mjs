@@ -30,12 +30,16 @@ const PJSON = join(ROOT, 'tests', '_reports.json'), PENC = join(ROOT, 'tests', '
 execFileSync(process.execPath, [join(ROOT, 'scripts/reports_build.mjs'), join(ROOT, 'tests/reports-fixture.json'), PJSON], { stdio: 'inherit' });
 execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', PJSON, PENC, '--salt-from', ENC],
   { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
+// 가상 라인업(tests/lineup-fixture.json, lineup_build.py 출력 형식)도 같은 비밀번호·salt 로
+const LENC = join(ROOT, 'tests', '_lineup.enc.json');
+execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', join(ROOT, 'tests/lineup-fixture.json'), LENC, '--salt-from', ENC],
+  { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const server = createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p.endsWith('/')) p += 'index.html';
-  const file = p === '/data.enc.json' ? ENC : p === '/dash.enc.json' ? DENC : p === '/research.enc.json' ? RENC : p === '/reports.enc.json' ? PENC : join(ROOT, p);
+  const file = p === '/data.enc.json' ? ENC : p === '/dash.enc.json' ? DENC : p === '/research.enc.json' ? RENC : p === '/reports.enc.json' ? PENC : p === '/lineup.enc.json' ? LENC : join(ROOT, p);
   if (!file.startsWith(ROOT) || !existsSync(file)) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
   res.end(readFileSync(file));
@@ -306,6 +310,35 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
     && (await page.locator('#rpBody details.rp-is[open]', { hasText: 'Shared Borrower' }).count()) === 2
     && (await page.getAttribute('#rpTop [data-v="issue"]', 'aria-pressed')) === 'true');
   await page.locator('#rpTop [data-v="sum"]').click();
+
+  // 라인업 탭(가상 라인업 4개): 자산군·상태·최근 수정·검색·펼치기
+  await page.locator(`${tabSel}[data-tab="lineup"]`).click();
+  await page.locator('#luBody details.lu-f').first().waitFor();
+  ok('라인업: 가상 펀드 4개·자산군 2개', (await page.locator('#luBody details.lu-f').count()) === 4 && (await page.locator('#luBody .lu-sec').count()) === 2);
+  ok('라인업 지표 카드 4개', (await page.locator('#luKpi .kc').count()) === 4);
+  await page.fill('#luq', '가상 인프라');
+  ok('라인업 검색(여러 단어 모두 포함·표시)', (await page.locator('#luBody details.lu-f').count()) === 1 && (await page.locator('#luBody mark').count()) >= 1);
+  await page.fill('#luq', '');
+  await page.locator('#luNew').click();
+  ok('라인업: 최근 수정만(7일 안)', (await page.locator('#luBody details.lu-f').count()) === 2);
+  await page.locator('#luNew').click();
+  await page.selectOption('#luSt', '모집 완료');
+  ok('라인업: 상태 거르기', (await page.locator('#luBody details.lu-f').count()) === 1);
+  await page.selectOption('#luSt', '');
+  await page.locator('#luBody details.lu-f summary').first().click();
+  ok('라인업: 펼치면 상세', await page.locator('#luBody details.lu-f[open] .lu-d').isVisible() && (await page.textContent('#luBody details.lu-f[open] .lu-d')).includes('주요 실적'));
+  await page.locator('.lu-seg button[data-ac="Infrastructure"]').click();
+  ok('라인업: 자산군 고르기', (await page.locator('#luBody details.lu-f').count()) === 1);
+  await page.locator('.lu-seg button[data-ac=""]').click();
+  ok('라인업 가로 넘침 없음', await noX());
+  await page.click('#gsBtn');
+  await page.fill('#gsq', 'Senior Loan');
+  await page.locator('#gsBody [data-glu]').first().waitFor({ timeout: 5000 });
+  ok('통합 검색: 라인업 펀드도', (await page.locator('#gsBody [data-glu]').count()) === 1);
+  await page.locator('#gsBody [data-glu]').first().click();
+  await page.locator('#gs').waitFor({ state: 'hidden' });
+  ok('통합 검색 결과 → 라인업 펀드 펼쳐서', await page.locator('#luBody details.lu-f[open]', { hasText: '가상 Senior Loan Fund II' }).waitFor({ timeout: 3000 }).then(() => true, () => false));
+  await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-lineup.png`), fullPage: vp.width < 760 });
   await page.locator(`${tabSel}[data-tab="dash"]`).click();
   await page.locator(vp.width < 760 ? '#dzNav .dz-pick select' : '#dzNav .dz-item').first().waitFor();
 

@@ -1,0 +1,68 @@
+/* 라인업 탭 — 해외대체 펀드 라인업(지표 카드는 dash.css 의 블록 스타일을 그대로 쓴다) */
+#luMain{display:flex;flex-direction:column;gap:12px;min-width:0}
+.lu-head h2{margin:2px 0 0;font:800 22px/1.25 var(--f-display)}
+.lu-head h2 small{font-size:14px;font-weight:600;color:var(--muted);margin-left:4px}
+#luKpi:empty{display:none}
+.lu-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.lu-tools input{flex:1 1 260px;min-width:0}
+.lu-tools select{flex:0 1 150px}
+.lu-tools .qbtn{flex:none}
+.lu-seg{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.lu-seg::-webkit-scrollbar{display:none}
+.lu-seg button{flex:none;border:1px solid var(--line);background:var(--panel);color:var(--muted);font:600 13px var(--f-body);padding:6px 12px;border-radius:99px;cursor:pointer;white-space:nowrap}
+.lu-seg button span{font-weight:500;opacity:.8;margin-left:2px}
+.lu-seg button[aria-pressed="true"]{background:var(--kb-ink);border-color:var(--kb-ink);color:#fff}
+.lu-cnt{font-size:12.5px;color:var(--muted)}
+#luBody{display:flex;flex-direction:column;gap:18px}
+.lu-sec h3{margin:0 0 6px;font:700 16px var(--f-display);display:flex;align-items:center;gap:8px}
+.lu-sec h3::before{content:"";width:9px;height:9px;border-radius:2px;background:var(--kb-yellow);flex:none}
+.lu-sec h3 small{font-size:12.5px;font-weight:500;color:var(--muted)}
+
+/* PC: 한 줄 = 펀드 하나(누르면 펼침) */
+.lu-hd,.lu-f>summary{display:grid;grid-template-columns:32px minmax(220px,2.3fr) minmax(90px,1fr) minmax(100px,1.1fr) 84px minmax(170px,2.1fr) 66px;gap:10px;align-items:start}
+.lu-hd{padding:7px 12px;font-size:11.5px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--line)}
+.lu-f{border-bottom:1px solid var(--line);background:var(--panel)}
+.lu-f:first-of-type{border-top:0}
+.lu-f>summary{list-style:none;cursor:pointer;padding:10px 12px;font-size:13.5px;line-height:1.5}
+.lu-f>summary::-webkit-details-marker{display:none}
+.lu-f>summary:hover{background:var(--soft)}
+.lu-f[open]>summary{background:var(--sel)}
+.lu-f>summary:focus-visible{outline:2px solid var(--kb-yellow);outline-offset:-2px}
+.lu-no{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12.5px;padding-top:1px}
+.lu-nm{display:flex;flex-direction:column;gap:1px;min-width:0}
+.lu-nm b{font-weight:700;word-break:keep-all;overflow-wrap:anywhere}
+.lu-nm em{font-style:normal;font-size:12px;color:var(--muted)}
+.lu-nm small{font-size:12px;color:var(--muted)}
+.lu-sz,.lu-rt,.lu-tl{min-width:0;word-break:keep-all;overflow-wrap:anywhere}
+.lu-tl{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.lu-f[open] .lu-tl{-webkit-line-clamp:unset;display:block}
+.lu-sz i,.lu-rt i,.lu-tl i{display:none}
+.lu-lm{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lu-pill{font-style:normal;font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px;white-space:nowrap;display:inline-block;background:var(--s-no-bg);color:var(--s-no)}
+.lu-pill.s-go{background:var(--s-go-bg);color:var(--s-go)}
+.lu-pill.s-done{background:var(--s-done-bg);color:var(--s-done)}
+.lu-pill.s-watch{background:var(--s-watch-bg);color:var(--s-watch)}
+.lu-na{color:var(--muted)}
+.lu-d{display:grid;grid-template-columns:120px minmax(0,1fr);gap:7px 14px;margin:0;padding:6px 14px 14px 54px;font-size:13.5px;line-height:1.6;background:var(--sel)}
+.lu-d dt{font-weight:700;color:var(--muted);font-size:12.5px;padding-top:1px}
+.lu-d dd{margin:0;white-space:pre-line;word-break:keep-all;overflow-wrap:anywhere}
+#luBody mark{background:var(--kb-yellow);color:#2A2621;border-radius:2px;padding:0 1px}
+
+/* 휴대폰: 카드 */
+@media (max-width:760px){
+  .lu-head h2{font-size:19px}
+  .lu-tools input{flex:1 1 100%}
+  .lu-tools select{flex:1 1 auto;min-height:40px}
+  .lu-tools .qbtn{min-height:40px}
+  .lu-seg button{padding:8px 13px;min-height:38px}
+  .lu-hd{display:none}
+  .lu-f{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden}
+  .lu-f>summary{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;grid-template-areas:"nm nm st" "sz rt rt" "tl tl tl";gap:6px 10px;padding:12px 13px}
+  .lu-no,.lu-lm{display:none}
+  .lu-nm{grid-area:nm}.lu-st{grid-area:st;justify-self:end}.lu-sz{grid-area:sz}.lu-rt{grid-area:rt}.lu-tl{grid-area:tl}
+  .lu-nm b{font-size:14.5px}
+  .lu-sz i,.lu-rt i,.lu-tl i{display:block;font-style:normal;font-size:11px;color:var(--muted);font-weight:600}
+  .lu-tl{-webkit-line-clamp:4}
+  .lu-d{grid-template-columns:minmax(0,1fr);gap:2px;padding:4px 13px 14px}
+  .lu-d dt{margin-top:8px}
+}

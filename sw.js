@@ -14,6 +14,8 @@ const SHELL = [
   './research.js',
   './reports.css',
   './reports.js',
+  './lineup.css',
+  './lineup.js',
   './data.enc.json',
   './manifest.webmanifest',
   './icons/icon-192.png',
@@ -21,8 +23,8 @@ const SHELL = [
   './icons/maskable-512.png',
   './icons/apple-touch-icon.png',
 ];
-// 없어도 설치는 되는 파일(대시보드·리서치·운용보고서 암호문 — 아직 안 올라왔을 수 있음)
-const OPTIONAL = ['./dash.enc.json', './research.enc.json', './reports.enc.json'];
+// 없어도 설치는 되는 파일(대시보드·리서치·운용보고서·라인업 암호문 — 아직 안 올라왔을 수 있음)
+const OPTIONAL = ['./dash.enc.json', './research.enc.json', './reports.enc.json', './lineup.enc.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

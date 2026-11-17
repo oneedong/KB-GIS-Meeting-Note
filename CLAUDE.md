@@ -5,12 +5,12 @@
 **DB는 2026년 미팅만 담는다(사용자 요청).** 2026-11-02 카톡 원문(2025-11-28~2026-10-27)으로 기존 미팅 223건에 `raw`(원문)를
 붙였다(정리본은 그대로, `legacyBody`). 2025-12 원문은 넣지 않는다. 아티팩트에서 직접 입력한 4건(10/20·21·28·29)은 카톡 원문이 없다.
 카톡 직급 약어: TJ=팀장, BJ=부장, CJ=차장, GJ=과장(검색 `SYN`에도 있음).
-앱 탭(2026-11-16 순서): 미팅노트·대시보드(엑셀 대시보드, `dash.enc.json`)·기관·인물·조직도·전략 수요판·리서치(구독 리포트 정리, `research.enc.json`)·운용보고서(LP 관점 운용보고서 분석, `reports.enc.json`).
+앱 탭(2026-11-16 순서): 미팅노트·대시보드(엑셀 대시보드, `dash.enc.json`)·기관·인물·조직도·전략 수요판·리서치(구독 리포트 정리, `research.enc.json`)·운용보고서(LP 관점 운용보고서 분석, `reports.enc.json`)·라인업(해외대체 펀드 라인업 엑셀, `lineup.enc.json` — 2026-11-17 추가, 사용자 요청).
 자매 앱: KB GIS Market(`oneedong/KB-GIS-App`).
 
 ## 절대 규칙
 - 평문 데이터(복호화한 data.json, patch.json, 사용자가 준 미팅노트 원문 txt 등)는 저장소 밖(스크래치패드)에만 두고 커밋하지 않는다.
-  저장소에 들어가는 데이터는 암호문 `data.enc.json`·`dash.enc.json`·`research.enc.json`·`reports.enc.json` 넷뿐. 커밋 전 `git status`로 확인.
+  저장소에 들어가는 데이터는 암호문 `data.enc.json`·`dash.enc.json`·`research.enc.json`·`reports.enc.json`·`lineup.enc.json` 다섯뿐. 커밋 전 `git status`로 확인.
   (`.gitignore`·CI 가 data/dash/patch/posts/research/reports .json·reports-src/·txt·eml·zip·엑셀·csv·pdf 를 막는다. 사용자가 준 리포트·운용보고서 PDF 도 평문이다)
 - 비밀번호를 파일·커밋·코드·로그·커밋 메시지에 남기지 않는다. 환경변수 `MEETING_DB_PASSWORD`로만 넘긴다
   (환경 설정에 있으면 그대로, 없으면 사용자에게 묻는다).
@@ -99,6 +99,13 @@
 - 화면은 `reports.js`·`reports.css`(지표 카드는 `Dash.blocks`). 통합 검색에 펀드·이슈자산(`Reports.open({fund}|{issue})`).
   맨 위 '펀드' 줄(2026-11-17, 사용자 요청: 각 펀드별로 보기): 전체 → 요약·이슈자산·비교표·공시·확인 / 펀드 하나 → 그 펀드 한 쪽(부실·Watchlist 줄·핵심 지표·바로가기·이전/다음).
   이슈자산 보기는 '펀드별' 묶음이 기본(수준순 전환, `kbnote-rpgrp`). 휴대폰 펀드 쪽은 `openDetail`(뒤로가기 → 들어온 보기). '부실' 칸(E.na)은 부실 여부를 한 줄로 답하게 쓴다(없으면 '없음 — 근거').
+
+## "라인업 업데이트해서 앱에 반영" (해외대체 펀드 라인업 엑셀)
+앱 '라인업' 탭(2026-11-17 추가, 사용자 요청: 'KB GIS App (DM)'에 라인업 반영) = 라인업 엑셀 메인 시트를 자산군·상태·검색·최근 수정으로 찾아보는 화면.
+형식·순서는 `docs/LINEUP.md`. 요점:
+- 엑셀부터 최신화(사용자 스킬 `kb-fund-lineup-update`, 펀드를 고치면 R열 최종 수정일도) → `python3 scripts/lineup_build.py <xlsx> <SP>/lineup.json`
+  → `node scripts/vault.mjs encrypt <SP>/lineup.json lineup.enc.json --salt-from data.enc.json` → 커밋(`lineup: 라인업 MM/DD 기준`, 펀드명·수치 쓰지 말 것) → push.
+- 셀 글자는 엑셀 그대로 — 앱에서 문구를 다듬지 않는다. 화면은 `lineup.js`·`lineup.css`(지표 카드는 `Dash.blocks`). 통합 검색에 펀드(`Lineup.open(no)` → 그 펀드를 펼침).
 
 ## 화면 수정
 - `app.js`/`app.css`는 아티팩트 페이지(lp_meeting_db.html) 원본에서 저장 기능·약어 사전을 뺀 것. KB 노랑·회색 토큰.

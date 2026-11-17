@@ -20,6 +20,8 @@ research.src.json
 reports.json
 reports.src.json
 reports-src/
+# 라인업: 펀드 라인업 엑셀에서 뽑은 평문 — 저장소에는 암호문 lineup.enc.json 만
+lineup.json
 *.pdf
 *.csv
 node_modules/

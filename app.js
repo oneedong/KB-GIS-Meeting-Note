@@ -52,13 +52,13 @@ function memoText(r){const {m,d}=md(r.date),att=parseAtt(r.attendees);
 // ── 탭 ──
 const tabY={};
 function setTab(t,push=true){if(t!==tab)tabY[tab]=scrollY;tab=t;document.querySelectorAll(".tab,.bnav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t?"true":"false"));
-  ["meetings","orgs","demand","people","dash","research","reports"].forEach(k=>$("#p-"+k).hidden=k!==t);document.body.classList.toggle("dashmode",t==="dash");document.body.classList.toggle("rpmode",t==="reports");
+  ["meetings","orgs","demand","people","dash","research","reports","lineup"].forEach(k=>$("#p-"+k).hidden=k!==t);document.body.classList.toggle("dashmode",t==="dash");document.body.classList.toggle("rpmode",t==="reports");
   if(push){try{history.replaceState(null,"","#"+t)}catch(e){}}
   renderTab();window.scrollTo({top:tabY[t]||0});fabSync()}   /* 다른 탭에 다녀와도 보던 자리 그대로 */
 document.querySelectorAll(".tab,.bnav button").forEach(b=>b.onclick=()=>{if(b.dataset.tab===tab){const sec=$("#p-"+tab);   /* 현재 탭을 다시 누르면: 상세 닫기 → 맨 위로 */
   if(isMob()&&sec&&sec.classList.contains("detail"))closeDetail();else{scrollTo({top:0,behavior:smooth()});const L=sec&&sec.querySelector(".list");if(L)L.scrollTo({top:0,behavior:smooth()})}return}setTab(b.dataset.tab)});
 mq.addEventListener?.("change",()=>{if(!isMob())document.querySelectorAll(".split.detail").forEach(s=>s.classList.remove("detail"));if(tab==="demand")renderDemand();fabSync()});
-function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,people:()=>{renderPList();renderPMain()},dash:()=>Dash.render(),research:()=>Research.render(),reports:()=>Reports.render()})[tab]()}
+function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,people:()=>{renderPList();renderPMain()},dash:()=>Dash.render(),research:()=>Research.render(),reports:()=>Reports.render(),lineup:()=>Lineup.render()})[tab]()}
 function gotoOrg(name){const o=orgOf(name);if(!o){toast("기관 프로필이 아직 없습니다. 기관 탭에서 추가하세요.");return}oSel=o.id;oMode="view";setTab("orgs");openDetail()}
 function gotoMeeting(id){mSel=id;mMode="view";setTab("meetings");if(isMob()){openDetail();return}setTimeout(()=>{const el=document.querySelector(`#mList [data-id="${CSS.escape(id)}"]`);if(el)el.scrollIntoView({block:"nearest"})},30)}
 function gotoPerson(id){const p=P.find(x=>x.id===id);if(!p)return;pSel=id;pMode="view";setTab("people");openDetail()}
@@ -458,13 +458,14 @@ function fillODash(o){const el=$("#oDash");if(!el)return;
 
 // ═════ 통합 검색(머리줄 돋보기 · Ctrl+K) — 미팅·기관·인물·대시보드·리서치·운용보고서를 한 번에 ═════
 // 검색어 넓히기(기관 약칭·한영 표기)는 각 탭 검색과 같다(terms). 결과를 누르면 그 탭의 해당 항목으로 간다.
-const GS={after:null,dz:null,rs:null,rp:null,dzSt:"",rsSt:"",rpSt:"",t:0};
+const GS={after:null,dz:null,rs:null,rp:null,lu:null,dzSt:"",rsSt:"",rpSt:"",luSt:"",t:0};
 function gsOpen(){const el=$("#gs"),i=$("#gsq");if(!el.hidden){i.focus();return}
   el.hidden=false;document.body.classList.add("gs-on");try{history.pushState({gs:1},"",location.hash)}catch(e){}
   i.focus();i.select();gsRun();
   if(!GS.dz){GS.dzSt="loading";Dash.data().then(D=>{GS.dz=D;GS.dzSt=D?"ready":"none";if(D&&!DZ)DZ=dzIndex(D);if(!el.hidden)gsRun()})}
   if(!GS.rs){GS.rsSt="loading";Research.data().then(R=>{GS.rs=R;GS.rsSt=R?"ready":"none";if(!el.hidden)gsRun()})}
-  if(!GS.rp){GS.rpSt="loading";Reports.data().then(R=>{GS.rp=R;GS.rpSt=R?"ready":"none";if(!el.hidden)gsRun()})}}
+  if(!GS.rp){GS.rpSt="loading";Reports.data().then(R=>{GS.rp=R;GS.rpSt=R?"ready":"none";if(!el.hidden)gsRun()})}
+  if(!GS.lu){GS.luSt="loading";Lineup.data().then(R=>{GS.lu=R;GS.luSt=R?"ready":"none";if(!el.hidden)gsRun()})}}
 function gsHide(){$("#gs").hidden=true;document.body.classList.remove("gs-on")}
 function gsClose(fromPop){if($("#gs").hidden)return;gsHide();if(!fromPop&&history.state&&history.state.gs){try{history.back()}catch(e){}}}
 // 결과를 누르면: 검색 창의 기록을 먼저 되돌린 뒤 이동(휴대폰 뒤로가기가 꼬이지 않게)
@@ -488,15 +489,21 @@ function gsReports(T,q){const out=[];if(!GS.rp)return out;
   Reports.groups().forEach(g=>{const lines=g.entries.flatMap(x=>[x.summary,...(x.metrics||[]),...(x.type||[]),x.gp,x.question]).filter(Boolean).map(String);
     if(!hits([g.name,...g.funds,...lines].join(" ").toLowerCase(),T))return;const hit=lines.find(l=>firstHit(l,q));out.push({k:"i",key:g.key,t:g.name,f:g.funds,lv:g.level,s:hit?snippet(hit,q):esc(g.entries[0].summary||"")})});
   return out}
+// 라인업: 펀드명·운용사·전략·지역·일정·비고 등 셀 글자 전체. 누르면 라인업 탭에서 그 펀드를 펼친다
+function gsLineup(T,q){const out=[];if(!GS.lu)return out;
+  GS.lu.funds.forEach(f=>{const lines=[f.fund,f.note,f.gp,f.strategy,f.target,f.geo,f.size,f.ret,f.timeline,f.overview,f.details,f.track].filter(x=>x&&x!=="-").map(String);
+    if(!hits([...lines,f.ac,f.type,f.structure,f.status].join(" ").toLowerCase(),T))return;const hit=lines.slice(2).find(l=>firstHit(l,q));
+    out.push({no:f.no,t:f.fund,st:f.status,s:hit?snippet(hit,q):esc([f.gp,f.ac,f.strategy].filter(x=>x&&x!=="-").join(" · "))})});
+  return out.sort((a,b)=>(hits(b.t.toLowerCase(),T)?1:0)-(hits(a.t.toLowerCase(),T)?1:0))}   /* 펀드명에 맞은 것 먼저 */
 function gsRun(){const raw=$("#gsq").value,q=raw.trim().toLowerCase(),B=$("#gsBody");
-  if(!q){B.innerHTML=`<div class="gs-hint"><b>미팅노트·기관·인물·대시보드·리서치·운용보고서를 한 번에 찾습니다.</b><span>기관 약칭(예: 교공)이나 GP 이름을 한글·영문 어느 쪽으로 써도 찾습니다. 여러 단어는 모두 들어 있는 것만.</span></div>`;return}
+  if(!q){B.innerHTML=`<div class="gs-hint"><b>미팅노트·기관·인물·대시보드·리서치·운용보고서·라인업을 한 번에 찾습니다.</b><span>기관 약칭(예: 교공)이나 GP 이름을 한글·영문 어느 쪽으로 써도 찾습니다. 여러 단어는 모두 들어 있는 것만.</span></div>`;return}
   const T=terms(q),LIM=5;
   // 순서: 기관명·약칭이 검색어와 같거나 맞는 것 먼저(교공 → 교직원공제회 미팅·기관), 그다음 최근 순
   const orgHit=r=>{const o=orgOf(r.org);return hits([r.org,...(o?[o.name,...(o.aliases||[])]:[])].join(" ").toLowerCase(),T)?1:0};
   const oScore=o=>{const ns=[o.name,...(o.aliases||[])].map(x=>x.toLowerCase());return ns.includes(q)?2:hits(ns.join(" "),T)?1:0};
   const ms=M.filter(r=>hits(hayM(r),T)).sort((a,b)=>orgHit(b)-orgHit(a)||(b.date||"").localeCompare(a.date||""));
   const os=O.filter(o=>hits(hayO(o),T)).sort((a,b)=>oScore(b)-oScore(a)||(lastMeet(b)||"").localeCompare(lastMeet(a)||""));
-  const ps=P.filter(p=>hits(hayP(p),T)).sort((a,b)=>(hits(a.name.toLowerCase(),T)?0:1)-(hits(b.name.toLowerCase(),T)?0:1)),dz=gsDash(T),rs=gsResearch(T,q),rp=gsReports(T,q);
+  const ps=P.filter(p=>hits(hayP(p),T)).sort((a,b)=>(hits(a.name.toLowerCase(),T)?0:1)-(hits(b.name.toLowerCase(),T)?0:1)),dz=gsDash(T),rs=gsResearch(T,q),rp=gsReports(T,q),lu=gsLineup(T,q);
   const grp=(name,n,body,all)=>`<section class="gs-g"><div class="gs-gh"><b>${name}</b><span>${n}</span>${all||""}</div>${body}</section>`;
   let h="";
   if(ms.length)h+=grp("미팅노트",`${ms.length}건`,ms.slice(0,LIM).map(r=>`<button type="button" class="gs-it" data-gm="${esc(r.id)}"><span class="gs-d">${esc(r.date.slice(5).replace("-","/"))}</span><span class="gs-m"><b>${hl(esc(r.org),q)}${r.dept?` <small>${hl(esc(r.dept),q)}</small>`:""}</b><small>${preview(r,q)}</small></span></button>`).join(""),
@@ -511,6 +518,8 @@ function gsRun(){const raw=$("#gsq").value,q=raw.trim().toLowerCase(),B=$("#gsBo
   else if(GS.rsSt==="loading")h+=grp("리서치","",`<p class="gs-wait">리서치 여는 중…</p>`);
   if(rp.length)h+=grp("운용보고서",`${rp.length}건`,rp.slice(0,8).map((x,i)=>`<button type="button" class="gs-it" data-grp="${i}"><span class="gs-m"><b>${x.k==="i"?`<span class="rp-lv rp-lv--${esc(x.lv)}">${({high:"높음",mid:"중간",low:"참고"})[x.lv]||""}</span> `:""}${hl(esc(x.t),q)}${x.k==="i"?` <small>${esc(x.f.join(", "))}</small>`:" <small>펀드</small>"}</b><small>${x.s}</small></span></button>`).join(""));
   else if(GS.rpSt==="loading")h+=grp("운용보고서","",`<p class="gs-wait">운용보고서 여는 중…</p>`);
+  if(lu.length)h+=grp("라인업",`${lu.length}개 펀드`,lu.slice(0,8).map(x=>`<button type="button" class="gs-it" data-glu="${x.no}"><span class="gs-m"><b>${hl(esc(x.t),q)}${x.st&&x.st!=="-"?` <small>${esc(x.st)}</small>`:""}</b><small>${x.s}</small></span></button>`).join(""));
+  else if(GS.luSt==="loading")h+=grp("라인업","",`<p class="gs-wait">라인업 여는 중…</p>`);
   B.innerHTML=h||`<div class="empty">‘${esc(raw.trim())}’ — 찾은 항목이 없습니다.</div>`;
   B.querySelectorAll("[data-gm]").forEach(b=>b.onclick=()=>gsGo(()=>{mResetFilters();$("#mq").value=raw.trim();renderMList();gotoMeeting(b.dataset.gm)}));
   B.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>gsGo(()=>{oSel=b.dataset.go;oMode="view";setTab("orgs");openDetail()}));
@@ -518,6 +527,7 @@ function gsRun(){const raw=$("#gsq").value,q=raw.trim().toLowerCase(),B=$("#gsBo
   B.querySelectorAll("[data-gd]").forEach(b=>b.onclick=()=>{const x=dz[+b.dataset.gd];gsGo(()=>{Dash.open(x.s.name,x.q);setTab("dash")})});
   B.querySelectorAll("[data-gr]").forEach(b=>b.onclick=()=>gsGo(()=>{Research.open(b.dataset.gr);setTab("research")}));
   B.querySelectorAll("[data-grp]").forEach(b=>b.onclick=()=>{const x=rp[+b.dataset.grp];gsGo(()=>{Reports.open(x.k==="f"?{fund:x.id}:{issue:x.key});setTab("reports")})});
+  B.querySelectorAll("[data-glu]").forEach(b=>b.onclick=()=>gsGo(()=>{Lineup.open(b.dataset.glu);setTab("lineup")}));
   B.querySelectorAll("[data-gall]").forEach(b=>b.onclick=()=>gsGo(()=>{const k=b.dataset.gall,v=raw.trim();
     if(k==="m"){mResetFilters();$("#mq").value=v;mSel=ms[0].id;setTab("meetings")}
     else if(k==="o"){oStarOnly=false;$("#oType").value="";$("#oq").value=v;oSel=null;setTab("orgs")}
@@ -538,7 +548,7 @@ async function copy(t){try{await navigator.clipboard.writeText(t);toast("메모 
 // ── 초기화 ──
 const h=(location.hash||"").replace("#","");if(["meetings","orgs","demand","people"].includes(h))setTab(h,false);else renderTab();
 fabSync();
-addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");if(t!==tab&&["meetings","orgs","demand","people","dash","research","reports"].includes(t))setTab(t,false)});
+addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");if(t!==tab&&["meetings","orgs","demand","people","dash","research","reports","lineup"].includes(t))setTab(t,false)});
 // 암호화된 DB(data.enc.json)를 풀어서 읽기 전용으로 보여준다. 미팅 추가·수정은 Claude에 미팅노트 텍스트를 주면
 // data.enc.json 을 갱신해 다시 배포한다(CLAUDE.md).
 ["#mNew","#oNew","#pNew"].forEach(s=>$(s).hidden=true);fabSync();

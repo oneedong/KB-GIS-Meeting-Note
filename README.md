@@ -6,7 +6,7 @@
 - 앱 주소: **https://oneedong.github.io/KB-GIS-Meeting-Note/**
 - 설치 링크(공유용): **https://oneedong.github.io/KB-GIS-Meeting-Note/install.html** — 아이폰·안드로이드·PC·카카오톡을 알아서 구분해 설치 방법을 보여주고, PC에서는 QR 코드를 띄운다
 - 안드로이드 APK: **https://github.com/oneedong/KB-GIS-Meeting-Note/releases/download/android/KB-GIS-Meeting-Note.apk**
-- 화면: 미팅노트 · 기관 · 전략 수요판 · 인물/조직도 (읽기 전용)
+- 화면: 미팅노트 · 대시보드 · 기관 · 인물/조직도 · 전략 수요판 · 리서치 · 운용보고서 · 라인업 (읽기 전용)
 - 업데이트: Claude에게 미팅노트 txt 파일이나 텍스트를 주고 "미팅노트 업데이트해줘" → DB에 반영해 다시 배포
 
 ## 데이터 보호
@@ -63,5 +63,7 @@ git add data.enc.json && git commit -m "data: 미팅노트 갱신" && git push
 | `scripts/upsert.mjs` | 새 미팅·인물·기관 레코드 넣기/고치기(원문 대조 검사 포함) |
 | `scripts/kakao.mjs` | 카톡 대화 내보내기 → 게시물(이어 보낸 메시지 묶음), 이미 DB에 있는 원문 표시 |
 | `docs/CONVERT.md` | 미팅노트 텍스트 → 레코드 변환 규칙 |
+| `lineup.js` · `lineup.css` · `lineup.enc.json` | 라인업 탭(해외대체 펀드 라인업, 암호문) |
+| `scripts/lineup_build.py` · `docs/LINEUP.md` | 라인업 엑셀 → 앱 데이터, 갱신 순서 |
 | `scripts/gen-icons.mjs` | 앱 아이콘(KB GIS Market / KB GIS 한 쌍) 생성 |
 | `tests/smoke.mjs` | 가상 데이터(`tests/fixture.json`)로 브라우저 점검 — 실제 데이터·비밀번호는 쓰지 않음 |

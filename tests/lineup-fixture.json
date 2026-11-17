@@ -1,0 +1,12 @@
+{
+ "kind": "lineup", "v": 1, "generatedAt": "2026-11-17 09:00", "asof": "2026-11-17",
+ "title": "[가상] Fund Line-up", "source": "가상_라인업.xlsx",
+ "acs": ["Private Credit", "Infrastructure"],
+ "notice": ["※ 테스트용 가상 데이터입니다.", "※ '-' 표기는 미공개 또는 확인되지 않은 항목입니다."],
+ "funds": [
+  {"no": 1, "fund": "가상 Direct Lending Fund I", "gp": "가상 운용사 A", "ac": "Private Credit", "type": "Debt", "strategy": "Direct Lending", "target": "Mid-Market", "geo": "북미", "structure": "Closed-end", "size": "$1bn", "ret": "Net IRR 10%", "status": "모집 중", "timeline": "1st close '26.06 / Final close '27.03 예정", "overview": "가상 선순위 대출 펀드", "details": "-", "track": "가상 1호 Net IRR 9%", "lastmod": "'26.11.17", "lm": "2026-11-17"},
+  {"no": 2, "fund": "가상 Evergreen Credit", "note": "※ 가상 Feeder 포함", "gp": "가상 운용사 B", "ac": "Private Credit", "type": "Debt", "strategy": "Multi-strategy", "target": "-", "geo": "글로벌", "structure": "Evergreen", "size": "-", "ret": "-", "status": "상시 모집", "timeline": "-", "overview": "가상 상시 모집 펀드", "details": "분기 환매", "track": "-", "lastmod": "'26.11.16", "lm": "2026-11-16"},
+  {"no": 3, "fund": "가상 Senior Loan Fund II", "gp": "가상 운용사 C", "ac": "Private Credit", "type": "Debt", "strategy": "Senior Secured", "target": "-", "geo": "유럽", "structure": "Closed-end", "size": "€2bn", "ret": "-", "status": "모집 완료", "timeline": "Final close '26.04", "overview": "가상 유럽 대출 펀드", "details": "-", "track": "-", "lastmod": "'26.10.26", "lm": "2026-10-26"},
+  {"no": 4, "fund": "가상 Core Fund", "gp": "가상 운용사 D", "ac": "Infrastructure", "type": "Equity", "strategy": "Core", "target": "Utilities", "geo": "OECD", "structure": "Open-end", "size": "-", "ret": "Net 8~10%", "status": "모집 중", "timeline": "-", "overview": "가상 인프라 코어 펀드", "details": "-", "track": "-", "lastmod": "'26.10.14", "lm": "2026-10-14"}
+ ]
+}
