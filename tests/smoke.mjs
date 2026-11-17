@@ -111,6 +111,36 @@ ok('CSP 해시 맞음', (() => { try { execFileSync(process.execPath, [join(ROOT
     && fs['수수료(USD)'] === 'usd2' && fs['총약정금액'] === 'amt2' && fs['Fee(bp)'] === 'm2' && fs['약정 건수'] === 'n0' && fs['수익(원)'] === 'won' && fs['KRW 기준'] === 'n0');
 }
 
+// 기관별 약정금액·수수료는 항상 보이게(가상 데이터): 약정내역(2022~) '전체'에 총약정금액·수수료 합계, 기관별 약정 행·묶음 머리·약정 현황 기관별 표에 수수료
+{
+  const f = join(ROOT, 'tests', '_fees.json');
+  const amt = (k, l, f2 = 'amt') => ({ k, l, f: f2 });
+  writeFileSync(f, JSON.stringify({ fx: { usd: 1000 }, sheets: [
+    { name: '약정 통계', group: 'x', short: 'x', view: [{ t: 'table', id: 's5', title: '기관별 (2010~현재)', cols: [{ k: 'B', l: '기관명', f: 'text' }, { k: 'H', l: 'USD 환산', f: 'n2' }],
+      rows: [{ c: { B: '가상기관', H: 30 } }, { c: { B: '가상증권', H: 5 } }], card: { title: 'B', amt: 'H', meta: [] } }] },
+    { name: '기관별 약정(2010~현재)', group: 'x', short: 'x', view: [{ t: 'table', id: 'og', title: '기관별 약정 목록', cols: [{ k: 'ab', l: '펀드(약칭)', f: 'text' }, { k: 'gp', l: '운용사', f: 'text' }, amt('am', '총약정금액'), { k: 'us', l: 'USD 환산', f: 'usd' }],
+      secs: [{ h: '1. 가상기관', s: '2건 · USD 30.00M', rows: [{ c: { ab: 'F1', gp: 'G1', am: 20e6, us: 20e6 } }, { c: { ab: 'F2', gp: 'G2', am: 10e6, us: 10e6 } }] },
+             { h: '2. 가상증권', s: '1건 · USD 5.00M', rows: [{ c: { ab: 'F1', gp: 'G1', am: 5e6, us: 5e6 } }] }], foot: [{ l: '합계', c: { us: 35e6 } }], card: { title: 'ab', amt: 'us', meta: [] } }] },
+    { name: '약정내역(2022~현재)', group: 'x', short: 'x', view: [{ t: 'table', id: 'cm', title: '기관별 약정내역', cols: [{ k: 'ab', l: '펀드(약칭)', f: 'text' }, { k: 'lp', l: '기관명', f: 'text' }, { k: 'gp', l: '운용사', f: 'text' },
+        { k: 'cy', l: '통화', f: 'tag', d: 1 }, { k: 'am', l: '총약정금액', f: 'amt', ck: 'cy', d: 1 }, { k: 'st', l: '상태', f: 'tag' },
+        { k: 'u2026', l: '2026 USD 환산', f: 'usd' }, { k: 'f2026', l: '2026 수수료(USD)', f: 'usd' }, { k: 'u2025', l: '2025 USD 환산', f: 'usd' }, { k: 'f2025', l: '2025 수수료(USD)', f: 'usd' }],
+      rows: [{ c: { ab: 'F1', lp: '가상기관(가상계정)', gp: 'G1', cy: 'USD', am: 20e6, f2025: 1000, f2026: 500 } }, { c: { ab: 'F2', lp: '가상기관', gp: 'G2', cy: 'USD', am: 10e6 } },
+             { c: { ab: 'F1', lp: '가상증권 PI', gp: 'G1', cy: 'USD', am: 5e6, f2026: 200 } }, { c: { ab: 'F9', lp: '가상기관', gp: 'G9', cy: 'USD', am: 1e6, f2026: 50 } }],
+      foot: [{ l: '합계', c: { f2025: 1000, f2026: 750 } }],
+      pick: { l: '연도', opts: ['전체', '2026', '2025'], def: '전체', cols: { '전체': [], 2026: ['u2026', 'f2026'], 2025: ['u2025', 'f2025'] } }, card: { title: 'ab', amt: '@u', meta: ['@f'] } }] },
+  ] }));
+  execFileSync('python3', [join(ROOT, 'scripts/dash_curate.py'), f], { stdio: 'pipe' });
+  execFileSync('python3', [join(ROOT, 'scripts/dash_curate.py'), f], { stdio: 'pipe' });   // 두 번 돌려도 같게
+  const c = JSON.parse(readFileSync(f, 'utf8')), T = (re) => c.sheets.find((x) => re.test(x.name)).view[0];
+  const cm = T(/^약정내역/), og = T(/^기관별 약정/), s5 = T(/^약정 통계/), cmc = cm.cols.map((x) => x.k);
+  ok('약정내역(2022~) 전체에 총약정금액·수수료 합계', !cm.cols.find((x) => x.k === 'am').d && cmc.indexOf('ft') === cmc.indexOf('am') + 1 && cm.pick.cols['전체'].join() === 'ft'
+    && cm.rows.map((r) => r.c.ft).join() === '1500,0,200,50' && cm.foot[0].c.ft === 1750);
+  const ogr = og.secs.map((x) => x.rows.map((r) => r.c.fe).join('/')).join(';');
+  ok('기관별 약정: 행마다 수수료(괄호·부서 꼬리 표기 맞춤), 묶음 머리 합계', ogr === '1500/0;200' && og.secs[0].s === '2건 · USD 30.00M · 수수료 USD 1,500.00'
+    && og.foot[0].c.fe === 1700 && og.card.meta.includes('fe') && (og.notes || []).some((n) => n.includes('USD 50.00')));
+  ok('약정 현황 기관별 표에 수수료 합계', s5.rows.map((r) => r.c.FE).join() === '1550,200' && s5.cols.map((x) => x.k).join() === 'B,H,FE');
+}
+
 const browser = await chromium.launch();
 for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', width: 1280, height: 860 }]) {
   console.log(`— ${vp.name} ${vp.width}×${vp.height}`);

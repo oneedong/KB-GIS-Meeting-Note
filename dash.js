@@ -207,7 +207,7 @@ const Dash = (() => {
   const CU = { M: 1e6, K: 1e3, 1: 1 };
   const krw = (v, cu) => {
     const r = D && D.fx && D.fx.usd;
-    if (!r || typeof v !== "number" || !CU[cu]) return "";
+    if (!r || typeof v !== "number" || !v || !CU[cu]) return "";     // 0('-')에는 억원을 붙이지 않는다
     return num(v * CU[cu] * r / 1e8, 2) + "억";        // 금액은 소수점 둘째 자리까지
   };
   function fmt(v, f, row, unit) {

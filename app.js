@@ -418,13 +418,15 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-sk]");if(!
 // 표기가 달라 안 붙는 기관은 DB 기관의 약칭(aliases)에 대시보드 표기를 더한다 — 공개 코드에 기관명을 두지 않는다.
 const nk=s=>String(s??"").toLowerCase().replace(/\s+/g,"");
 function nameKeys(s){s=String(s??"").trim();const k=[nk(s)],m=/^(.+?)\s*\(([^)]+)\)$/.exec(s);if(m)k.push(nk(m[1]),nk(m[2]));return k.filter(Boolean)}
+// 약정내역의 기관 표기는 부서·계정 꼬리도 뗀다('KB증권 PI' → KB증권, '삼성증권PI' → 삼성증권, 3글자 이상) — scripts/dash_curate.py _keys_lp 와 같은 규칙
+function lpKeys(s){const k=nameKeys(s),t=String(s??"").trim();[t.split(/\s+/)[0]||"",t.replace(/[A-Z]{2,}$/,"")].forEach(y=>{const v=nk(y);if(v.length>=3&&!k.includes(v))k.push(v)});return k}
 function orgKeys(o){const k=new Set();[o.name,...(o.aliases||[])].forEach(n=>nameKeys(n).forEach(x=>k.add(x)));return k}
 const n2=(v,d=2)=>Number(v||0).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 let DZ=null;
 function dzTable(D,id){let f=null;D.sheets.forEach(s=>Dash.walk(s.view||[],b=>{if(!f&&b.t==="table"&&b.id===id)f={s,b}}));return f}
 function dzIndex(D){const og=dzTable(D,"og"),cm=dzTable(D,"cm"),com=[],fee=[],fy=[];
   if(og)(og.b.secs||[]).forEach(sec=>{const lbl=String(sec.h||"").replace(/^\d+\.\s*/,"");sec.rows.forEach(r=>com.push({lbl,k:nameKeys(lbl),c:r.c}))});
-  if(cm){cm.b.cols.forEach(c=>{const m=/^f(\d{4})$/.exec(c.k);if(m)fy.push(m[1])});(cm.b.rows||[]).forEach(r=>fee.push({lbl:String(r.c.lp??""),k:nameKeys(r.c.lp),c:r.c}))}
+  if(cm){cm.b.cols.forEach(c=>{const m=/^f(\d{4})$/.exec(c.k);if(m)fy.push(m[1])});(cm.b.rows||[]).forEach(r=>fee.push({lbl:String(r.c.lp??""),k:lpKeys(r.c.lp),c:r.c}))}
   return {asof:D.asof,usd:(D.fx||{}).usd||0,com,fee,fy:fy.sort().reverse(),og:og&&og.s.name,cm:cm&&cm.s.name}}
 function dzOf(o){if(!DZ)return null;const K=orgKeys(o),gp=o.type==="GP",mine=x=>gp?K.has(nk(x.c.gp)):x.k.some(k=>K.has(k));
   const com=DZ.com.filter(mine),fee=DZ.fee.filter(mine);if(!com.length&&!fee.length)return null;

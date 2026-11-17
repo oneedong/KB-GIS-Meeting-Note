@@ -260,6 +260,101 @@ def _money_decimals(d):
                 b["f"] = _f2(b["f"], bool(b.get("cu")) or bool(re.match(r"(USD|억원|조원)", b.get("sub") or "")))
 
 
+# ── 기관별 약정금액·수수료는 항상 보이게(사용자 요청 2026-11-17) ─────────────────
+# '약정내역(2022~)'(표 cm): '전체'에서도 총약정금액과 수수료 합계(2022~, 연도별 f{YYYY} 합)를 보인다(연도를 고르면 그 해 USD 환산·수수료·수수료율).
+# '기관별 약정'(표 og): 약정 행마다 수수료 합계(cm 의 같은 펀드·운용사·기관 표기 행을 더함), 기관 묶음 머리에 약정·수수료 합계.
+# '약정 현황'의 기관별 표: 기관마다 수수료 합계 열. '약정내역(2010~21)'(표 hi): 보수 조건을 펼치지 않아도 보이게.
+# 기관 표기는 괄호 밖·안을 각각 맞춘다(KPOST ↔ KPOST(보험과)) — 앱 기관 상세(app.js dzOf)와 같은 규칙. 두 번 돌려도 같다.
+FEE_L = "수수료 합계(USD, 2022~)"
+
+def _nk(x): return re.sub(r"\s+", "", str(x if x is not None else "")).lower()
+def _keys(x):
+    x = str(x if x is not None else "").strip(); k = [_nk(x)]
+    m = re.match(r"^(.+?)\s*\(([^)]+)\)$", x)
+    if m: k += [_nk(m.group(1)), _nk(m.group(2))]
+    return {y for y in k if y}
+
+def _keys_lp(x):
+    """약정내역의 기관 표기: 괄호 밖·안 + 부서·계정 꼬리를 뗀 이름('KB증권 PI' → KB증권, '삼성증권PI' → 삼성증권, 3글자 이상만)."""
+    k = _keys(x); x = str(x if x is not None else "").strip()
+    for y in (x.split()[0] if x.split() else "", re.sub(r"[A-Z]{2,}$", "", x)):
+        if len(_nk(y)) >= 3: k.add(_nk(y))
+    return k
+
+def _table(d, tid=None, title=None, sheet=None):
+    for s in d["sheets"]:
+        if sheet and not re.search(sheet, s["name"]): continue
+        for b in _walk(s.get("view") or []):
+            if b.get("t") == "table" and (tid is None or b.get("id") == tid) and (title is None or re.search(title, b.get("title") or "")): return b
+    return None
+
+def _add_col(b, col, after):
+    b["cols"] = [c for c in b["cols"] if c["k"] != col["k"]]
+    i = next((n + 1 for n, c in enumerate(b["cols"]) if c["k"] == after), len(b["cols"]))
+    b["cols"].insert(i, col)
+
+def _org_fees(d):
+    cm = _table(d, "cm")
+    if not cm: return
+    fy = [c["k"] for c in cm["cols"] if re.match(r"^f\d{4}$", c["k"])]
+    fee = lambda c: sum(v for v in (c.get(k) for k in fy) if isinstance(v, (int, float)))
+    for c in cm["cols"]:
+        if c["k"] == "am": c.pop("d", None)                               # 총약정금액(통화 함께)은 늘 보인다
+    for r in cm["rows"]:
+        r["c"]["ft"] = fee(r["c"])                                        # 없으면 0 → 앱에 '-'(빈칸 대신)
+    _add_col(cm, {"k": "ft", "l": FEE_L, "f": "usd", "sum": 1}, "am")
+    if cm.get("pick") and isinstance(cm["pick"].get("cols"), dict): cm["pick"]["cols"]["전체"] = ["ft"]
+    for f in cm.get("foot") or []:
+        f["c"].pop("ft", None); t = fee(f["c"])
+        if t: f["c"]["ft"] = t
+    cm["sub"] = "전체 = 총약정금액·수수료 합계(2022~) · 연도를 고르면 그 해 USD 환산·수수료·수수료율"
+    rows = [(r["c"], _keys(r["c"].get("lp")), fee(r["c"])) for r in cm["rows"]]
+    rows2 = [(x, _keys_lp(x.get("lp")), f) for x, _, f in rows]   # 바로 안 맞을 때만 쓰는 넓힌 표기
+
+    og = _table(d, "og")
+    if og:
+        used, tot = set(), 0
+        for sec in og.get("secs") or []:
+            lk = _keys(re.sub(r"^\d+\.\s*", "", str(sec.get("h") or "")))
+            st = 0
+            for r in sec["rows"]: r["c"]["fe"] = 0
+            for R in (rows, rows2):                                       # 같은 펀드·운용사에서 표기가 바로 맞는 것 먼저, 그다음 넓힌 표기
+                for r in sec["rows"]:
+                    c = r["c"]; v = 0
+                    for i, (x, k, f) in enumerate(R):
+                        if i in used or not f or _nk(x.get("ab")) != _nk(c.get("ab")) or _nk(x.get("gp")) != _nk(c.get("gp")) or not (k & lk): continue
+                        used.add(i); v += f
+                    if v: c["fe"] += v; st += v
+            tot += st
+            sv = re.sub(r" · 수수료 USD [\d,.]+(?: \(≈ [\d,.]+억\))?", "", str(sec.get("s") or ""))
+            sec["s"] = (sv + (f" · 수수료 USD {st:,.2f}" if st else "")).strip(" ·")
+        _add_col(og, {"k": "fe", "l": FEE_L, "f": "usd", "sum": 1}, "us")
+        for f in og.get("foot") or []:
+            f["c"].pop("fe", None)
+        if og.get("foot") and tot: og["foot"][0]["c"]["fe"] = tot
+        cd = og.get("card")
+        if cd and "fe" not in (cd.get("meta") or []): cd["meta"] = list(cd.get("meta") or []) + ["fe"]
+        miss = sum(f for i, (x, k, f) in enumerate(rows) if f and i not in used)
+        if miss: og["notes"] = [n for n in (og.get("notes") or []) if not n.startswith("수수료 합계는")] + [
+            f"수수료 합계는 약정내역(2022~)의 같은 펀드·운용사·기관 행을 더한 값. 약정 목록에 없는 건(진행·청구예정 등) 수수료 USD {miss:,.2f}는 약정내역(2022~)에서."]
+
+    st5 = _table(d, None, r"^기관별", r"^약정 통계")
+    if st5:
+        kc = st5["cols"][0]["k"]; ak = next((c["k"] for c in st5["cols"] if re.search(r"USD|환산", c.get("l", ""))), None)
+        for r in st5.get("rows") or []:
+            c = r["c"]; c.pop("FE", None); lk = _keys(c.get(kc))
+            v = sum(f for x, k, f in rows2 if f and (k & lk))
+            c["FE"] = v
+        _add_col(st5, {"k": "FE", "l": FEE_L, "f": "usd", "sum": 1}, ak or kc)
+        cd = st5.get("card")
+        if cd and "FE" not in (cd.get("meta") or []): cd["meta"] = list(cd.get("meta") or []) + ["FE"]
+
+    hi = _table(d, "hi")
+    if hi:
+        for c in hi["cols"]:
+            if c["k"] == "fe": c.pop("d", None)                           # 보수 조건(2010~21 은 금액 대신 조건 글)
+        if any(c["k"] == "fe" for c in hi["cols"]) and hi.get("card") and not hi["card"].get("wide"): hi["card"]["wide"] = "fe"   # 휴대폰 카드에도 한 줄 전체로
+
 def curate(d):
     """dash.json(dict)을 제자리에서 다듬는다. 두 번 돌려도 결과가 같다."""
     sheets = [s for s in d["sheets"] if not any(re.search(p, s["name"]) for p in HIDE)]
@@ -269,6 +364,7 @@ def curate(d):
             _sheet_rules(s)
     d["sheets"] = sheets
     _seed_by_approval(d)
+    _org_fees(d)
     _mark_krw(d)
     _money_decimals(d)
     ordered, used = [], set()
