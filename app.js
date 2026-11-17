@@ -195,17 +195,19 @@ function renderMMain(){const W=$("#mMain");if(mMode!=="view")return renderMForm(
     <h2>${o?`<button class="link" id="mOrg" type="button">${hl(esc(r.org),q)}</button>`:hl(esc(r.org),q)}${r.dept?` <span class="h-dept">${hl(esc(r.dept),q)}</span>`:""}</h2>
     <div class="chips">${inner?`<span class="chip flag">내부용 · 외부 공유 금지</span>`:""}${(r.assets||[]).map(t=>`<span class="chip asset">${esc(t)}</span>`).join("")}</div></div>
     <div class="actions">${starBtn("m",r.id)}<button class="btn" id="mCopy" type="button">메모 복사</button>${canWrite?`<button class="btn" id="mEdit" type="button">수정</button>`:""}</div></div>
-  <div class="body">
+  <div class="body mbody"><div class="mcol">
     ${r.raw?`<div class="seg" role="group" aria-label="보기"><button type="button" data-view="memo" aria-pressed="true">요약정리</button><button type="button" data-view="raw" aria-pressed="false">원문</button></div>`:""}
-    ${r.nextAction?`<div class="next"><span>다음 액션</span>${hl(esc(r.nextAction),q)}</div>`:""}
-    ${att.length?`<div class="attendees">${att.map(a=>`<div class="att"><b>${hl(esc(a.who),q)}</b><div>${a.note?hl(esc(a.note),q):"<span class='ro'>소개 없음</span>"}</div></div>`).join("")}</div>`:""}
     <div class="memo">${bodyHtml(r,q)}</div>
     ${r.raw?`<div class="raw" hidden>${r.rawShared?`<p class="legacy">여러 미팅을 한 메시지로 올린 원문입니다.</p>`:""}${rawHtml(r,q)}</div>`:""}
     ${r.truncated&&!secs.some(s=>s.b.includes(r.truncAt))?`<p class="cutline">✂ 원문이 잘린 노트입니다</p>`:""}
     ${cut}
+  </div><aside class="mside">
+    ${r.nextAction?`<div class="next"><span>다음 액션</span>${hl(esc(r.nextAction),q)}</div>`:""}
+    ${att.length?`<div class="attendees">${att.map(a=>`<div class="att"><b>${hl(esc(a.who),q)}</b><div>${a.note?hl(esc(a.note),q):"<span class='ro'>소개 없음</span>"}</div></div>`).join("")}</div>`:""}
     ${checks.length?`<div class="warnbox">${checks.map(esc).join(" · ")}</div>`:""}
     <div class="meta"><div><span>작성·당사 참석</span>${esc(r.kbAttendees)||"—"}</div><div><span>출처</span>${esc(r.source)||"직접 입력"}</div><div><span>최종 수정</span>${r.updatedAt?esc(r.updatedAt.slice(0,10)):"—"}</div>
       ${(r.tags||[]).length?`<div class="tags"><span>태그</span>${(r.tags||[]).map(t=>`<button type="button" class="chip tag" data-tag="${esc(t)}">#${esc(t)}</button>`).join("")}</div>`:""}</div>
+  </aside>
     ${newer||older?`<div class="pn">${nav(newer,"newer")}${nav(older,"older")}</div>`:""}
   </div>`;
   $("#mCopy").onclick=$("#mCopyM").onclick=()=>{const rv=W.querySelector(".raw");copy(rv&&!rv.hidden?rawText(r):memoText(r))};
@@ -272,15 +274,17 @@ function renderOMain(){const W=$("#oMain");if(oMode!=="view")return renderOForm(
   W.innerHTML=BACK+`<div class="head"><div class="t"><div class="eyebrow">${esc(o.type)}${(o.aliases||[]).length?" · 약칭 "+(o.aliases||[]).map(esc).join(", "):""}</div>
     <h2>${esc(o.name)}</h2><div class="sub2">미팅 ${ms.length}건${ms[0]?` · 최근 ${esc(ms[0].date)}`:""} · 인물 ${ps.length}명</div></div>
     <div class="actions">${starBtn("o",o.id)}${ps.length?`<button class="btn" id="oChart" type="button">조직도</button>`:""}${canWrite?`<button class="btn" id="oMeet" type="button">+ 미팅 추가</button>`:""}${canWrite?`<button class="btn" id="oEdit" type="button">수정</button>`:""}</div></div>
-  <div class="body">
-    ${o.summary?`<div class="sec"><h3>최신 스탠스</h3><p>${esc(o.summary)}</p></div>`:""}
-    <div class="kv">${[["선호·제약",o.prefs],["티켓",o.ticket],["심사·의사결정",o.process],["조직·인사",o.hr]].filter(x=>x[1]).map(([k,v])=>`<div><span>${k}</span>${esc(v)}</div>`).join("")}</div>
-    ${sig.length?`<div class="sec"><h3>전략 시그널</h3><div class="sigrows">${sig.map(([k,v])=>`<div class="sigrow"><b>${esc(k)}</b><span class="sg s-${esc(v.s)}">${esc(v.s)}</span><span>${esc(v.note)}</span><span class="d">${esc(v.date||"")}</span></div>`).join("")}</div></div>`:""}
-    <div id="oDash" class="sec dzorg" hidden></div>
-    ${ps.length?`<div class="sec"><h3>인물</h3><div class="pgrid">${ps.sort((a,b)=>(b.lastSeen||"").localeCompare(a.lastSeen||"")).slice(0,18).map(p=>`<button type="button" class="pcard" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b> ${esc(p.title||"")}<div class="sub2">${esc([p.dept,p.team].filter(Boolean).join(" · ")||p.note||"")}</div></button>`).join("")}</div>${ps.length>18?`<p class="basis">외 ${ps.length-18}명은 인물·조직도 탭에서 볼 수 있습니다.</p>`:""}</div>`:""}
-    <div class="sec"><h3>미팅 이력</h3>${ms.length?`<div class="timeline">${ms.map(m=>{const {secs,take}=parseBody(m.body);const first=(take.length?take.map(t=>"→ "+t):secs.flatMap(s=>s.b)).slice(0,2).join(" / ");
+  <div class="body obody"><div class="ocol">
+    ${o.summary?`<div class="sec o-st"><h3>최신 스탠스</h3><p>${esc(o.summary)}</p></div>`:""}
+    <div class="kv o-kv">${[["선호·제약",o.prefs],["티켓",o.ticket],["심사·의사결정",o.process],["조직·인사",o.hr]].filter(x=>x[1]).map(([k,v])=>`<div><span>${k}</span>${esc(v)}</div>`).join("")}</div>
+    ${sig.length?`<div class="sec o-sig"><h3>전략 시그널</h3><div class="sigrows">${sig.map(([k,v])=>`<div class="sigrow"><b>${esc(k)}</b><span class="sg s-${esc(v.s)}">${esc(v.s)}</span><span>${esc(v.note)}</span><span class="d">${esc(v.date||"")}</span></div>`).join("")}</div></div>`:""}
+    <div class="sec o-tl"><h3>미팅 이력</h3>${ms.length?`<div class="timeline">${ms.map(m=>{const {secs,take}=parseBody(m.body);const first=(take.length?take.map(t=>"→ "+t):secs.flatMap(s=>s.b)).slice(0,2).join(" / ");
       return `<button type="button" class="tl" data-mid="${esc(m.id)}"><span class="d">${esc(m.date)}</span><span style="min-width:0"><b>${esc(m.dept||m.category||"")}</b> ${esc(parseAtt(m.attendees).map(a=>a.who).join(", "))}${m.truncated?` <span class="chip cut">✂ 잘림</span>`:""}<span class="s">${esc(first)}</span>${m.nextAction?`<span class="s nx"><b>다음 액션</b> ${esc(m.nextAction)}</span>`:""}</span></button>`}).join("")}</div>`:`<p class="ro">기록된 미팅이 없습니다.</p>`}</div>
-    <p class="basis">${esc(o.basis||"")}${o.updatedAt?` · 최종 수정 ${esc(o.updatedAt.slice(0,10))}`:""}</p>
+  </div><aside class="oside">
+    <div id="oDash" class="sec dzorg" hidden></div>
+    ${ps.length?`<div class="sec o-ppl"><h3>인물</h3><div class="pgrid">${ps.sort((a,b)=>(b.lastSeen||"").localeCompare(a.lastSeen||"")).slice(0,18).map(p=>`<button type="button" class="pcard" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b> ${esc(p.title||"")}<div class="sub2">${esc([p.dept,p.team].filter(Boolean).join(" · ")||p.note||"")}</div></button>`).join("")}</div>${ps.length>18?`<p class="basis">외 ${ps.length-18}명은 인물·조직도 탭에서 볼 수 있습니다.</p>`:""}</div>`:""}
+  </aside>
+    <p class="basis o-bs">${esc(o.basis||"")}${o.updatedAt?` · 최종 수정 ${esc(o.updatedAt.slice(0,10))}`:""}</p>
   </div>`;
   W.querySelectorAll("[data-mid]").forEach(b=>b.onclick=()=>gotoMeeting(b.dataset.mid));
   W.querySelectorAll("[data-pid]").forEach(b=>b.onclick=()=>gotoPerson(b.dataset.pid));

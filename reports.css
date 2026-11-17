@@ -2,7 +2,7 @@
 :root{--r-high:#B83224;--r-high-bg:#FAE3E0;--r-mid:#B5590C;--r-mid-bg:#FCEBDA;--r-good:#2F7A4F;--r-on:#FFFFFF}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--r-high:#EE6B5E;--r-high-bg:#351E1B;--r-mid:#EF8A57;--r-mid-bg:#33221A;--r-good:#7CC79A;--r-on:#1B1915}}
 :root[data-theme="dark"]{--r-high:#EE6B5E;--r-high-bg:#351E1B;--r-mid:#EF8A57;--r-mid-bg:#33221A;--r-good:#7CC79A;--r-on:#1B1915}
-body.rpmode .page{max-width:1500px}
+body.rpmode .page{max-width:var(--page-max)}   /* 2026-11-17 PC 넓게: 공통 최대 폭 */
 
 #rpTop{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
 #rpTop:empty{display:none}
