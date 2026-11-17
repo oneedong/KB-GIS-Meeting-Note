@@ -320,7 +320,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('라인업 검색(여러 단어 모두 포함·표시)', (await page.locator('#luBody details.lu-f').count()) === 1 && (await page.locator('#luBody mark').count()) >= 1);
   await page.fill('#luq', '');
   await page.locator('#luNew').click();
-  ok('라인업: 최근 수정만(7일 안)', (await page.locator('#luBody details.lu-f').count()) === 2);
+  ok('라인업: 최근 수정만(6일 안)', (await page.locator('#luBody details.lu-f').count()) === 2);
   await page.locator('#luNew').click();
   await page.selectOption('#luSt', '모집 완료');
   ok('라인업: 상태 거르기', (await page.locator('#luBody details.lu-f').count()) === 1);

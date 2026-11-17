@@ -39,11 +39,11 @@ const Lineup = (() => {
   function render() { if (!D && state !== "loading" && state !== "error") ensure(); paint(); }
 
   const dot = (iso) => (iso ? iso.replace(/-/g, ".") : "");
-  // 최근 수정 = 가장 최근 수정일에서 7일 안에 고친 펀드(이번 업데이트에서 바뀐 펀드)
+  // 최근 수정 = 가장 최근 수정일과 같은 주(6일 안)에 고친 펀드 — 이번 업데이트에서 바뀐 펀드(주 1회 갱신이면 지난번 것은 빠진다)
   function recentSet() {
     const last = D.funds.map((f) => f.lm).filter(Boolean).sort().pop();
     if (!last) return new Set();
-    const t = new Date(last + "T00:00:00").getTime() - 7 * 864e5;
+    const t = new Date(last + "T00:00:00").getTime() - 6 * 864e5;
     return new Set(D.funds.filter((f) => f.lm && new Date(f.lm + "T00:00:00").getTime() >= t).map((f) => f.no));
   }
   const words = () => q.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -81,7 +81,7 @@ const Lineup = (() => {
       <div class="lu-tools">
         <input id="luq" type="search" placeholder="펀드명·운용사·전략·지역·일정 검색" value="${h(q)}" aria-label="라인업 검색">
         <select id="luSt" aria-label="모집 상태"><option value="">상태 전체</option>${sts.map((s) => `<option${s === st ? " selected" : ""}>${h(s)}</option>`).join("")}</select>
-        <button class="qbtn" id="luNew" type="button" aria-pressed="${recent}" title="이번 업데이트(최근 수정일에서 7일 안)에 고친 펀드만">최근 수정 <span>${rc}</span></button>
+        <button class="qbtn" id="luNew" type="button" aria-pressed="${recent}" title="이번 업데이트(가장 최근 수정일에서 6일 안)에 고친 펀드만">최근 수정 <span>${rc}</span></button>
       </div>
       <div class="lu-seg" role="group" aria-label="자산군"></div>
       <div class="lu-cnt" id="luCnt"></div>
