@@ -12,7 +12,10 @@
 블록 형식은 scripts/dash_views.py 머리 주석과 같다.
 
 --notes: 화면에 덧붙일 설명(공개 저장소라 기관명·금액이 든 설명은 코드에 두지 않고 이 파일로 넘긴다 — Project 문서
-`claude/외화수수료_원장_앱메모.json`). 형식: {"period": {"2019-2기 예정": "…"}, "periodNotes": [...], "checkNotes": [...], "summaryNotes": [...]}
+`claude/외화수수료_원장_앱메모.json`). 형식: {"period": {"2019-2기 예정": "…"}, "periodNotes": [...], "checkNotes": [...], "summaryNotes": [...],
+  "recon": {"2019-2기 예정": {"st": "대사 완료", "nt": "…", "bs": "회계부 총괄표", "rk": 원, "ru": USD, "re": EUR, "dk": 원 차이, "du": USD 차이, "de": EUR 차이}},
+  "xcheck": {"sched": [{v, nm, bs, cy, tt, n, g, ga, gp, ds, mm}], "kpi": [{fd, lp, kp, iv, v}], "inv": [{y, n, mx, ms, mc, nt}], "dup": [{no, ds}], "plan": [...], "other": [...]}}
+  recon 이 있으면 '신고기간별 대사' 쪽에 대사 상태·차이 칸, xcheck 가 있으면 '크로스체크' 쪽(7번째)을 붙인다. 둘 다 없으면 예전처럼 6쪽.
 """
 import csv, datetime, json, re, sys
 from collections import Counter, defaultdict
@@ -67,7 +70,7 @@ GP_RULES = [
     (r"Energy Capital|\bECP\b", "Energy Capital Partners"), (r"Savills", "DRC Savills"), (r"Lombard Odier|\bLO SECONDARY", "Lombard Odier"),
     (r"Galdana", "Galdana Ventures"), (r"Meritech", "Meritech"), (r"Greenstone", "Greenstone"), (r"Brinley", "Brinley Partners"),
     (r"\bBBAM\b", "BBAM"), (r"\bICG\b", "ICG"), (r"Colchis", "Colchis"), (r"\bGAM\b", "GAM"), (r"Knighthead", "Knighthead"),
-    (r"Novus", "Novus Capital"), (r"T-C H-T", "T-C H-T Venture"), (r"Brentwood", "Brentwood"),
+    (r"Novus", "Novus Capital"), (r"T-C H-T", "T-C H-T Venture"), (r"Brentwood", "Brentwood"), (r"Brightwood", "Brightwood"),
 ]
 GP_RX = [(re.compile(rx, re.I), name) for rx, name in GP_RULES]
 
@@ -138,6 +141,7 @@ def fx_text(by):  # {"USD": x, "EUR": y} → 'USD 1,234.56 · EUR 7.00'
 def build(rows, source, notes=None):
     N = notes or {}
     PN = N.get("period", {})
+    RC = N.get("recon", {})          # 신고기간별 대사(대사 기준·원화/외화 차이·상태) — 앱메모
     R = []
     for r in rows:
         x = {"no": int(r["NO"]), "y": int(r["연도"]), "pr": r["기간"], "d": r["입금(결의)일"], "dp": r["부서(당시)"], "ty": r["구분"],
@@ -359,6 +363,12 @@ def build(rows, source, notes=None):
             else:
                 c["st"] = "자료 없음"
             if key in PN: c["nt"] = PN[key]
+            rc = RC.get(key)
+            if rc:
+                c["rs"] = rc.get("st")
+                for k_ in ("bs", "rk", "dk", "du", "de"):
+                    if rc.get(k_) is not None: c[k_] = rc[k_]
+                if rc.get("nt"): c["rn"] = rc["nt"]
             if key > period_of(last) and not rs:
                 c["st"] = "신고 전"; c.setdefault("nt", "아직 신고 전 — 그 사이 입금은 '수익 (현금기준)' 쪽")
             r = {"c": {k: v for k, v in c.items() if v not in (None, "")}}
@@ -368,16 +378,20 @@ def build(rows, source, notes=None):
     allp = [f"{y}-{nm}" for y in range(years[0], cur_y + 1) for nm, _ in PERIODS]
     allp = allp[:allp.index(period_of(last)) + 1]                      # 원장 마지막 입금이 든 기간까지(그 뒤는 신고 전)
     empt = [p for p in allp if not per.get(p)]
+    RT = {"대사 완료": "ok", "대사 불가": "warn", "자료 없음": "bad", "해당 없음": "muted", "진행 중": "muted"}
+    rdone = sum(1 for p in allp if RC.get(p, {}).get("st") == "대사 완료")
     v5 = [{"t": "kpis", "id": "k", "items": [
         kpi("신고기간", len(allp) - len(empt), "n0", f"/{len(allp)}개", f"{allp[0]} ~ {allp[-1]} 중 원장 건이 있는 기간"),
         kpi("건 없는 기간", len(empt), "n0", "개", " · ".join(empt) or "없음", tone="warn" if empt else None),
         kpi("증빙 대조", ev_n, "n0", f"/{len(R)}건", "회계부 총괄표·엑셀만 있는 건 제외"),
-    ]},
+    ] + ([kpi("신고 대사", rdone, "n0", f"/{len(allp)}개", "회계부 총괄표·엑셀 신고자료와 원화·외화 대조 — 차이는 '대사 비고'", tone="ok" if rdone else None)] if RC else [])},
           {"t": "table", "id": "per", "title": "부가세 영세율 신고기간별", "sub": "1기 예정 1~3월 · 1기 확정 4~6월 · 2기 예정 7~9월 · 2기 확정 10~12월 · 단위 원",
            "cols": [col("p", "신고기간"), col("mo", "입금월"), col("st", "상태", "tag", tone={"증빙 있음": "ok", "일부 증빙 없음": "info", "자료 없음": "bad", "신고 전": "muted", "진행 중": "muted"}),
                     col("n", "건수", "n0"), col("k", "원화 합계", "won", sum=1), col("usd", "USD", "usd2"), col("eur", "EUR", "m2"),
-                    col("ev", "증빙 있는 건"), col("src", "자료 구성", d=1), col("files", "원본 파일(업로드 ID)", d=1), col("nt", "비고", d=1)],
-           "card": {"title": "p", "amt": "k", "sub": ["mo"], "chips": ["st"], "meta": ["n", "ev"]},
+                    col("ev", "증빙 있는 건"), col("src", "자료 구성", d=1), col("files", "원본 파일(업로드 ID)", d=1), col("nt", "비고", d=1)]
+                   + ([col("rs", "대사", "tag", tone=RT), col("dk", "원화 차이", "won"), col("du", "USD 차이", "m2", d=1), col("de", "EUR 차이", "m2", d=1),
+                       col("rk", "대사 기준 원화", "won", d=1), col("bs", "대사 기준", d=1), col("rn", "대사 비고", d=1)] if RC else []),
+           "card": {"title": "p", "amt": "k", "sub": ["mo"], "chips": ["st"] + (["rs"] if RC else []), "meta": ["n", "ev"]},
            "secs": psecs},
           {"t": "notes", "id": "nt", "items": [
               "자료 구성: 회계부 = 회계부 영세율 총괄표(전 부서 자료에서 우리 부서 행만), 엑셀 = 부서 영세율 신고자료 엑셀, 증빙 = 입금결의서·송금명세·SWIFT·인보이스 PDF.",
@@ -415,6 +429,48 @@ def build(rows, source, notes=None):
            "secs": csecs},
           {"t": "notes", "id": "nt", "items": N.get("checkNotes", []) + ["끊긴 정기 수수료는 '정기수수료 연도별' 쪽의 '끊김'·'올해 아직 없음' 묶음."]}]
     sheets.append({"name": "수수료 원장 확인 필요", "short": "확인 필요·정정", "view": v6})
+
+    # ── 7. 크로스체크 (앱메모 xcheck — 기관명·금액이 있어 코드에 두지 않음) ─────────────────
+    XC = N.get("xcheck")
+    if XC:
+        SCH, KP, IV = XC.get("sched", []), XC.get("kpi", []), XC.get("inv", [])
+        VT = {"확인 필요": "warn", "정리": "muted", "진행 중": "info", "완료": "ok"}
+        vc = Counter(s["v"] for s in SCH)
+        kv = lambda k: "일치" if str(k.get("v", "")).startswith("일치") else "차이"
+        kc = Counter(kv(k) for k in KP)
+        v7 = [{"t": "kpis", "id": "k", "items": [
+            kpi("분할 일정 대조", len(SCH), "n0", "건", " · ".join(f"{k} {vc[k]}" for k in VT if vc.get(k)), tone="warn" if vc.get("확인 필요") else None),
+            kpi("약정내역(KPI) 대조", len(KP), "n0", "건", f"일치 {kc['일치']} · 차이 {kc['차이']}", tone="warn" if kc.get("차이") else None),
+            kpi("인보이스 빈 번호", sum(i.get("mc", 0) for i in IV if i.get("ms")), "n0", "개", "원장(입금)에 없는 번호 — 원화 청구·취소·미수 확인"),
+        ]}]
+        secs7 = []
+        for vk in VT:
+            rs = [s for s in SCH if s.get("v") == vk]
+            if not rs: continue
+            rows7 = []
+            for s in rs:
+                c = dict(s, n=f"{s.get('n')}회", g=f"{s.get('g')}회")
+                rows7.append({"c": {k: v for k, v in c.items() if v not in (None, "")}})
+            secs7.append({"h": vk, "s": f"{len(rs)}건", "rows": rows7})
+        v7.append({"t": "table", "id": "sch", "title": "계약·인보이스 분할 일정 대조",
+                   "sub": "인보이스의 총액·분할 횟수로 받을 금액을 세우고 원장 입금과 맞춤 · 금액은 청구 기준(송금수수료 차감 전) · 눌러서 계약 근거·입금일·메모",
+                   "cols": [col("v", "판단", "tag", tone=VT), col("nm", "펀드 · LP"), col("cy", "통화", "tag"), col("tt", "총액", "m2"), col("n", "분할"),
+                            col("g", "받은 횟수"), col("ga", "받은 금액", "m2"), col("gp", "총액 − 받은 금액", "m2"),
+                            col("bs", "계약 근거", d=1), col("ds", "입금일", d=1), col("mm", "메모", d=1)],
+                   "card": {"title": "nm", "sub": ["bs"], "chips": ["v", "cy"], "meta": ["g", "gp"]}, "secs": secs7})
+        if KP:
+            v7.append({"t": "table", "id": "kp", "title": "약정내역(부서 KPI 제출 약정) ↔ 원장 산정근거", "sub": "차이 건은 대시보드 엑셀 「약정내역」 금액 확인 — 수수료는 인보이스 기준으로 받음",
+                       "cols": [col("vs", "판단", "tag", tone={"일치": "ok", "차이": "warn"}), col("fd", "펀드"), col("lp", "LP"), col("kp", "KPI 제출 약정"),
+                                col("iv", "원장(인보이스) 약정"), col("v", "내용", d=1)],
+                       "card": {"title": "fd", "sub": ["lp"], "chips": ["vs"], "meta": ["kp", "iv"]},
+                       "rows": [{"c": {k: v for k, v in dict(k, vs=kv(k)).items() if v not in (None, "")}} for k in KP]})
+        if IV:
+            v7.append({"t": "table", "id": "inv", "title": "인보이스 번호 — 원장(입금)에 없는 번호", "sub": "원화 청구·취소·미수(미입금) 중 무엇인지 부서 인보이스 대장에서 확인", "compact": True,
+                       "cols": [col("y", "연도"), col("n", "원장 번호 수", "n0"), col("mx", "최대 번호", "n0"), col("ms", "원장에 없는 번호"), col("nt", "메모", d=1)],
+                       "rows": [{"c": {k: (str(v) if k == "y" else v) for k, v in i.items() if v not in (None, "")}} for i in IV]})
+        dup = [f"{d['no']}: {d['ds']}" for d in XC.get("dup", [])]
+        v7.append({"t": "notes", "id": "nt", "items": XC.get("plan", []) + XC.get("other", []) + (["같은 인보이스 번호로 다른 날 입금: " + " / ".join(dup)] if dup else [])})
+        sheets.append({"name": "수수료 원장 크로스체크", "short": "크로스체크", "view": v7})
 
     for s in sheets:
         s.update(group=GROUP, asofl=f"원장 {first} ~ {last}", cols=[], rows=[], rh=[], hs=0, hdr=0)

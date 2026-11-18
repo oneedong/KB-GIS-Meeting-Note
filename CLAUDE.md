@@ -89,7 +89,7 @@
 
 ## "수수료 원장 앱에 반영" (Project 'Back Office 업무연동'의 외화 수수료 원장 CSV가 바뀌었을 때)
 대시보드 탭 '수수료 원장' 묶음(2026-11-17 추가, 사용자 요청: '수수료 내역 증빙 자료' 대화의 수수료 내역·증빙을 앱에 촘촘하게) =
-원장 요약·입금 원장·운용사별·정기수수료 연도별·신고기간별 대사·확인 필요·정정 6쪽. 형식·순서는 `docs/FEES.md`. 요점:
+원장 요약·입금 원장·운용사별·정기수수료 연도별·신고기간별 대사·확인 필요·정정 6쪽 + 크로스체크(앱메모 `xcheck`, 2026-11-18 추가 — 사용자 요청: 약정내역·다른 자료와 대조 결과를 앱에). 신고기간별 대사의 대사 상태·차이 칸은 앱메모 `recon`. 형식·순서는 `docs/FEES.md`. 요점:
 - 원본: Project 문서 `claude/외화수수료_원장_2017-2026.csv` + 화면 설명 `claude/외화수수료_원장_앱메모.json`(기관명·금액이 든 설명은 공개 코드에 두지 않고 여기에).
 - `python3 scripts/fees_build.py <SP>/원장.csv <SP>/fees.json --notes <SP>/앱메모.json`(NO·기간·외화×환율=원화 검증, 어긋나면 멈춤)
   → `node scripts/vault.mjs encrypt <SP>/fees.json fees.enc.json --salt-from data.enc.json` → 커밋(`fees: 수수료 원장 MM/DD 기준`, 펀드명·금액 쓰지 말 것) → push.

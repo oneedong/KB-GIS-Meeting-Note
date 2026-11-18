@@ -558,11 +558,17 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('정기수수료: 올해 입금·올해 아직 없음 묶음', rec.includes('입금 중') && rec.includes('올해 아직 없음') && rec.includes('가상 Gamma Fund'));
   await pick('영세율 신고기간별 대사');
   await page.locator('#dzBody .kc').first().waitFor();
-  ok('신고기간별 대사: 건 없는 기간·메모', (await page.textContent('#dzBody')).includes('2025-2기 확정') && (await page.textContent('#dzBody')).includes('가상 기간 설명'));
+  ok('신고기간별 대사: 건 없는 기간·메모·대사 상태', (await page.textContent('#dzBody')).includes('2025-2기 확정') && (await page.textContent('#dzBody')).includes('가상 기간 설명')
+    && (await page.textContent('#dzBody')).includes('대사 완료') && (await page.textContent('#dzBody')).includes('신고 대사'));
   await pick('수수료 원장 확인 필요');
   await page.locator('#dzBody .kc').first().waitFor();
   const ck = await page.textContent('#dzBody');
   ok('확인 필요: 추정·회계부 차이 묶음', ck.includes('추정 값') && ck.includes('회계부 신고액과 다른 건') && ck.includes('-10,000') && ck.includes('가상 확인 메모'));
+  await pick('수수료 원장 크로스체크');   // 앱메모 xcheck 가 있을 때만 생기는 7번째 쪽
+  await page.locator('#dzMain h2', { hasText: '크로스체크' }).waitFor();
+  const xc = await page.textContent('#dzBody');
+  ok('크로스체크: 분할 일정·약정 대조·인보이스 번호·메모', xc.includes('분할 일정') && xc.includes('가상 Alpha Fund I') && xc.includes('약정내역')
+    && xc.includes('인보이스 번호') && xc.includes('가상 연내 계획 메모') && (await page.locator('#dzBody .kc').count()) === 3);
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-fees.png`), fullPage: vp.width < 760 });
   if (vp.width >= 760) {   // 통합 검색이 원장 표도 찾는다
     await page.click('#gsBtn'); await page.fill('#gsq', 'Epsilon');
