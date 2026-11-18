@@ -43,6 +43,9 @@
 2. `node scripts/vault.mjs encrypt <SP>/dash.json dash.enc.json --salt-from data.enc.json`
    (반드시 `--salt-from` — 미팅노트와 같은 비밀번호·salt 여야 앱이 기억된 키로 연다. 비밀번호가 다르면 스크립트가 멈춘다)
 3. `git status`로 dash.enc.json 만 올라가는지 확인 → 커밋(`dash: 대시보드 MM/DD 기준`, 숫자·기관명 쓰지 말 것) → push. 평문 dash.json 삭제.
+4. 약정내역(2022~현재·2010~2021) 시트가 바뀌었으면 수수료 원장 쪽의 약정 연결도 갱신(2026-11-18, 사용자 요청 — 엑셀을 꾸준히 고침):
+   `node scripts/vault.mjs decrypt fees.enc.json <SP>/fees_prev.json` → `python3 scripts/fees_build.py --from <SP>/fees_prev.json <SP>/fees.json --dash <SP>/dash.json`
+   ('대시보드에서 못 찾은 행' 이 나오면 docs/FEES.md) → `vault.mjs encrypt … fees.enc.json --salt-from data.enc.json` → 같이 커밋. 평문 fees*.json 삭제.
 - 2022년~ 약정 시트 이름은 '약정내역(2022~현재)'(2026-11-09, 예전 '약정내역&수수료' — 코드는 두 이름 다 받음). 약정 통계의 펀드 수·기관 수는 수식(13행 확인 칸).
 - 엑셀에만 두고 앱에는 아직 안 올리는 시트는 `dash_extract.py`의 `EXCEL_ONLY`(지금은 없음).
 - '근거_01~16_…' 시트(2026-11-16 추가, 사용자 요청): 해외대체 시딩 펀드별 수익률 산식(관리판 캐피탈콜 G~Z·원본상환 AI~AN·이익분배 AO~BD 전 칸 연결, NAV 기준일 = 관리판 BG3).
@@ -89,9 +92,12 @@
 
 ## "수수료 원장 앱에 반영" (Project 'Back Office 업무연동'의 외화 수수료 원장 CSV가 바뀌었을 때)
 대시보드 탭 '수수료 원장' 묶음(2026-11-17 추가, 사용자 요청: '수수료 내역 증빙 자료' 대화의 수수료 내역·증빙을 앱에 촘촘하게) =
-원장 요약·입금 원장·운용사별·정기수수료 연도별·신고기간별 대사·확인 필요·정정 6쪽 + 크로스체크(앱메모 `xcheck`, 2026-11-18 추가 — 사용자 요청: 약정내역·다른 자료와 대조 결과를 앱에). 신고기간별 대사의 대사 상태·차이 칸은 앱메모 `recon`. 형식·순서는 `docs/FEES.md`. 요점:
+원장 요약·입금 원장·운용사별·펀드별 약정·입금·정기수수료 연도별·신고기간별 대사·확인 필요·정정 + 크로스체크(앱메모 `xcheck`, 2026-11-18 추가 — 사용자 요청: 약정내역·다른 자료와 대조 결과를 앱에). 신고기간별 대사의 대사 상태·차이 칸은 앱메모 `recon`.
+모든 쪽에 입금별 관련 LP·약정금액·수수료율·약정내역 수수료(2026-11-18 v2, 사용자 요청) — 원장 CSV '약정 연결' 칸의 키로 대시보드 엑셀 약정내역(2022~현재·2010~2021) 행을 찾아 채운다.
+KPI 제출 약정 목록은 부정확(사용자 확인) — 약정 기준은 대시보드 엑셀 약정내역 시트. 형식·순서는 `docs/FEES.md`. 요점:
 - 원본: Project 문서 `claude/외화수수료_원장_2017-2026.csv` + 화면 설명 `claude/외화수수료_원장_앱메모.json`(기관명·금액이 든 설명은 공개 코드에 두지 않고 여기에).
-- `python3 scripts/fees_build.py <SP>/원장.csv <SP>/fees.json --notes <SP>/앱메모.json`(NO·기간·외화×환율=원화 검증, 어긋나면 멈춤)
+- `python3 scripts/fees_build.py <SP>/원장.csv <SP>/fees.json --notes <SP>/앱메모.json --dash <SP>/dash.json`(NO·기간·외화×환율=원화 검증, 어긋나면 멈춤.
+  --dash = 복호화한 대시보드 — 입금마다 관련 LP·약정금액·수수료율·약정내역 수수료를 엑셀 약정내역 값으로, '펀드별 약정·입금' 쪽 추가)
   → `node scripts/vault.mjs encrypt <SP>/fees.json fees.enc.json --salt-from data.enc.json` → 커밋(`fees: 수수료 원장 MM/DD 기준`, 펀드명·금액 쓰지 말 것) → push.
 - 엑셀 대시보드와 따로 연다(dash.js `addExtra`: '실적·KPI' 묶음 바로 뒤) — 매일 대시보드를 다시 뽑아도 사라지지 않는다. 원장 글자·숫자는 그대로, 화면용 칸은 분류·운용사뿐.
 

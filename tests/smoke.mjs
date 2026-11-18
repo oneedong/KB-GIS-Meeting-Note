@@ -543,15 +543,26 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok(`수수료 원장 묶음(${vp.name})`, groups.includes('수수료 원장') && (await page.locator('#dzNav option', { hasText: '입금 원장' }).count()) === 1);
   await pick('수수료 원장 요약');
   await page.locator('#dzMain h2', { hasText: '원장 요약' }).waitFor();
-  ok('원장 요약: 지표 카드·연도별 차트', (await page.locator('#dzBody .kc').count()) === 6 && (await page.textContent('#dzBody .kc')).includes('0.62')
+  ok('원장 요약: 지표 카드(약정 연결 포함)·연도별 차트', (await page.locator('#dzBody .kc').count()) === 7 && (await page.textContent('#dzBody .kc')).includes('0.62')
+    && (await page.textContent('#dzBody')).includes('약정 연결')
     && (await page.locator('#dzBody svg.ch').count()) === 1 && (await page.textContent('#dzMain .eyebrow')).includes('원장 2025-02-10 ~ 2026-07-01'));
   await pick('외화 수수료 입금 원장 (2025~)');
   await page.locator('#dzBody .tb-n').waitFor();
   ok('입금 원장: 7건·통화별 외화 합계·원화 합계', (await page.textContent('#dzBody .tb-n')).startsWith('7건')
     && (await page.textContent('#dzBody')).includes('USD 41,300.00 · EUR 2,000.00') && (await page.textContent('#dzBody')).includes('62,335,000'));
+  ok('입금 원장: 관련 LP·약정금액·수수료율(대시보드 약정내역)', (await page.textContent('#dzBody')).includes('가상공제회') && (await page.textContent('#dzBody')).includes('USD 10M')
+    && (await page.textContent('#dzBody')).includes('0.1%'));
   await page.fill('#dzBody .tb-q', 'Beta'); await page.waitForTimeout(300);
   ok('입금 원장 찾기', (await page.textContent('#dzBody .tb-n')).startsWith('2건'));
-  await page.fill('#dzBody .tb-q', '');
+  await page.fill('#dzBody .tb-q', '가상공제회'); await page.waitForTimeout(300);
+  await page.locator('#dzBody .ex').first().click();
+  await page.locator('#dzBody', { hasText: '약정내역 연결' }).waitFor({ timeout: 4000 }).catch(() => {});
+  ok('입금 원장: 눌러서 약정내역 연결 행', (await page.textContent('#dzBody')).includes('약정내역 연결') && (await page.textContent('#dzBody')).includes('2025 USD 10,000'));
+  await page.fill('#dzBody .tb-q', ''); await page.waitForTimeout(250);
+  await pick('펀드별 약정·입금');
+  await page.locator('#dzBody .kc').first().waitFor();
+  const fnd = await page.textContent('#dzBody');
+  ok('펀드별 약정·입금: 펀드·판정·약정·원장 입금', fnd.includes('가상 Alpha I') && fnd.includes('가상 Beta II') && fnd.includes('일부 입금') && fnd.includes('USD 30M'));
   await pick('정기수수료 연도별');
   await page.locator('#dzBody .kc').first().waitFor();
   const rec = await page.textContent('#dzBody');
@@ -567,8 +578,9 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await pick('수수료 원장 크로스체크');   // 앱메모 xcheck 가 있을 때만 생기는 7번째 쪽
   await page.locator('#dzMain h2', { hasText: '크로스체크' }).waitFor();
   const xc = await page.textContent('#dzBody');
-  ok('크로스체크: 분할 일정·약정 대조·인보이스 번호·메모', xc.includes('분할 일정') && xc.includes('가상 Alpha Fund I') && xc.includes('약정내역')
-    && xc.includes('인보이스 번호') && xc.includes('가상 연내 계획 메모') && (await page.locator('#dzBody .kc').count()) === 3);
+  ok('크로스체크: 분할 일정·약정내역 대조·수익 이력 대조·인보이스 번호·메모', xc.includes('분할 일정') && xc.includes('가상 Alpha Fund I') && xc.includes('약정내역 ↔ 원장')
+    && xc.includes('가상 약정 대조 메모') && xc.includes('수익 이력') && xc.includes('가상 원장에 없음')
+    && xc.includes('인보이스 번호') && xc.includes('가상 연내 계획 메모') && (await page.locator('#dzBody .kc').count()) === 4);
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-fees.png`), fullPage: vp.width < 760 });
   if (vp.width >= 760) {   // 통합 검색이 원장 표도 찾는다
     await page.click('#gsBtn'); await page.fill('#gsq', 'Epsilon');
