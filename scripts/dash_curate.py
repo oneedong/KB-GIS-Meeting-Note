@@ -331,28 +331,46 @@ def _org_fees(d):
 
     og = _table(d, "og")
     if og:
-        used, tot = set(), 0
+        # 기관별 약정 행 ↔ 약정내역 행(2022~ cm · 2010~21 hi): 같은 펀드·운용사, 기관 표기는 바로 맞는 것 먼저 그다음 넓힌 표기.
+        # 붙은 행으로 수수료 합계(fe)·수수료 상태(fs = cm 상태: 수취완료·진행중·청구예정 등)·원장 연결 키(r.lk — 수수료 원장 '약정 연결'과 같은 꼴,
+        # 앱 dash.js linkLedger 가 원장 입금을 붙인다. 사용자 요청 2026-11-19: 기관별 약정에서도 fee 를 받았는지)
+        hi = _table(d, "hi")
+        hrows = [r["c"] for sec in (hi.get("secs") or [{"rows": hi.get("rows") or []}]) for r in sec["rows"]] if hi else []
+        H1 = [(c, _keys(c.get("lp")), 0) for c in hrows]; H2 = [(c, _keys_lp(c.get("lp")), 0) for c in hrows]
+        ckey = lambda t, c: "|".join([t, c.get("gp") or "", str(c.get("ab") or "").replace("\n", " "), c.get("lp") or ""])
+        used, hused, tot = set(), set(), 0
         for sec in og.get("secs") or []:
             lk = _keys(re.sub(r"^\d+\.\s*", "", str(sec.get("h") or "")))
             st = 0
-            for r in sec["rows"]: r["c"]["fe"] = 0
-            for R in (rows, rows2):                                       # 같은 펀드·운용사에서 표기가 바로 맞는 것 먼저, 그다음 넓힌 표기
-                for r in sec["rows"]:
-                    c = r["c"]; v = 0
-                    for i, (x, k, f) in enumerate(R):
-                        if i in used or not f or _nk(x.get("ab")) != _nk(c.get("ab")) or _nk(x.get("gp")) != _nk(c.get("gp")) or not (k & lk): continue
-                        used.add(i); v += f
-                    if v: c["fe"] += v; st += v
+            att = {id(r): [] for r in sec["rows"]}
+            for r in sec["rows"]:
+                r["c"]["fe"] = 0; r["c"].pop("fs", None); r.pop("lk", None)
+            for t, pairs, us in (("cm", (rows, rows2), used), ("hi", (H1, H2), hused)):
+                for R in pairs:
+                    for r in sec["rows"]:
+                        c = r["c"]
+                        for i, (x, k, f) in enumerate(R):
+                            if i in us or _nk(x.get("ab")) != _nk(c.get("ab")) or _nk(x.get("gp")) != _nk(c.get("gp")) or not (k & lk): continue
+                            us.add(i); att[id(r)].append((t, x, f))
+            for r in sec["rows"]:
+                c, a = r["c"], att[id(r)]
+                v = sum(f for t, x, f in a if t == "cm" and f)
+                if v: c["fe"] = v; st += v
+                fs = list(dict.fromkeys(str(x.get("st")) for t, x, f in a if t == "cm" and x.get("st")))
+                if fs: c["fs"] = " · ".join(fs)
+                if a: r["lk"] = [ckey(t, x) for t, x, f in a]
             tot += st
             sv = re.sub(r" · 수수료 USD [\d,.]+(?: \(≈ [\d,.]+억\))?", "", str(sec.get("s") or ""))
             sec["s"] = (sv + (f" · 수수료 USD {st:,.2f}" if st else "")).strip(" ·")
         _add_col(og, {"k": "fe", "l": FEE_L, "f": "usd", "sum": 1}, "us")
+        _add_col(og, {"k": "fs", "l": "수수료 상태", "f": "tag", "tone": {"수취완료": "ok", "진행중": "info", "청구예정·확인중": "warn"}}, "fe")
         for f in og.get("foot") or []:
             f["c"].pop("fe", None)
         if og.get("foot") and tot: og["foot"][0]["c"]["fe"] = tot
         cd = og.get("card")
         if cd and "fe" not in (cd.get("meta") or []): cd["meta"] = list(cd.get("meta") or []) + ["fe"]
-        miss = sum(f for i, (x, k, f) in enumerate(rows) if f and i not in used)
+        if cd and "fs" not in (cd.get("chips") or []): cd["chips"] = ["fs"] + list(cd.get("chips") or [])
+        miss = sum(f for i, (x, k, f) in enumerate(rows) if f and i not in used and not any(i2 in used and x2 is x for i2, (x2, _, _) in enumerate(rows2)))
         if miss: og["notes"] = [n for n in (og.get("notes") or []) if not n.startswith("수수료 합계는")] + [
             f"수수료 합계는 약정내역(2022~)의 같은 펀드·운용사·기관 행을 더한 값. 약정 목록에 없는 건(진행·청구예정 등) 수수료 USD {miss:,.2f}는 약정내역(2022~)에서."]
 

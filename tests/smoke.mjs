@@ -130,7 +130,7 @@ ok('CSP 해시 맞음', (() => { try { execFileSync(process.execPath, [join(ROOT
     { name: '약정내역(2022~현재)', group: 'x', short: 'x', view: [{ t: 'table', id: 'cm', title: '기관별 약정내역', cols: [{ k: 'ab', l: '펀드(약칭)', f: 'text' }, { k: 'lp', l: '기관명', f: 'text' }, { k: 'gp', l: '운용사', f: 'text' },
         { k: 'cy', l: '통화', f: 'tag', d: 1 }, { k: 'am', l: '총약정금액', f: 'amt', ck: 'cy', d: 1 }, { k: 'st', l: '상태', f: 'tag' },
         { k: 'u2026', l: '2026 USD 환산', f: 'usd' }, { k: 'f2026', l: '2026 수수료(USD)', f: 'usd' }, { k: 'u2025', l: '2025 USD 환산', f: 'usd' }, { k: 'f2025', l: '2025 수수료(USD)', f: 'usd' }],
-      rows: [{ c: { ab: 'F1', lp: '가상기관(가상계정)', gp: 'G1', cy: 'USD', am: 20e6, f2025: 1000, f2026: 500 } }, { c: { ab: 'F2', lp: '가상기관', gp: 'G2', cy: 'USD', am: 10e6 } },
+      rows: [{ c: { ab: 'F1', lp: '가상기관(가상계정)', gp: 'G1', cy: 'USD', am: 20e6, f2025: 1000, f2026: 500, st: '수취완료' } }, { c: { ab: 'F2', lp: '가상기관', gp: 'G2', cy: 'USD', am: 10e6 } },
              { c: { ab: 'F1', lp: '가상증권 PI', gp: 'G1', cy: 'USD', am: 5e6, f2026: 200 } }, { c: { ab: 'F9', lp: '가상기관', gp: 'G9', cy: 'USD', am: 1e6, f2026: 50 } }],
       foot: [{ l: '합계', c: { f2025: 1000, f2026: 750 } }],
       pick: { l: '연도', opts: ['전체', '2026', '2025'], def: '전체', cols: { '전체': [], 2026: ['u2026', 'f2026'], 2025: ['u2025', 'f2025'] } }, card: { title: 'ab', amt: '@u', meta: ['@f'] } }] },
@@ -147,6 +147,9 @@ ok('CSP 해시 맞음', (() => { try { execFileSync(process.execPath, [join(ROOT
   const ogr = og.secs.map((x) => x.rows.map((r) => r.c.fe).join('/')).join(';');
   ok('기관별 약정: 행마다 수수료(괄호·부서 꼬리 표기 맞춤), 묶음 머리 합계', ogr === '1500/0;200' && og.secs[0].s === '2건 · USD 30.00M · 수수료 USD 1,500.00'
     && og.foot[0].c.fe === 1700 && og.card.meta.includes('fe') && (og.notes || []).some((n) => n.includes('USD 50.00')));
+  const og0 = og.secs[0].rows[0];
+  ok('기관별 약정: 수수료 상태(약정내역 상태)·원장 연결 키', og0.c.fs === '수취완료' && og0.lk.join() === 'cm|G1|F1|가상기관(가상계정)' && !og.secs[0].rows[1].c.fs
+    && og.cols.map((x) => x.k).join().includes('fe,fs') && og.card.chips[0] === 'fs');
   ok('약정 현황 기관별 표에 수수료 합계', s5.rows.map((r) => r.c.FE).join() === '1550,200' && s5.cols.map((x) => x.k).join() === 'B,H,FE');
 }
 
@@ -541,6 +544,13 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   const pick = (name) => vp.width < 760 ? page.selectOption('#dzNav .dz-pick select', name) : page.locator(`.dz-item[data-s="${name}"]`).click();
   const groups = await page.evaluate(() => [...document.querySelectorAll('#dzNav optgroup')].map((g) => g.label));
   ok(`수수료 원장 묶음(${vp.name})`, groups.includes('수수료 원장') && (await page.locator('#dzNav option', { hasText: '입금 원장' }).count()) === 1);
+  // 기관별 약정·약정내역 행에 원장 입금(약정 연결 키로 찾음): 건수·최근 입금일, 원장 기간에 약정했는데 입금이 없으면 '없음', 펼치면 입금 건
+  await pick('가상 기관별 약정');
+  await page.locator('#dzBody .tb-q').first().waitFor();
+  const ogTxt = await page.locator('#dzBody .blk >> nth=0').innerText();
+  ok(`기관별 약정에 원장 입금(${vp.name})`, ogTxt.includes('원장 입금') && ogTxt.includes('3건 · 2026-03-02') && ogTxt.includes('없음') && ogTxt.includes('수취완료'));
+  await page.locator('#dzBody .blk >> nth=0').locator('tr.r.ex, article.cd.ex', { hasText: '2026-03-02' }).first().click();
+  ok(`원장 입금 펼치면 입금 건(${vp.name})`, (await page.locator('#dzBody .xd h4', { hasText: '수수료 원장 입금 3건' }).count()) === 1);
   await pick('수수료 원장 요약');
   await page.locator('#dzMain h2', { hasText: '원장 요약' }).waitFor();
   ok('원장 요약: 지표 카드(약정 연결 포함)·연도별 차트', (await page.locator('#dzBody .kc').count()) === 7 && (await page.textContent('#dzBody .kc')).includes('0.62')

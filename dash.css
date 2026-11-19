@@ -340,3 +340,4 @@ body.dashmode .page{max-width:var(--page-max)}   /* 2026-11-17 PC 넓게: 공통
 .sec-h:has(.sec-n){flex-wrap:wrap;row-gap:0}.sec-h:has(.sec-n)>b{flex:none;max-width:100%}
 .dt tr.sf.ss td{font-weight:700;background:var(--sel)}
 .cd-ft.ss{background:var(--sel)}
+.dt td.nw{white-space:nowrap}   /* 원장 입금(건·최근) 칸: 날짜가 줄바꿈되지 않게 */

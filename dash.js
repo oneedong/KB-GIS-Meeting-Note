@@ -39,6 +39,51 @@ const Dash = (() => {
     let at = -1; base.forEach((s, i) => { if (s.group === "실적·KPI") at = i; });
     if (at < 0) at = base.length - 1;
     D.sheets = base.slice(0, at + 1).concat(x.sheets, base.slice(at + 1));
+    linkLedger(x);
+  }
+  // 약정 행에 원장 입금(사용자 요청 2026-11-19: 기관별 약정에서도 fee 를 받았는지). 원장 행의 '약정 연결'(표 id|운용사|약칭|기관 — ' ; ' 여러 개)과
+  // 약정내역 행(cm·hi)은 같은 꼴로 맞추고, 기관별 약정(og) 행은 scripts/dash_curate.py 가 붙여 둔 r.lk 로 찾는다.
+  // '원장 입금' 칸 = 입금 n건 · 최근 입금일(원장 기간 안에 약정했는데 입금이 없으면 '없음'), 펼치면 입금 건 표.
+  function linkLedger(x) {
+    const src = x.src && Array.isArray(x.src.rows) ? x.src.rows : null; if (!src) return;
+    const nk = (v) => String(v ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+    const by = new Map();
+    src.forEach((r) => {
+      const keys = String(r["약정 연결"] || "").split(" ; ").map((k) => k.trim()).filter(Boolean);
+      const dep = { no: r["NO"], d: r["입금(결의)일"] || "", k: r["구분"] || "", cy: r["통화"] || "", a: +r["외화금액(결의·신고)"] || 0, w: +r["원화금액(결의금액)"] || 0, m: r["약정 연결 방식"] || "", n: keys.length };
+      keys.forEach((k) => { const kk = nk(k); if (!by.has(kk)) by.set(kk, []); by.get(kk).push(dep); });
+    });
+    if (!by.size) return;
+    const y0 = +String((x.range || [])[0] || "").slice(0, 4) || 0;
+    const key = (t, c) => nk([t, c.gp || "", String(c.ab || "").replace(/\n/g, " "), c.lp || ""].join("|"));
+    const xcols = [{ k: "d", l: "입금일", f: "text" }, { k: "k", l: "구분", f: "text" }, { k: "fx", l: "외화", f: "text" }, { k: "w", l: "원화", f: "won" }, { k: "m", l: "연결", f: "text" }];
+    const put = (b, r, keys, after) => {
+      const seen = new Set(), deps = [];
+      keys.forEach((k) => (by.get(nk(k)) || []).forEach((dp) => { if (!seen.has(dp.no)) { seen.add(dp.no); deps.push(dp); } }));
+      deps.sort((p, q) => q.d.localeCompare(p.d));
+      const yr = +String(r.c.yr || r.c.ym || "").slice(0, 4) || 0;
+      if (deps.length) {
+        const sh = deps.filter((dp) => dp.n > 1).length;   // 여러 기관에 함께 연결된 입금(펀드 전체·약정 합계로 나눈 것)
+        r.c.rc = `${deps.length}건${sh ? ` (공동 ${sh})` : ""} · ${deps[0].d}`;
+        r.x = (r.x || []).filter((v) => !v.ledger).concat([{ ledger: 1, h: `수수료 원장 입금 ${deps.length}건`, cols: xcols,
+          rows: deps.map((dp) => ({ d: dp.d, k: dp.k, fx: `${dp.cy} ${num(dp.a, 2)}`, w: dp.w, m: dp.n > 1 ? `${dp.m} · ${dp.n}곳 함께` : dp.m })) }]);
+      } else if (keys.length && (!y0 || !yr || yr >= y0)) r.c.rc = "없음";
+    };
+    D.sheets.forEach((s) => walk(s.view || [], (b) => {
+      if (b.t !== "table" || !["og", "cm", "hi"].includes(b.id)) return;
+      let any = false;
+      (b.secs || [{ rows: b.rows || [] }]).forEach((sec) => sec.rows.forEach((r) => {
+        const keys = b.id === "og" ? r.lk || [] : [key(b.id, r.c)];
+        put(b, r, keys); if (r.c.rc) any = true;
+      }));
+      if (!any || b.cols.some((c) => c.k === "rc")) return;
+      const after = b.id === "og" ? "fs" : b.id === "cm" ? "st" : "st";
+      const i = b.cols.findIndex((c) => c.k === after);
+      b.cols.splice(i < 0 ? b.cols.length : i + 1, 0, { k: "rc", l: "원장 입금(건·최근)", f: "text", nw: 1 });
+      if (b.card) { const m = b.card.meta || []; if (!m.includes("rc")) b.card.meta = m.concat("rc"); }
+      b.notes = (b.notes || []).filter((t) => !t.startsWith("원장 입금 =")).concat(`원장 입금 = 외화 수수료 원장(${(x.range || []).join("~")})에서 이 약정에 연결된 입금 건수·최근 입금일. `
+        + "'공동' = 펀드 전체·약정 합계로 여러 기관에 함께 연결된 입금(그 펀드 기관 모두에 보임). '없음' = 원장 기간에 약정했는데 연결된 입금이 아직 없음. 행을 펼치면 입금 건.");
+    }));
   }
   // 다른 탭(기관 상세의 약정·수수료, 통합 검색)이 대시보드 데이터를 읽을 때. 없거나 못 열면 null
   function data() {
@@ -504,7 +549,7 @@ const Dash = (() => {
     const th = cols.map((c, i) => `<th class="${isNum(c) ? "n" : ""}${c.f === "months" ? " mo" : ""}" data-k="${h(c.k)}"${c.f !== "months" && c.f !== "long" ? ` data-sort="1" aria-sort="${sk === c.k ? (st.sort.d > 0 ? "ascending" : "descending") : "none"}"` : ""}>${c.f === "months" ? monthHead(b) : h(c.l)}${sk === c.k ? `<i class="so">${st.sort.d > 0 ? "▲" : "▼"}</i>` : ""}</th>`).join("");
     const row = (r) => {
       const ex = expandable(b, st, r), open = st.open.has(r._i);
-      const tds = cols.map((c, i) => `<td class="${isNum(c) ? "n" : ""}${c.f === "long" ? " lg" : c.f === "text" ? " tx" : ""}">${i === 0 && ex ? `<span class="chev" aria-hidden="true">${open ? "▾" : "▸"}</span>` : ""}${cell(c, r.c)}</td>`).join("");
+      const tds = cols.map((c, i) => `<td class="${isNum(c) ? "n" : ""}${c.f === "long" ? " lg" : c.f === "text" && !c.nw ? " tx" : ""}${c.nw ? " nw" : ""}">${i === 0 && ex ? `<span class="chev" aria-hidden="true">${open ? "▾" : "▸"}</span>` : ""}${cell(c, r.c)}</td>`).join("");
       let out = `<tr class="r${ex ? " ex" : ""}${r.st ? " st-" + r.st : ""}${open ? " open" : ""}" data-i="${r._i}"${ex ? ` tabindex="0" aria-expanded="${open}"` : ""}>${tds}</tr>`;
       if (ex && open) out += `<tr class="xrow"><td colspan="${nc}">${detailHtml(b, st, r, dc)}</td></tr>`;
       return out;

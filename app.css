@@ -471,3 +471,4 @@ body.gs-on{overflow:hidden}
   .ocol .sec p{max-width:none}
   .ocol .kv{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
 }
+.dzr .m small.rcv{color:var(--fg);opacity:.8}

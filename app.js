@@ -447,7 +447,8 @@ function fillODash(o){const el=$("#oDash");if(!el)return;
     const fs=f?DZ.fy.filter(y=>+f["f"+y]).map(y=>`${y} USD ${n2(f["f"+y])}${f["r"+y]?` (${n2(f["r"+y]*100)}%)`:""}`):[];
     const who=z.gp?(r.x?r.x.lbl:r.f.lbl):c.gp,amt=amtTxt(c.cy,c.am),u=r.x?c.us:z.us(r);
     return `<div class="dzr"><span class="d">${esc(z.yr(r)||"—")}</span><span class="m"><b>${esc([who,c.ab].filter(Boolean).join(" · "))}</b>
-      <small>${esc([c.ac,c.is,c.st].filter(Boolean).join(" · "))}${!r.x?" · 약정 목록 밖(수수료 표)":""}${!z.gp&&r.x&&z.lbls.length>1?` · 표기 ${esc(r.x.lbl)}`:""}</small>${fs.length?`<small class="fee">수수료 ${esc(fs.join(" · "))}</small>`:""}</span>
+      <small>${esc([c.ac,c.is,c.st].filter(Boolean).join(" · "))}${!r.x?" · 약정 목록 밖(수수료 표)":""}${!z.gp&&r.x&&z.lbls.length>1?` · 표기 ${esc(r.x.lbl)}`:""}</small>${fs.length?`<small class="fee">수수료 ${esc(fs.join(" · "))}</small>`:""}
+      ${(()=>{const st=r.x?r.x.c.fs:f&&f.st,rc=(r.x&&r.x.c.rc)||(f&&f.rc);return st||rc?`<small class="rcv">${st?`수수료 상태 ${esc(st)}`:""}${st&&rc?" · ":""}${rc?`원장 입금 ${esc(rc)}`:""}</small>`:""})()}</span>
       <span class="a">${amt}${u?`<small>${eok(u)}</small>`:""}</span></div>`};
   const last=z.fees[0];
   el.innerHTML=`<h3>${z.gp?"당사 경유 약정 (이 운용사 펀드)":"약정·수수료"} <span class="h-sub">대시보드 · 기준일 ${esc(DZ.asof||"")}</span></h3>
