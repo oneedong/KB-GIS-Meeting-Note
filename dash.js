@@ -13,6 +13,10 @@ const Dash = (() => {
   const mob = () => matchMedia("(max-width:760px)").matches;
   const SUM = "__sum", DEMO = "대시보드(Demo)";
   let D = null, state = "idle", err = "", sel = LS.get("kbnote-dzsel", SUM);
+  // 월말 대시보드(사용자 요청 2026-11-23): LIVE = 최신(+수수료 원장), D = 지금 보는 것(최신 또는 지난 달 보관본 dash-hist/YYYY-MM.enc.json).
+  // HIST = dash-hist/index.json 의 지난 달들(최신과 같은 달은 빼고), cur = 보는 달('' = 최신). 다른 탭(기관 상세·통합 검색)은 늘 LIVE.
+  let LIVE = null, HIST = [], cur = "", hErr = "";
+  const SNAP = {};
   const mode = {};          // 시트별 '정리 화면'(v) / '엑셀 원본'(g)
   const T = {};             // 표 상태(찾기·필터·연도·정렬·펼침) — 앱을 닫을 때까지 유지
   let pendingQ = "", lastMob = null, gridView = null;
@@ -20,12 +24,18 @@ const Dash = (() => {
   // ── 데이터 열기 ─────────────────────────────────────────
   let loadP = null;
   function ensure() {
-    if (D) return Promise.resolve(D);
+    if (LIVE) return Promise.resolve(LIVE);
     if (loadP) return loadP;
     state = "loading"; paint();
     // fees.enc.json = 외화 수수료 원장(scripts/fees_build.py) — 엑셀과 따로 갱신되는 쪽 묶음. 없거나 못 열면 대시보드만
-    loadP = Promise.all([Vault.openExtra("dash.enc.json"), Vault.openExtra("fees.enc.json").catch(() => ({}))]).then(([r, f]) => {
-      if (r.data) { D = r.data; addExtra(f && f.data); state = "ready"; buildStyles(); index(); }
+    const hx = fetch("dash-hist/index.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    loadP = Promise.all([Vault.openExtra("dash.enc.json"), Vault.openExtra("fees.enc.json").catch(() => ({})), hx]).then(([r, f, hi]) => {
+      if (r.data) {
+        D = LIVE = r.data; addExtra(f && f.data); state = "ready"; buildStyles(); index(D);
+        const lm = String(D.asof || "").slice(0, 7);
+        HIST = (hi && Array.isArray(hi.months) ? hi.months : []).filter((x) => /^\d{4}-\d{2}$/.test(x.m) && /^\d{4}-\d{2}-\d{2}$/.test(x.asof) && x.m < lm)
+          .sort((a, b) => (a.m < b.m ? 1 : -1));
+      }
       else { state = "error"; err = r.error; }
       loadP = null; paint(); return D;
     });
@@ -87,17 +97,17 @@ const Dash = (() => {
   }
   // 다른 탭(기관 상세의 약정·수수료, 통합 검색)이 대시보드 데이터를 읽을 때. 없거나 못 열면 null
   function data() {
-    if (D) return Promise.resolve(D);
+    if (LIVE) return Promise.resolve(LIVE);
     if (state === "error" && (err === "missing" || err === "mismatch")) return Promise.resolve(null);
     return ensure().catch(() => null);
   }
   // 다른 탭에서 시트를 골라 연다(앱이 대시보드 탭으로 옮긴 뒤 그린다). q = 그 시트 첫 표의 찾기 칸에 넣을 말
-  function open(name, q) { sel = name; LS.set("kbnote-dzsel", name); pendingQ = q || ""; if (q) mode[name] = "v"; }
+  function open(name, q) { toLive(); sel = name; LS.set("kbnote-dzsel", name); pendingQ = q || ""; if (q) mode[name] = "v"; }
   function render() { if (!D) { if (state !== "loading" && state !== "error") ensure(); paint(); return; } paint(); }
 
-  function index() {
+  function index(d) {
     // 표 행마다 고정 번호(펼침 상태용)·찾기용 글자
-    D.sheets.forEach((s) => walk(s.view || [], (b) => {
+    d.sheets.forEach((s) => walk(s.view || [], (b) => {
       if (b.t !== "table") return;
       let n = 0;
       (b.secs || [{ rows: b.rows || [] }]).forEach((sec) => sec.rows.forEach((r) => { r._i = n++; }));
@@ -152,6 +162,28 @@ const Dash = (() => {
     paint(); window.scrollTo({ top: 0 });
   }
 
+  // ── 월말 대시보드 ────────────────────────────────────────
+  const md = (d) => { const m = String(d || "").match(/^\d{4}-(\d{2})-(\d{2})/); return m ? `${+m[1]}/${+m[2]}` : String(d || ""); };
+  // '2026년 10월말 · 10/30' — 기준일 뒤로 그 달에 영업일(월~금)이 없으면 월말. 남았으면 '2026년 11월 · 11/20 기준'
+  function mLabel(x) {
+    const [y, m] = x.m.split("-").map(Number), d = +String(x.asof).slice(8, 10), last = new Date(y, m, 0).getDate();
+    let end = true;
+    for (let k = d + 1; k <= last; k++) { const w = new Date(y, m - 1, k).getDay(); if (w !== 0 && w !== 6) { end = false; break; } }
+    return `${y}년 ${m}월${end ? "말" : ""} · ${m}/${d}${end ? "" : " 기준"}`;
+  }
+  function toLive() { if (!cur) return; cur = ""; D = LIVE; buildStyles(); }
+  async function setAsof(m) {
+    hErr = "";
+    if (!m) { toLive(); paint(); return; }
+    if (!SNAP[m]) {
+      const b = $("#dzBody"); if (b) b.innerHTML = `<div class="empty">${h(mLabel(HIST.find((x) => x.m === m) || { m, asof: m + "-01" }))} 대시보드를 여는 중…</div>`;
+      const r = await Vault.openExtra(`dash-hist/${m}.enc.json`);
+      if (!r.data) { hErr = r.error === "network" ? "그 달 대시보드를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요." : "그 달 대시보드를 열지 못했습니다."; toLive(); paint(); return; }
+      index(r.data); SNAP[m] = r.data;
+    }
+    cur = m; D = SNAP[m]; buildStyles(); paint();
+  }
+
   // ── 쪽(요약 / 시트) ─────────────────────────────────────
   function paintPage() {
     const isSum = sel === SUM, s = isSum ? sheetBy(DEMO) : sheetBy(sel);
@@ -166,9 +198,15 @@ const Dash = (() => {
         ${ck.ok !== ck.n ? `<button type="button" class="ck ng" data-s="검증" title="${h((ck.fails || []).join(" / "))}">검증 ${ck.ok}/${ck.n} 확인 필요</button>` : ""}</div>` : "";   // 엑셀 정합성 검증은 어긋날 때만 보인다
     const seg = canView && canGrid ? `<div class="seg dz-seg" role="group" aria-label="보기 방식">${canA3 ? `<button type="button" data-m="a" aria-pressed="${m === "a"}">한눈에</button>` : ""}<button type="button" data-m="v" aria-pressed="${m === "v"}">정리 화면</button><button type="button" data-m="g" aria-pressed="${m === "g"}">엑셀 원본</button></div>` : "";
     const gs = isSum && m === "v" ? `<div class="gfind"><input type="search" id="gq" placeholder="대시보드 전체에서 찾기 (운용사·펀드·기관…)" aria-label="대시보드 전체에서 찾기" autocomplete="off"></div>` : "";
-    $("#dzMain").innerHTML = `
-      <div class="dz-head"><div class="t"><div class="eyebrow">${eyebrow}</div><h2>${h(title)}</h2>${!isSum && s.short !== s.name ? `<div class="sub2">${h(s.name)}</div>` : ""}</div>${meta}${seg}</div>
+    const hx = HIST.find((x) => x.m === cur);
+    const asof = HIST.length ? `<label class="dz-asof${cur ? " past" : ""}"><span>기준</span><select id="dzAsof" aria-label="대시보드 기준 달 고르기 (월말)"><option value="">최신 · ${h(md(LIVE.asof))}</option>${HIST.map((x) => `<option value="${h(x.m)}"${cur === x.m ? " selected" : ""}>${h(mLabel(x))}</option>`).join("")}</select></label>` : "";
+    const past = hx ? `<div class="dz-past" role="status"><span><b>${h(mLabel(hx))}</b> 대시보드를 보는 중 · 기준일 ${h(D.asof)} <small>(수수료 원장 쪽은 최신에만)</small></span><button type="button" class="btn sm" id="dzLive">최신으로</button></div>`
+      : hErr ? `<div class="dz-past err" role="alert"><span>${h(hErr)}</span></div>` : "";
+    $("#dzMain").innerHTML = `${past}
+      <div class="dz-head"><div class="t"><div class="eyebrow">${eyebrow}</div><h2>${h(title)}</h2>${!isSum && s.short !== s.name ? `<div class="sub2">${h(s.name)}</div>` : ""}</div>${asof}${meta}${seg}</div>
       ${gs}<div id="dzBody" class="dz-body"></div>`;
+    const asel = $("#dzAsof"); if (asel) asel.onchange = () => setAsof(asel.value);
+    const lv = $("#dzLive"); if (lv) lv.onclick = () => setAsof("");
     $$("#dzMain .dz-seg button").forEach((b) => b.onclick = () => { mode[sel] = b.dataset.m; paintPage(); });
     const ckb = $("#dzMain .ck[data-s]"); if (ckb && sheetBy("검증")) ckb.onclick = () => go("검증");
     const body = $("#dzBody");
@@ -1010,11 +1048,11 @@ const Dash = (() => {
   }
   // 리서치 탭 등 다른 화면에서 같은 블록(지표 카드·차트)을 그릴 때. id 접두어를 달리해 대시보드 요소와 겹치지 않는다
   function blocks(list, el, key) {
-    const keep = idp; idp = "r";
+    const keep = idp, kd = D; idp = "r"; D = LIVE || D;   // 다른 탭(리서치·운용보고서·라인업·기관 상세)은 늘 최신 환율로
     try { const mounts = []; el.innerHTML = list.map((b, i) => blockHtml(b, `${key}:${b.id || i}`, mounts)).join(""); mounts.forEach((fn) => fn()); }
-    finally { idp = keep; }
+    finally { idp = keep; D = kd; }
   }
-  // 약정 계산·화면에 쓰는 도우미(기관 상세)
-  const sheets = () => (D ? D.sheets : []);
+  // 약정 계산·화면에 쓰는 도우미(기관 상세) — 늘 최신
+  const sheets = () => (LIVE ? LIVE.sheets : []);
   return { render, focusFind, blocks, data, open, walk, sheets };
 })();

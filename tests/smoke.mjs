@@ -38,6 +38,18 @@ execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', join
 const FENC = join(ROOT, 'tests', '_fees.enc.json');
 execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', join(ROOT, 'tests/fees-fixture.json'), FENC, '--salt-from', ENC],
   { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
+// 월말 대시보드 보관본(dash-hist/YYYY-MM.enc.json + index.json): 가상 대시보드의 기준일만 지난 달 말로 바꿔 같은 키로
+const HENC = join(ROOT, 'tests', '_hist.enc.json'), HIDX = join(ROOT, 'tests', '_hist-index.json');
+{
+  const d = JSON.parse(readFileSync(join(ROOT, 'tests/dash-fixture.json'), 'utf8'));
+  d.asof = '2025-12-31'; d.generatedAt = '2025-12-31 09:00';
+  const tj = join(ROOT, 'tests', '_hist-src.json'); writeFileSync(tj, JSON.stringify(d));
+  execFileSync(process.execPath, [join(ROOT, 'scripts/vault.mjs'), 'encrypt', tj, HENC, '--salt-from', ENC],
+    { env: { ...process.env, MEETING_DB_PASSWORD: PW }, stdio: 'inherit' });
+  const env = JSON.parse(readFileSync(HENC, 'utf8'));
+  if (env.asof !== '2025-12-31') throw new Error('vault.mjs 가 대시보드 암호문 겉에 기준일(asof)을 적지 않았습니다');
+  writeFileSync(HIDX, JSON.stringify({ v: 1, months: [{ m: '2026-01', asof: '2026-01-01', gen: '' }, { m: '2025-12', asof: '2025-12-31', gen: '' }] }));
+}
 let serveFees = false;
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
@@ -45,7 +57,8 @@ const server = createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p.endsWith('/')) p += 'index.html';
   const file = p === '/data.enc.json' ? ENC : p === '/dash.enc.json' ? DENC : p === '/research.enc.json' ? RENC : p === '/reports.enc.json' ? PENC : p === '/lineup.enc.json' ? LENC
-    : p === '/fees.enc.json' ? (serveFees ? FENC : join(ROOT, 'tests', '_none')) : join(ROOT, p);
+    : p === '/fees.enc.json' ? (serveFees ? FENC : join(ROOT, 'tests', '_none')) : p === '/dash-hist/index.json' ? HIDX : p === '/dash-hist/2025-12.enc.json' ? HENC
+    : p.startsWith('/dash-hist/') ? join(ROOT, 'tests', '_none') : join(ROOT, p);
   if (!file.startsWith(ROOT) || !existsSync(file)) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
   res.end(readFileSync(file));
@@ -216,6 +229,14 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   const pickSheet = (name) => vp.width < 760 ? page.selectOption('#dzNav .dz-pick select', name) : page.locator(`.dz-item[data-s="${name}"]`).click();
   if (vp.width < 760) ok('휴대폰 시트 선택 상자(묶음별)', (await page.locator('#dzNav .dz-pick optgroup').count()) >= 1 && !(await page.locator('.dz-item').first().isVisible()));
   ok('요약에 시트 바로가기', (await page.locator('#dzBody .qk').count()) === 3);
+  // 월말 대시보드: 지난 달 보관본 고르기 → 노랑 띠·그 달 기준일 → 최신으로 (최신과 같은 달은 목록에서 뺀다)
+  ok('기준 달 고르기(최신 + 지난 월말)', (await page.locator('#dzAsof option').count()) === 2 && (await page.locator('#dzAsof option').nth(1).textContent()).startsWith('2025년 12월말'));
+  await page.selectOption('#dzAsof', '2025-12');
+  await page.locator('#dzMain .dz-past').waitFor();
+  ok('지난 월말 보기: 노랑 띠·그 달 기준일', (await page.textContent('#dzMain .eyebrow')).includes('2025-12-31') && (await page.textContent('#dzMain .dz-past')).includes('2025년 12월말')
+    && (await page.locator('#dzMain .kc').count()) === 2);
+  await page.locator('#dzLive').click();
+  ok('최신으로 돌아오기', (await page.locator('#dzMain .dz-past').count()) === 0 && (await page.textContent('#dzMain .eyebrow')).includes('2026-01-01') && (await page.inputValue('#dzAsof')) === '');
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-dash.png`), fullPage: vp.width < 760 });
   await page.fill('#gq', 'Demo Partners'); await page.waitForTimeout(400);
   ok('전체 찾기', (await page.locator('#dzBody .gres li').count()) >= 6 && (await page.textContent('#dzBody .gres')).includes('샘플 수익표'));

@@ -1,0 +1,41 @@
+name: Dashboard month snapshots (월말 대시보드 보관)
+
+# dash.enc.json 이 바뀔 때마다 그 달 보관본 dash-hist/YYYY-MM.enc.json 을 같은 암호문으로 바꾼다(scripts/dash_hist.mjs).
+# 그 달 마지막 업데이트가 남으므로 = 월말 대시보드. 비밀번호 없이 암호문 겉의 기준일만 읽는다. 바이트가 같아 저장소는 커지지 않는다.
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'dash.enc.json' ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dash-hist
+  cancel-in-progress: false
+
+jobs:
+  keep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Keep this month's dashboard
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4; do
+            git pull -q --rebase origin main
+            node scripts/dash_hist.mjs
+            git add dash-hist
+            if git diff --cached --quiet; then echo "바뀐 것 없음"; exit 0; fi
+            git commit -q -m "dash-hist: 월별 대시보드 보관"
+            if git push -q origin HEAD:main; then exit 0; fi
+            git reset -q --hard origin/main; sleep $((i * 5))
+          done
+          echo "::error::보관본을 올리지 못했습니다(다른 push 와 계속 겹침)"; exit 1

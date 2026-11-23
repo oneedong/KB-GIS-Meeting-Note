@@ -11,6 +11,7 @@
 //   node scripts/vault.mjs encrypt <SP>/reports.json reports.enc.json --salt-from data.enc.json     운용보고서(kind:"reports")도 같은 방식
 //   node scripts/vault.mjs encrypt <SP>/lineup.json lineup.enc.json --salt-from data.enc.json       라인업(kind:"lineup")도 같은 방식
 //   node scripts/vault.mjs encrypt <SP>/fees.json fees.enc.json --salt-from data.enc.json           수수료 원장(kind:"fees")도 같은 방식
+//   대시보드 암호문 겉에는 기준일(asof, 날짜만)도 적는다 → scripts/dash_hist.mjs(월말 대시보드 보관)
 //
 // 비밀번호: 환경변수 MEETING_DB_PASSWORD, 없으면 터미널에서 입력받는다(화면에 안 보임).
 // 같은 비밀번호로 다시 암호화하면 기존 salt 를 그대로 써서, 휴대폰에 기억된 키가 계속 맞는다.
@@ -109,6 +110,8 @@ if (cmd === 'check') {
   const plain = gzipSync(Buffer.from(JSON.stringify(data), 'utf8'), { level: 9 });
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain));
   const env = { v: 1, alg: 'AES-256-GCM', kdf: 'PBKDF2-SHA256', iter, salt: b64(salt), iv: b64(iv), z: 'gzip', generatedAt: data.generatedAt || '', ct: b64(ct) };
+  // 대시보드는 기준일(날짜만)을 겉에 — scripts/dash_hist.mjs 가 비밀번호 없이 그 달 보관 파일을 고른다(월말 대시보드, 2026-11-23)
+  if (data.kind === 'dashboard' && /^\d{4}-\d{2}-\d{2}/.test(String(data.asof || ''))) env.asof = String(data.asof).slice(0, 10);
 
   // 써 넣기 전에 되풀어서 확인
   if (JSON.stringify(await open(env, pw)) !== JSON.stringify(data)) throw new Error('복호화 검증 실패');

@@ -40,6 +40,15 @@ jobs:
             node -e "const j=require('./fees.enc.json');if(!j.ct||!j.iv||!j.salt||j.sheets)process.exit(1)" \
               || { echo "::error::fees.enc.json 이 암호문 형식이 아닙니다"; exit 1; }
           fi
+          for f in dash-hist/*.enc.json; do
+            [ -f "$f" ] || continue
+            node -e "const j=require('./'+process.argv[1]);if(!j.ct||!j.iv||!j.salt||j.sheets||j.summary)process.exit(1)" "$f" \
+              || { echo "::error::$f 이 암호문 형식이 아닙니다"; exit 1; }
+          done
+          if [ -f dash-hist/index.json ]; then   # 월말 대시보드 목록 — 달·기준일·만든 시각만
+            node -e "const j=require('./dash-hist/index.json');const ok=Array.isArray(j.months)&&j.months.every((x)=>Object.keys(x).every((k)=>['m','asof','gen'].includes(k)));process.exit(ok?0:1)" \
+              || { echo "::error::dash-hist/index.json 에 달·기준일 말고 다른 내용이 있습니다"; exit 1; }
+          fi
           if [ -f data.enc.json ]; then
             node -e "const j=require('./data.enc.json');if(!j.ct||!j.iv||!j.salt||j.meetings||j.people)process.exit(1)" \
               || { echo "::error::data.enc.json 이 암호문 형식이 아닙니다"; exit 1; }

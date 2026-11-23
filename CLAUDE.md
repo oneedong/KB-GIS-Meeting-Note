@@ -10,7 +10,7 @@
 
 ## 절대 규칙
 - 평문 데이터(복호화한 data.json, patch.json, 사용자가 준 미팅노트 원문 txt 등)는 저장소 밖(스크래치패드)에만 두고 커밋하지 않는다.
-  저장소에 들어가는 데이터는 암호문 `data.enc.json`·`dash.enc.json`·`fees.enc.json`·`research.enc.json`·`reports.enc.json`·`lineup.enc.json` 여섯뿐. 커밋 전 `git status`로 확인.
+  저장소에 들어가는 데이터는 암호문 `data.enc.json`·`dash.enc.json`·`fees.enc.json`·`research.enc.json`·`reports.enc.json`·`lineup.enc.json` 여섯뿐(+ 월말 대시보드 보관본 `dash-hist/YYYY-MM.enc.json` = dash.enc.json 과 같은 암호문, `dash-hist/index.json` = 달·기준일만). 커밋 전 `git status`로 확인.
   (`.gitignore`·CI 가 data/dash/fees/patch/posts/research/reports .json·reports-src/·txt·eml·zip·엑셀·csv·pdf 를 막는다. 사용자가 준 리포트·운용보고서 PDF 도 평문이다)
 - 비밀번호를 파일·커밋·코드·로그·커밋 메시지에 남기지 않는다. 환경변수 `MEETING_DB_PASSWORD`로만 넘긴다
   (환경 설정에 있으면 그대로, 없으면 사용자에게 묻는다).
@@ -46,6 +46,13 @@
 4. 약정내역(2022~현재·2010~2021) 시트가 바뀌었으면 수수료 원장 쪽의 약정 연결도 갱신(2026-11-18, 사용자 요청 — 엑셀을 꾸준히 고침):
    `node scripts/vault.mjs decrypt fees.enc.json <SP>/fees_prev.json` → `python3 scripts/fees_build.py --from <SP>/fees_prev.json <SP>/fees.json --dash <SP>/dash.json`
    ('대시보드에서 못 찾은 행' 이 나오면 docs/FEES.md) → `vault.mjs encrypt … fees.enc.json --salt-from data.enc.json` → 같이 커밋. 평문 fees*.json 삭제.
+- **월말 대시보드(사용자 요청 2026-11-23: '월말일 기준으로 각각 대시보드 볼 수 있게')**: 대시보드 머리의 '기준' 고르기 = 최신 + 지난 달들(`dash-hist/index.json`, 최신과 같은 달은 뺌).
+  지난 달을 고르면 `dash-hist/YYYY-MM.enc.json` 을 열어 노랑 띠로 표시(수수료 원장 쪽은 최신에만, 기관 상세·통합 검색은 늘 최신 — dash.js `LIVE`/`cur`/`setAsof`).
+  보관은 자동: dash.enc.json 을 push 하면 GitHub Actions `dash-hist.yml` → `node scripts/dash_hist.mjs` 가 그 달 보관본을 같은 암호문(바이트 그대로 — 저장소 안 커짐)으로 바꾸고 bot 커밋
+  → 그 달 마지막 업데이트 = 그 달 월말. 달은 암호문 겉의 `asof`(vault.mjs 가 대시보드에 붙임, 없으면 generatedAt 날짜). 매일 업데이트에서 따로 할 일 없음(push 뒤 bot 커밋이 생기니 fetch·rebase).
+  **지난 달 채우기(2026-01~10, 아직 없음)**: 엑셀을 그 달 말 기준으로 다시 계산해야 한다 — 최신 xlsm 사본에서 대시보드_설정 기준일(C7·C14)=그 달 말일, 환율(C8 USD·C13 EUR)=그 달 마지막 영업일 매매기준율로 바꿔 다시 계산
+  (매일 작업의 uno_daily.py 와 같은 방식) → `dash_extract.py <사본> <SP>/dash-YYYY-MM.json` → `vault.mjs encrypt … <SP>/dash-YYYY-MM.enc.json --salt-from data.enc.json` → `node scripts/dash_hist.mjs <SP>/dash-YYYY-MM.enc.json` → `git add dash-hist` 커밋(`dash-hist: 월말 대시보드 MM월`) → push.
+  보관 전에 그 달까지만 세는지 확인(요약 A3 제목 'N월 대시보드'·월별 수익이 그 달까지·약정/계약 건수가 그 달 날짜까지). 엑셀 수식이 기준일과 상관없이 전부 세는 표가 있으면 보관하지 말고 사용자에게 알린다. 잘못 넣은 달은 `--force` 로 다시.
 - 2022년~ 약정 시트 이름은 '약정내역(2022~현재)'(2026-11-09, 예전 '약정내역&수수료' — 코드는 두 이름 다 받음). 약정 통계의 펀드 수·기관 수는 수식(13행 확인 칸).
 - 엑셀에만 두고 앱에는 아직 안 올리는 시트는 `dash_extract.py`의 `EXCEL_ONLY`(지금은 없음).
 - '근거_01~16_…' 시트(2026-11-16 추가, 사용자 요청): 해외대체 시딩 펀드별 수익률 산식(관리판 캐피탈콜 G~Z·원본상환 AI~AN·이익분배 AO~BD 전 칸 연결, NAV 기준일 = 관리판 BG3).

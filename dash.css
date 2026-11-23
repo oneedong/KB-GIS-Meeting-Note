@@ -399,3 +399,13 @@ body.dashmode .page{max-width:var(--page-max)}   /* 2026-11-17 PC 넓게: 공통
 .a3 .a3c{transition:none}
 .a3wrap:fullscreen{border:0;border-radius:0;box-shadow:none;padding:0;background:var(--panel)}
 .a3wrap:fullscreen .a3{margin:0 auto}
+/* 월말 대시보드(2026-11-23): 기준 달 고르기 + 지난 달을 볼 때 노랑 띠 */
+.dz-asof{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);flex:none}
+.dz-asof>span{white-space:nowrap}
+.dz-past small{color:var(--muted);font-size:12px}
+.dz-asof select{font:inherit;font-size:13px;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 26px 5px 9px;min-height:32px}
+.dz-asof.past select{border-color:var(--kb-yellow);background:var(--sel);font-weight:700}
+.dz-past{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:8px 12px;border-radius:10px;
+  background:var(--sel);border:1px solid color-mix(in srgb, var(--kb-yellow) 60%, transparent);font-size:13px;color:var(--fg)}
+.dz-past.err{background:color-mix(in srgb, var(--s-watch) 12%, var(--panel));border-color:color-mix(in srgb, var(--s-watch) 40%, transparent)}
+@media (max-width:760px),(pointer:coarse){.dz-asof select{min-height:38px}}
