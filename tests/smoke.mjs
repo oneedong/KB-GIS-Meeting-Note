@@ -231,7 +231,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('필터 칩 → 선택 합계', (await page.textContent('#dzBody .tb-n')).startsWith('10건') && (await page.textContent('#dzBody')).includes('선택한 10건 합계'));
   await page.locator('#dzBody .tb-x').click();
   await page.locator(item).first().click();
-  ok('펼치면 세부 내역', (await page.locator('#dzBody .xd .dt.mini tr').count()) === 3);
+  ok('펼치면 세부 내역', (await page.locator('#dzBody .xd .dt.mini thead tr, #dzBody .xd .dt.mini tbody tr').count()) === 3);
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-dash-sheet.png`) });
   await page.locator('.dz-seg button[data-m="g"]').click();
   await page.locator('#xs td').first().waitFor();
