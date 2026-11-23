@@ -726,74 +726,90 @@ const Dash = (() => {
   // ── 한눈에(A3) — 대시보드(Demo) 시트 인쇄 영역을 엑셀 배치 그대로 화면에 맞춰(사용자 요청 2026-11-23) ──
   //    칸 = 절대 위치(열 폭·행 높이 그대로), 차트 = 엑셀 차트 자리에 정리 화면과 같은 데이터로, KPI 달성 막대 = 4행 아래 막대.
   function paintA3(s, host) {
-    const A = s.a3, X = [0], Y = [0];
-    A.cols.forEach((w) => X.push(X[X.length - 1] + w)); A.rh.forEach((v) => Y.push(Y[Y.length - 1] + v));
-    const W = X[X.length - 1], H = Y[Y.length - 1];
+    const A = s.a3, X0 = [0], Y0 = [0];
+    A.cols.forEach((w) => X0.push(X0[X0.length - 1] + w)); A.rh.forEach((v) => Y0.push(Y0[Y0.length - 1] + v));
+    const W = X0[X0.length - 1], H = Y0[Y0.length - 1];
     const byId = {}; walk(s.view || [], (b) => { if (b.id && b.t === "col") byId[b.id] = b; });
-    const box = (r0, c0, r1, c1) => `left:${X[c0]}px;top:${Y[r0]}px;width:${X[c1] - X[c0]}px;height:${Y[r1] - Y[r0]}px`;
-    let out = "";
-    // 엑셀처럼 글자가 옆의 빈 칸으로 넘쳐 보이게: 글자 있는 칸(병합 포함) 자리표
     const nc = A.cols.length, full = new Set();
     A.cells.forEach(([r, c, t, , cs, rs]) => { if (t) for (let a = 0; a < rs; a++) for (let b = 0; b < cs; b++) full.add((r + a) + ":" + (c + b)); });
-    A.cells.forEach(([r, c, t, k, cs, rs, sz, va, wr]) => {
-      const st = D.styles[k] || [], al = st[4], nm = t && NUMRE.test(t.trim());
-      const ja = al === "center" ? "center" : (al === "right" || (nm && al !== "left")) ? "flex-end" : "flex-start";
-      const ai = va === "t" ? "flex-start" : va === "b" ? "flex-end" : "center";
-      const fs = Math.round(sz * 4 / 3 * 10) / 10;
-      let spill = 0;
-      if (t && !wr && rs === 1 && ja !== "center") {
-        if (ja === "flex-start") { let e = c + cs; while (e < nc && !full.has(r + ":" + e)) e++; spill = X[e] - X[c + cs]; }
-        else { let e = c - 1; while (e >= 0 && !full.has(r + ":" + e)) e--; spill = X[c] - X[e + 1]; }
-      }
-      const sp = spill > 2 ? ` style="max-width:${X[c + cs] - X[c] + spill - 6}px"` : "";
-      out += `<div class="a3c s${k}${wr ? " w" : ""}${spill > 2 ? " sp" : ""}${isNoBg(k) ? " nb" : ""}" style="${box(r, c, r + rs, c + cs)};justify-content:${ja};align-items:${ai};font-size:${fs}px${al === "center" ? ";text-align:center" : ""}"${t ? ` title="${h(t)}"` : ""}>${t ? `<span${sp}>${h(t).replace(/\n/g, "<br>")}</span>` : ""}</div>`;
-    });
-    (A.bars || []).forEach((b) => {
-      const p = Math.max(0, Math.min(1, b.p || 0));
-      out += `<div class="a3bar" style="${box(b.r, b.c0, b.r + 1, b.c1 + 1)}"><i style="width:${(p * 100).toFixed(1)}%"></i></div>`;
-    });
-    const mounts = [];
-    (A.charts || []).forEach((c, i) => {
-      const b = byId[c.ref]; if (!b) return;
-      const [ro, co, ro2, co2] = c.o || [0, 0, 0, 0];
-      const l = X[c.c0] + co, t = Y[c.r0] + ro, w = X[c.c1] + co2 - l, hh = Y[c.r1] + ro2 - t;
-      const id = "a3ch" + i;
-      out += `<div class="a3ch" id="${id}" style="left:${l}px;top:${t}px;width:${w}px;height:${hh}px"><div class="chslot"></div></div>`;
-      mounts.push(() => {
-        const el = document.getElementById(id); if (!el) return;
-        const one = Object.assign({}, b, { title: "" });
-        $(".chslot", el).innerHTML = colChart(one, w, hh - (one.series.length > 1 ? 22 : 4));
-      });
-    });
-    const zKey = "kbnote-a3z", saved = LS.get(zKey, null);
+    const zKey = "kbnote-a3z2", saved = LS.get(zKey, null);
     host.innerHTML = `
-      <div class="sh-tools a3tools"><span class="a3cap">엑셀 「대시보드」 시트(A3 인쇄 영역) 그대로 · 차트는 정리 화면과 같은 데이터</span>
-        <div class="sh-zoom" role="group" aria-label="확대"><button type="button" class="btn sm" id="zOut" aria-label="축소">−</button><span id="zLab">100%</span><button type="button" class="btn sm" id="zIn" aria-label="확대">+</button><button type="button" class="btn sm" id="zFit">화면 맞춤</button></div></div>
-      <div class="a3wrap" id="a3wrap"><div class="a3" id="a3" style="width:${W}px;height:${H}px">${out}</div></div>`;
-    mounts.forEach((fn) => fn());
+      <div class="sh-tools a3tools"><span class="a3cap">엑셀 「대시보드」 시트(A3 인쇄 영역) 배치 그대로 · 화면에 꽉 차게 · 차트는 정리 화면과 같은 데이터</span>
+        <div class="sh-zoom" role="group" aria-label="확대"><button type="button" class="btn sm" id="zOut" aria-label="축소">−</button><span id="zLab">100%</span><button type="button" class="btn sm" id="zIn" aria-label="확대">+</button><button type="button" class="btn sm" id="zFit">화면 맞춤</button>${document.fullscreenEnabled ? `<button type="button" class="btn sm" id="zFull" aria-label="전체 화면">전체 화면</button>` : ""}</div></div>
+      <div class="a3wrap" id="a3wrap"><div class="a3" id="a3"></div></div>`;
     const wrap = $("#a3wrap"), cv = $("#a3");
-    // 칸에 다 안 들어가는 글자는 엑셀 '셀에 맞춤'처럼 글자를 줄인다(최소 65%)
-    $$(".a3c > span", cv).forEach((sp) => {
-      const d = sp.parentElement; if (d.classList.contains("w")) return;
-      const avail = sp.style.maxWidth ? parseFloat(sp.style.maxWidth) : d.clientWidth - 6;
-      if (sp.scrollWidth > avail + 0.5) { const f = parseFloat(d.style.fontSize) || 14; d.style.fontSize = Math.max(f * 0.65, f * avail / sp.scrollWidth).toFixed(1) + "px"; }
-    });
-    const fitZ = () => {
-      const r = wrap.getBoundingClientRect(), wz = (wrap.clientWidth - 2) / W;
-      if (mob()) return Math.max(0.15, wz);
-      const hz = (window.innerHeight - Math.max(r.top, 0) - 16) / H;
-      return Math.max(0.3, Math.min(wz, hz >= 0.55 ? hz : wz));   // PC: 한 화면에 다 보이게(너무 작아지면 폭 맞춤)
+    // 화면 맞춤 = 가로·세로를 따로 늘려 화면을 꽉 채운다(사용자 요청 2026-11-23). 휴대폰은 폭 맞춤(두 손가락 확대)
+    const fitS = () => {
+      const fx = Math.max(0.15, (wrap.clientWidth - 2) / W);
+      if (document.fullscreenElement === wrap) { const fy = (wrap.clientHeight - 2) / H; return mob() && fy < fx * 0.6 ? [fx, fx] : [fx, Math.max(fx * 0.45, Math.min(fx * 1.6, fy))]; }
+      if (mob()) return [fx, fx];
+      const top = Math.max(wrap.getBoundingClientRect().top, 0), fy = (window.innerHeight - top - 14) / H;
+      return [fx, Math.max(0.45, Math.min(fx * 1.6, fy))];
     };
+    let sx = 1, sy = 1;
+    const draw = () => {
+      const X = X0.map((v) => v * sx), Y = Y0.map((v) => v * sy), fz = Math.min(sx, sy * 1.1);
+      const box = (r0, c0, r1, c1) => `left:${X[c0].toFixed(1)}px;top:${Y[r0].toFixed(1)}px;width:${(X[c1] - X[c0]).toFixed(1)}px;height:${(Y[r1] - Y[r0]).toFixed(1)}px`;
+      let out = "";
+      A.cells.forEach(([r, c, t, k, cs, rs, sz, va, wr]) => {
+        const st = D.styles[k] || [], al = st[4], nm = t && NUMRE.test(t.trim());
+        const ja = al === "center" ? "center" : (al === "right" || (nm && al !== "left")) ? "flex-end" : "flex-start";
+        const ai = va === "t" ? "flex-start" : va === "b" ? "flex-end" : "center";
+        const fs = Math.round(sz * 4 / 3 * fz * 10) / 10;
+        let spill = 0;
+        if (t && !wr && rs === 1 && ja !== "center") {
+          if (ja === "flex-start") { let e = c + cs; while (e < nc && !full.has(r + ":" + e)) e++; spill = X[e] - X[c + cs]; }
+          else { let e = c - 1; while (e >= 0 && !full.has(r + ":" + e)) e--; spill = X[c] - X[e + 1]; }
+        }
+        const sp = spill > 2 ? ` style="max-width:${(X[c + cs] - X[c] + spill - 6).toFixed(1)}px"` : "";
+        out += `<div class="a3c s${k}${wr ? " w" : ""}${spill > 2 ? " sp" : ""}${isNoBg(k) ? " nb" : ""}${a3Title(k) && t ? " ttl" : ""}" style="${box(r, c, r + rs, c + cs)};justify-content:${ja};align-items:${ai};font-size:${fs}px${al === "center" ? ";text-align:center" : ""}"${t ? ` title="${h(t)}"` : ""}>${t ? `<span${sp}>${h(t).replace(/\n/g, "<br>")}</span>` : ""}</div>`;
+      });
+      (A.bars || []).forEach((b) => {
+        const p = Math.max(0, Math.min(1, b.p || 0));
+        out += `<div class="a3bar" style="${box(b.r, b.c0, b.r + 1, b.c1 + 1)}"><i style="width:${(p * 100).toFixed(1)}%"></i></div>`;
+      });
+      const mounts = [];
+      (A.charts || []).forEach((c, i) => {
+        const b = byId[c.ref]; if (!b) return;
+        const [ro, co, ro2, co2] = c.o || [0, 0, 0, 0];
+        const l = X[c.c0] + co * sx, t = Y[c.r0] + ro * sy, w = X[c.c1] + co2 * sx - l, hh = Y[c.r1] + ro2 * sy - t;
+        const id = "a3ch" + i;
+        out += `<div class="a3ch" id="${id}" style="left:${l.toFixed(1)}px;top:${t.toFixed(1)}px;width:${w.toFixed(1)}px;height:${hh.toFixed(1)}px"><div class="chslot"></div></div>`;
+        mounts.push(() => {
+          const el = document.getElementById(id); if (!el) return;
+          const one = Object.assign({}, b, { title: "" });
+          const slot = $(".chslot", el), k = Math.max(0.2, fz);
+          slot.style.zoom = k;
+          slot.innerHTML = colChart(one, (w - 8) / k, (hh - 4) / k - (one.series.length > 1 ? 22 : 0));
+        });
+      });
+      cv.style.width = (W * sx).toFixed(1) + "px"; cv.style.height = (H * sy).toFixed(1) + "px";
+      cv.innerHTML = out;
+      mounts.forEach((fn) => fn());
+      // 칸에 다 안 들어가는 글자는 엑셀 '셀에 맞춤'처럼 글자를 줄인다(최소 65%)
+      $$(".a3c > span", cv).forEach((sp) => {
+        const d = sp.parentElement; if (d.classList.contains("w")) return;
+        const avail = sp.style.maxWidth ? parseFloat(sp.style.maxWidth) : d.clientWidth - 6;
+        const sw = sp.getBoundingClientRect().width / (parseFloat(getComputedStyle(cv).zoom) || 1);
+        if (sp.scrollWidth > avail - 0.5 || sw > avail - 0.5) { const f = parseFloat(d.style.fontSize) || 14; d.style.fontSize = Math.max(f * 0.5, f * (avail - 1.5) / Math.max(sp.scrollWidth, sw)).toFixed(1) + "px"; }
+      });
+    };
+    // 확대 = 화면 맞춤 위에 곱하는 배율(100% = 화면 맞춤). 두 손가락·두 번 누르기는 CSS zoom 으로 바로
     let z = 1;
     const setZ = (v, keep) => {
-      z = Math.max(0.15, Math.min(2.5, Math.round(v * 100) / 100));
+      z = Math.max(0.5, Math.min(4, Math.round(v * 100) / 100));
       cv.style.zoom = z; $("#zLab").textContent = Math.round(z * 100) + "%";
       if (keep) LS.set(zKey, z); else if (keep === false) LS.set(zKey, null);
     };
-    $("#zIn").onclick = () => setZ(z + 0.1, true); $("#zOut").onclick = () => setZ(z - 0.1, true); $("#zFit").onclick = () => setZ(fitZ(), false);
-    setZ(saved != null ? saved : fitZ());
-    a3View = { fit: () => { if (LS.get(zKey, null) == null) setZ(fitZ()); } };
-    // 손가락: 두 손가락으로 확대·축소, 두 번 누르면 100% ↔ 화면 맞춤(누른 자리 기준)
+    const refit = () => { [sx, sy] = fitS(); draw(); };
+    $("#zIn").onclick = () => setZ(z + 0.1, true); $("#zOut").onclick = () => setZ(z - 0.1, true); $("#zFit").onclick = () => { setZ(1, false); refit(); };
+    const fb = $("#zFull");
+    if (fb) {
+      fb.onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else wrap.requestFullscreen().catch(() => {}); };
+      wrap.onfullscreenchange = () => { fb.textContent = document.fullscreenElement ? "전체 화면 닫기" : "전체 화면"; setTimeout(refit, 60); };
+    }
+    refit(); setZ(saved != null ? saved : 1);
+    a3View = { fit: () => { refit(); } };
     const zoomAt = (nz, mx, my) => {
       const cx = (wrap.scrollLeft + mx) / z, cy = (wrap.scrollTop + my) / z;
       setZ(nz, true); wrap.scrollLeft = cx * z - mx; wrap.scrollTop = cy * z - my;
@@ -807,7 +823,7 @@ const Dash = (() => {
         const now = Date.now();
         if (now - lastTap < 300) {
           e.preventDefault(); const r = wrap.getBoundingClientRect(), t = e.touches[0];
-          if (z < 0.9) zoomAt(1, t.clientX - r.left, t.clientY - r.top); else setZ(fitZ(), false);
+          if (z < 1.5) zoomAt(2.4, t.clientX - r.left, t.clientY - r.top); else setZ(1, false);
           lastTap = 0; return;
         }
         lastTap = now;
@@ -830,11 +846,31 @@ const Dash = (() => {
       if (/^(left|right|center)$/.test(al)) r.push(`text-align:${al}`);
       const sides = ["top", "bottom", "left", "right"];
       String(bd || "0000").split("").forEach((w, j) => { if (+w) r.push(`border-${sides[j]}:${w}px solid #222`); });
-      if (r.length) css.push(`.xs td.s${k},.a3 .a3c.s${k}{${r.join(";")}}`);
+      if (r.length) css.push(`.xs td.s${k}{${r.join(";")}}`);
+      const q = a3Css(bg, fc, b, i, al, bd);
+      if (q) css.push(`.a3 .a3c.s${k}{${q}}`);
     });
     if (!styleEl) { styleEl = document.createElement("style"); document.head.appendChild(styleEl); }
     styleEl.textContent = css.join("\n");
   }
+  // 한눈에(A3) 서식(사용자 요청 2026-11-23: 검정 실선이 투박 → 앱 톤으로): 테두리는 옅은 선(굵은 선은 회색 강조), 채우기는 앱 색으로 바꿔 다크 모드에서도
+  const A3BG = { "#FFBB00": "var(--kb-yellow)", "#FFBC00": "var(--kb-yellow)", "#FFC000": "var(--kb-yellow)", "#F1F3F6": "var(--a3-head)", "#F2F2F2": "var(--a3-head)", "#D9D9D9": "var(--a3-head)",
+    "#FFFBE6": "var(--a3-sum)", "#FFF2CC": "var(--a3-sum)", "#FFE8A3": "var(--a3-sum2)", "#EDEDED": "var(--soft)", "#FFFEF8": "transparent", "#FFFFFF": "transparent" };
+  const A3FG = /^#(2E3440|1A1A1A|3F4654|000000|222222|262626|333333)$/, A3MU = /^#(6E7480|8C8C8C|7F7F7F|808080|595959|A6A6A6|767171)$/;
+  function a3Css(bg, fc, b, i, al, bd) {
+    const r = [], B = String(bg || "").toUpperCase(), F = String(fc || "").toUpperCase();
+    const yel = A3BG[B] === "var(--kb-yellow)";
+    if (/^#[0-9A-F]{6}$/.test(B)) r.push(`background:${A3BG[B] || `color-mix(in srgb, ${B} 55%, var(--panel))`}`);
+    if (yel) r.push("color:#2A2621");
+    else if (/^#[0-9A-F]{6}$/.test(F)) r.push(`color:${A3FG.test(F) ? "var(--fg)" : A3MU.test(F) ? "var(--muted)" : F === "#B8860B" ? "var(--s-watch)" : `color-mix(in srgb, ${F} 80%, var(--fg))`}`);
+    if (b) r.push("font-weight:700"); if (i) r.push("font-style:italic");
+    const sides = ["top", "bottom", "left", "right"];
+    String(bd || "0000").split("").forEach((w, j) => { if (+w) r.push(`border-${sides[j]}:${+w >= 2 ? "1.5px solid var(--a3-ln2)" : "1px solid var(--a3-ln)"}`); });
+    return r.join(";");
+  }
+  // 묶음 제목 칸(굵게·왼쪽·위 테두리·채우기 없음·진한 글자) → 앞에 노랑 막대
+  const a3Title = (k) => { const st = D.styles[k]; if (!st) return false; const [bg, fc, b, , al, bd] = st;
+    return !!b && al === "left" && String(bd || "")[0] > "0" && (!bg || String(bg).toUpperCase() === "#FFFFFF") && !A3MU.test(String(fc || "").toUpperCase()); };
   const NUMRE = /^[-+(]?\s*[₩$€]?\s*[\d,]+(\.\d+)?\s*%?\)?$|^[\d,]+(\.\d+)?\s*(조원|억원|억|원|건|%)$/;
   const isNoBg = (k) => { const st = D.styles[k]; return !st || !st[0] || st[0].toUpperCase() === "#FFFFFF"; };
 

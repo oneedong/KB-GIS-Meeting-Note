@@ -344,8 +344,10 @@ body.dashmode .page{max-width:var(--page-max)}   /* 2026-11-17 PC 넓게: 공통
 /* 한눈에(A3) — 대시보드(Demo) 시트 인쇄 영역을 엑셀 배치 그대로(2026-11-23) */
 .a3tools{justify-content:space-between;margin-bottom:8px}
 .a3cap{font-size:12px;color:var(--muted)}
-.a3wrap{overflow:auto;touch-action:pan-x pan-y;background:#fff;border:1px solid var(--line);border-radius:8px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-.a3{position:relative;margin:0 auto;background:#fff;color:#1E1E1E;font-family:"Malgun Gothic","맑은 고딕",var(--f-body);line-height:1.25;font-variant-numeric:tabular-nums}
+.a3wrap{overflow:auto;touch-action:pan-x pan-y;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.05);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.a3{position:relative;margin:0;background:var(--panel);color:var(--fg);font-family:var(--f-body);line-height:1.25;font-variant-numeric:tabular-nums;letter-spacing:-.01em;
+  --a3-ln:color-mix(in srgb, var(--fg) 10%, transparent);--a3-ln2:color-mix(in srgb, var(--kb-gray) 50%, transparent);
+  --a3-head:color-mix(in srgb, var(--kb-gray) 9%, var(--panel));--a3-sum:color-mix(in srgb, var(--kb-yellow) 13%, var(--panel));--a3-sum2:color-mix(in srgb, var(--kb-yellow) 32%, var(--panel))}
 .a3 .a3c{position:absolute;box-sizing:border-box;display:flex;padding:0 3px;overflow:hidden;white-space:nowrap}
 .a3 .a3c span{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .a3 .a3c.w{white-space:normal}
@@ -353,16 +355,16 @@ body.dashmode .page{max-width:var(--page-max)}   /* 2026-11-17 PC 넓게: 공통
 .a3 .a3c.sp span{flex:none}
 .a3 .a3c.w span{display:block}
 .a3 .a3bar{position:absolute;box-sizing:border-box;padding:0 8px;display:flex;align-items:center}
-.a3 .a3bar::before{content:"";position:absolute;left:8px;right:8px;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:#EDE7D9}
-.a3 .a3bar i{position:relative;display:block;height:4px;border-radius:2px;background:var(--kb-yellow,#FFBC00)}
-.a3 .a3ch{position:absolute;background:#fff;display:flex;flex-direction:column;padding:2px 4px}
+.a3 .a3bar::before{content:"";position:absolute;left:8px;right:8px;top:50%;height:5px;margin-top:-2.5px;border-radius:3px;background:var(--soft)}
+.a3 .a3bar i{position:relative;display:block;height:5px;border-radius:3px;background:linear-gradient(90deg,var(--kb-yellow),#FFD34D)}
+.a3 .a3ch{position:absolute;background:transparent;display:flex;flex-direction:column;padding:2px 4px}
 .a3 .a3ch .chslot{flex:1;min-height:0;display:flex;flex-direction:column}
-.a3 .a3ch .lg{margin:0 0 2px;font-size:11px;color:#555}
+.a3 .a3ch .lg{margin:0 0 2px;font-size:11px;color:var(--muted)}
 .a3 .a3ch .chw{flex:1;min-height:0}
 .a3 .a3ch .ch{height:100%}
-.a3 .a3ch .ch text{fill:#555}
-.a3 .a3ch .ch .vl{fill:#1E1E1E}
-.a3 .a3ch .ch .gl{stroke:#E5E5E5}
+.a3 .a3ch .ch text{fill:var(--muted)}
+.a3 .a3ch .ch .vl{fill:var(--fg)}
+.a3 .a3ch .ch .gl{stroke:var(--line)}
 /* PC 압축(사용자 요청 2026-11-23: '대시보드 좀 더 압축해서 — PC 에서 차트·도표가 너무 넓어') — 간격·여백·표 줄 높이·카드 크기를 줄이고
    여러 블록이 한 줄에 들어가게. 휴대폰(760px 이하)은 그대로. */
 @media (min-width:761px){
@@ -390,3 +392,10 @@ body.dashmode .page{max-width:var(--page-max)}   /* 2026-11-17 PC 넓게: 공통
   /* 넓은 PC: 혼자 한 줄 전체를 쓰던 차트는 폭을 줄여 가운데로 퍼지지 않게 */
   .dz-body>.ch-blk{max-width:1100px}
 }
+
+/* 한눈에(A3) 다듬기(2026-11-23): 묶음 제목 앞 노랑 막대, 굵은 숫자는 앱 글꼴 */
+.a3 .a3c.ttl{padding-left:11px;font-weight:800}
+.a3 .a3c.ttl::before{content:"";position:absolute;left:3px;top:24%;bottom:24%;width:3px;border-radius:2px;background:var(--kb-yellow)}
+.a3 .a3c{transition:none}
+.a3wrap:fullscreen{border:0;border-radius:0;box-shadow:none;padding:0;background:var(--panel)}
+.a3wrap:fullscreen .a3{margin:0 auto}
