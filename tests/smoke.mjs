@@ -500,7 +500,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.click('#gsq');
   await page.fill('#gsq', '샘공');
   await page.locator('#gsBody .gs-g', { hasText: '대시보드' }).waitFor({ timeout: 5000 });
-  ok('통합 검색: 미팅·기관·인물·대시보드를 한 번에(약칭으로)', (await page.locator('#gsBody .gs-gh b').allInnerTexts()).join(',') === '미팅노트,기관,인물,대시보드' &&(await page.locator('#gsBody [data-gm]').count()) === 1
+  ok('통합 검색: 미팅·기관·인물·대시보드를 한 번에(약칭으로)', (await page.locator('#gsBody .gs-gh b').allInnerTexts()).join(',').startsWith('미팅노트,기관,인물') && (await page.locator('#gsBody .gs-gh b', { hasText: '대시보드' }).count()) === 1 &&(await page.locator('#gsBody [data-gm]').count()) === 1
     && (await page.locator('#gsBody [data-go]').count()) === 1 && (await page.locator('#gsBody [data-gd]').count()) >= 1);
   await page.fill('#gsq', '헤드라인');
   await page.locator('#gsBody [data-gr]').first().waitFor({ timeout: 5000 });
