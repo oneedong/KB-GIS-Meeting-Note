@@ -481,6 +481,8 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   ok('기관 상세에 대시보드 약정·수수료(약칭·괄호 표기로 맞춤, 다른 기관 제외)', (await page.locator('#oDash .dzr').count()) === 3 && od.includes('2건') && od.includes('USD 31.00M')
     && od.includes('Test Fund III') && od.includes('수수료 2025 USD 11,000.00') && !od.includes('5.00M'));
   ok('약정 금액에 억원 함께', /≈ [\d,.]+억/.test(await page.textContent('#oDash .dzk')));
+  ok('기관 상세에 지분·그룹 관계(주무부처·인수 예정·이 기관)', (await page.textContent('#oMain .o-own .own-me')).includes('샘플공제회') && (await page.textContent('#oMain .own-n.reg')).includes('가상부')
+    && (await page.locator('#oMain .own-n.pend', { hasText: '51%' }).count()) === 1 && (await page.textContent('#oMain .own-ev')).includes('가상 계약 체결'));
   await page.locator('#oMain .actions [data-sk]').click();
   await page.locator('#oDzGo').click();
   await page.locator('#dzMain .tb-q').first().waitFor();
@@ -515,6 +517,9 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.fill('#mq', '');
   await page.evaluate(() => { localStorage.removeItem('kbnote-star'); STAR.m.clear(); STAR.o.clear(); renderMList(); });
 
+  await page.evaluate(() => { $('#pOrg').value = '샘플공제회'; $('#pOrg').dispatchEvent(new Event('input')); });
+  ok('조직도(기관 → 부서 카드 → 팀 → 인물)', (await page.textContent('#pMain .oc-root')).includes('샘플공제회') && (await page.locator('#pMain .oc-d').count()) >= 1 && (await page.locator('#pMain .oc-m, #pMain .oc-head').count()) >= 1);
+  if (vp.width < 760) await page.goBack();
   await page.evaluate(() => gotoPerson('p-test1'));
   const links = await page.locator('#pMain a.contact').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
   ok('전화·메일 링크', links.includes('tel:01000000000') && links.includes('mailto:hong@example.com'));

@@ -88,7 +88,7 @@ function terms(q){let s=(q||"").trim().toLowerCase();if(!s)return [];const T=[];
   SYN.flat().filter(x=>x.includes(" ")).sort((a,b)=>b.length-a.length).forEach(ph=>{if(s.includes(ph)){T.push(expand(ph));s=s.split(ph).join(" ")}});  // 띄어쓴 이름은 한 단어로
   s.split(/\s+/).filter(Boolean).forEach(t=>T.push(expand(t)));return T}
 const hits=(hay,T)=>T.every(alts=>alts.some(a=>hay.includes(a)));
-const hayO=o=>[o.name,...(o.aliases||[]),o.type,o.summary,o.prefs,o.hr,Object.keys(o.signals||{}).join(" ")].join(" ").toLowerCase();
+const hayO=o=>[o.name,...(o.aliases||[]),o.type,o.summary,o.prefs,o.hr,Object.keys(o.signals||{}).join(" "),o.own?[o.own.group,...(o.own.holders||[]).map(h=>h.n),...(o.own.pending||[]).map(p=>p.n)].join(" "):""].join(" ").toLowerCase();
 function hayP(p){const o=orgOf(p.org);return [p.name,p.org,...(o?[o.name,...(o.aliases||[])]:[]),p.dept,p.team,p.title,p.note].join(" ").toLowerCase()}
 function hayM(r){let h=HAY.get(r.id);if(h)return h;const o=orgOf(r.org);
   h=[r.org,...(o?[o.name,...(o.aliases||[])]:[]),r.dept,r.attendees,r.body,r.raw?rawText(r):"",r.nextAction,r.kbAttendees,(r.tags||[]).join(" "),(r.assets||[]).join(" "),r.category,r.orgType].join(" ").toLowerCase();HAY.set(r.id,h);return h}
@@ -257,15 +257,18 @@ $("#mNew").onclick=$("#fab").onclick=()=>{if(!canWrite)return toast("이 링크�
 
 // ═════ 기관 ═════
 function lastMeet(o){const ms=meetingsOf(o);return ms.length?ms.reduce((a,b)=>a.date>b.date?a:b).date:""}
-function oFiltered(){const T=terms($("#oq").value),t=$("#oType").value;
-  return O.filter(o=>(!t||o.type===t)&&(!oStarOnly||STAR.o.has(o.id))&&(!T.length||hits(hayO(o),T)))
+function oGroups(){const el=$("#oGroup");if(!el)return;const cur=el.value,c={};O.forEach(o=>{const g=o.own&&o.own.group;if(g&&!OWN_PUB.test(g))c[g]=(c[g]||0)+1});
+  const gs=Object.entries(c).filter(([,n])=>n>1).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"ko"));el.hidden=!gs.length;
+  el.innerHTML=`<option value="">그룹 전체</option>`+gs.map(([g,n])=>`<option value="${esc(g)}"${g===cur?" selected":""}>${esc(g)} (${n})</option>`).join("")}
+function oFiltered(){const T=terms($("#oq").value),t=$("#oType").value,g=($("#oGroup")||{}).value;
+  return O.filter(o=>(!t||o.type===t)&&(!g||(o.own&&(o.own.group===g||(o.own.pending||[]).some(p=>p.grp===g))))&&(!oStarOnly||STAR.o.has(o.id))&&(!T.length||hits(hayO(o),T)))
    .map(o=>({o,last:lastMeet(o),n:meetingsOf(o).length})).sort((a,b)=>(b.last||"").localeCompare(a.last||"")||a.o.name.localeCompare(b.o.name))}
 function renderOList(){const f=oFiltered(),L=$("#oList");$("#oCnt").textContent=`${f.length}곳 / 전체 ${O.length}곳`;
   const sb=$("#oStarOnly"),ns=O.filter(o=>STAR.o.has(o.id)).length;sb.querySelector("span").textContent=ns||"";sb.setAttribute("aria-pressed",oStarOnly?"true":"false");
   if(!f.length){L.innerHTML=`<div class="empty">${oStarOnly&&!ns?"★ 표시한 기관이 없습니다. 기관 상세에서 ‘☆ 관심’을 누르세요(이 기기에만 저장).":"조건에 맞는 기관이 없습니다."}</div>`;return}
   L.innerHTML=f.map(({o,last,n})=>{const sg=Object.entries(o.signals||{}).filter(([k,v])=>v.s==="진행"||v.s==="관심");
     return `<button type="button" class="item noDate${o.id===oSel?" on":""}" data-id="${esc(o.id)}"><div style="min-width:0">
-      <div class="ttl">${STAR.o.has(o.id)?`<span class="smark" title="관심">★</span>`:""}${esc(o.name)}</div><div class="sub2">${esc(o.type)} · 미팅 ${n}건${last?` · 최근 ${esc(last.slice(5).replace("-","/"))}`:""}</div>
+      <div class="ttl">${STAR.o.has(o.id)?`<span class="smark" title="관심">★</span>`:""}${esc(o.name)}</div><div class="sub2">${esc(o.type)}${o.own&&o.own.group&&!OWN_PUB.test(o.own.group)?` · ${esc(o.own.group)}${(o.own.pending||[]).some(p=>p.grp)?" → "+esc(o.own.pending.find(p=>p.grp).grp):""}`:""} · 미팅 ${n}건${last?` · 최근 ${esc(last.slice(5).replace("-","/"))}`:""}</div>
       <div class="chips">${sg.slice(0,4).map(([k,v])=>`<span class="sg s-${esc(v.s)}" style="font-size:10.5px;padding:0 6px">${esc(SHORT[k]||k)}</span>`).join("")}</div></div></button>`}).join("")}
 function renderOMain(){const W=$("#oMain");if(oMode!=="view")return renderOForm();
   const o=O.find(x=>x.id===oSel);if(!o){const f=!isMob()&&$("#oList .item");if(f&&f.dataset.id!==oSel){oSel=f.dataset.id;renderOList();return renderOMain()}
@@ -281,6 +284,7 @@ function renderOMain(){const W=$("#oMain");if(oMode!=="view")return renderOForm(
     <div class="sec o-tl"><h3>미팅 이력</h3>${ms.length?`<div class="timeline">${ms.map(m=>{const {secs,take}=parseBody(m.body);const first=(take.length?take.map(t=>"→ "+t):secs.flatMap(s=>s.b)).slice(0,2).join(" / ");
       return `<button type="button" class="tl" data-mid="${esc(m.id)}"><span class="d">${esc(m.date)}</span><span style="min-width:0"><b>${esc(m.dept||m.category||"")}</b> ${esc(parseAtt(m.attendees).map(a=>a.who).join(", "))}${m.truncated?` <span class="chip cut">✂ 잘림</span>`:""}<span class="s">${esc(first)}</span>${m.nextAction?`<span class="s nx"><b>다음 액션</b> ${esc(m.nextAction)}</span>`:""}</span></button>`}).join("")}</div>`:`<p class="ro">기록된 미팅이 없습니다.</p>`}</div>
   </div><aside class="oside">
+    ${o.own?`<div class="sec o-own">${ownHtml(o)}</div>`:""}
     <div id="oDash" class="sec dzorg" hidden></div>
     ${ps.length?`<div class="sec o-ppl"><h3>인물</h3><div class="pgrid">${ps.sort((a,b)=>(b.lastSeen||"").localeCompare(a.lastSeen||"")).slice(0,18).map(p=>`<button type="button" class="pcard" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b> ${esc(p.title||"")}<div class="sub2">${esc([p.dept,p.team].filter(Boolean).join(" · ")||p.note||"")}</div></button>`).join("")}</div>${ps.length>18?`<p class="basis">외 ${ps.length-18}명은 인물·조직도 탭에서 볼 수 있습니다.</p>`:""}</div>`:""}
   </aside>
@@ -288,6 +292,7 @@ function renderOMain(){const W=$("#oMain");if(oMode!=="view")return renderOForm(
   </div>`;
   W.querySelectorAll("[data-mid]").forEach(b=>b.onclick=()=>gotoMeeting(b.dataset.mid));
   W.querySelectorAll("[data-pid]").forEach(b=>b.onclick=()=>gotoPerson(b.dataset.pid));
+  W.querySelectorAll(".own-c[data-oid]").forEach(b=>b.onclick=()=>{oSel=b.dataset.oid;oMode="view";renderOList();renderOMain();if(isMob())scrollTo({top:0});else $("#oMain").scrollIntoView({block:"nearest"})});
   const c=$("#oChart");if(c)c.onclick=()=>{pOrg=o.name;pSel=null;pMode="view";$("#pOrg").value=o.name;setTab("people");openDetail()};
   const om=$("#oMeet");if(om)om.onclick=()=>{if(!canWrite)return toast("이 링크에서는 수정 권한이 없습니다.");mMode="new";setTab("meetings");openDetail();setTimeout(()=>{$("#fOrg").value=o.name;$("#fType").value=o.type},0)};
   const e=$("#oEdit");if(e)e.onclick=()=>{oMode="edit";renderOMain()};
@@ -315,7 +320,7 @@ function renderOForm(){const o=oMode==="edit"?O.find(x=>x.id===oSel)||{}:{type:"
       ticket:$("#gTicket").value.trim(),process:$("#gProc").value.trim(),hr:$("#gHr").value.trim(),signals,updatedAt:nowIso()};delete data.id;if(!data.createdAt)data.createdAt=data.updatedAt;
     await write(C.orgs,oMode==="edit"?oSel:null,data,id=>{oSel=id;oMode="view"},"#gSave")}}
 $("#oList").addEventListener("click",e=>{const b=e.target.closest(".item");if(!b)return;oSel=b.dataset.id;oMode="view";confirmDel=false;renderOList();renderOMain();if(isMob())openDetail();else if(innerWidth<=900)$("#oMain").scrollIntoView()});
-["oq","oType"].forEach(i=>$("#"+i).addEventListener("input",renderOList));
+["oq","oType","oGroup"].forEach(i=>$("#"+i).addEventListener("input",renderOList));
 $("#oStarOnly").onclick=()=>{oStarOnly=!oStarOnly;renderOList();if(!isMob())renderOMain()};
 $("#oNew").onclick=()=>{if(!canWrite)return toast("이 링크에서는 수정 권한이 없습니다.");oMode="new";confirmDel=false;renderOMain();openDetail()};
 
@@ -359,11 +364,20 @@ function renderPList(){pOrg=$("#pOrg").value;const f=pFiltered(),L=$("#pList");$
   L.innerHTML=f.slice(0,400).map(p=>{const head=p.org!==last?`<div class="mhead">${hl(esc(p.org),q)}<span>${per[p.org]}명</span></div>`:"";last=p.org;
     return head+`<button type="button" class="item noDate${p.id===pSel?" on":""}" data-id="${esc(p.id)}"><div style="min-width:0"><div class="ttl">${hl(esc(p.name),q)} <span class="sub2" style="display:inline">${esc(p.title||"")}</span></div>
     <div class="sub2">${hl(esc([p.dept,p.team].filter(Boolean).join(" · ")||p.note||""),q)}</div></div></button>`}).join("")+(f.length>400?`<div class="empty">상위 400명만 표시 — 검색으로 좁혀 보세요.</div>`:"")}
+// 조직도(사용자 요청 2026-11-23: 앱과 어울리게) — 맨 위 기관, 그 아래 부서 카드(부서장·팀 수·인원), 카드 안 팀별 인물(팀장 먼저·내선 순).
+// 동그라미 = 이름 첫 글자(노랑 = 팀장·부서장), 작은 점 = 연락처(휴대폰·이메일) 있음. 휴대폰은 왼쪽 세로줄로 이어진 목록.
 function chartHtml(org){const ps=P.filter(p=>p.org===org);if(!ps.length)return"";const depts={};
   ps.forEach(p=>{const d=p.dept||"부서 미상",t=p.team||"";(depts[d]=depts[d]||{head:[],teams:{}});if(p.role==="부서장"&&!t)depts[d].head.push(p);else (depts[d].teams[t||"—"]=depts[d].teams[t||"—"]||[]).push(p)});
-  const mem=p=>`<button type="button" class="mem${p.role==="팀장"?" lead":""}" data-pid="${esc(p.id)}"><span>${esc(p.name)} ${esc(p.title&&p.title!=="팀장"?p.title:(p.role==="팀장"?"팀장":""))}${p.mobile||p.email?` <span class="has" title="연락처 있음">●</span>`:""}</span><small>${esc(p.ext||"")}</small></button>`;
-  return `<div class="chart">${Object.entries(depts).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,v])=>`<div class="dept"><div class="dept-h"><b>${esc(d)}</b>${v.head.map(h=>`<span>부서장 <button class="link" type="button" data-pid="${esc(h.id)}" style="color:#fff">${esc(h.name)}</button>${h.ext?` ☎ ${esc(h.ext)}`:""}</span>`).join("")}</div>
-    <div class="teams">${Object.entries(v.teams).sort((a,b)=>a[0].localeCompare(b[0])).map(([t,ms])=>`<div class="team"><h4>${esc(t==="—"?"팀 미상":t)} · ${ms.length}</h4>${ms.sort((a,b)=>(a.role==="팀장"?-1:0)-(b.role==="팀장"?-1:0)||(a.ext||"").localeCompare(b.ext||"")).map(mem).join("")}</div>`).join("")}</div></div>`).join("")}</div>`}
+  const ttl=p=>p.title&&p.title!=="팀장"?p.title:(p.role==="팀장"?"팀장":"");
+  const av=(p,lead)=>`<span class="oc-av${lead?" lead":""}" aria-hidden="true">${esc(String(p.name||"?").slice(0,1))}</span>`;
+  const mem=p=>`<button type="button" class="oc-m${p.role==="팀장"?" lead":""}" data-pid="${esc(p.id)}">${av(p,p.role==="팀장")}<span class="oc-nm"><b>${esc(p.name)}</b>${ttl(p)?` <small>${esc(ttl(p))}</small>`:""}</span>${p.mobile||p.email?`<i class="oc-has" title="연락처 있음"></i>`:""}${p.ext?`<span class="oc-ext">${esc(p.ext)}</span>`:""}</button>`;
+  const D=Object.entries(depts).sort((a,b)=>(a[0]==="부서 미상")-(b[0]==="부서 미상")||a[0].localeCompare(b[0],"ko"));
+  const nT=D.reduce((a,[,v])=>a+Object.keys(v.teams).filter(t=>t!=="—").length,0);
+  return `<div class="oc"><div class="oc-root"><span class="oc-mark" aria-hidden="true">${esc(String(org).slice(0,1))}</span><div><b>${esc(org)}</b><span>부서 ${D.length} · 팀 ${nT} · ${ps.length}명</span></div></div>
+    <div class="oc-depts">${D.map(([d,v])=>{const T=Object.entries(v.teams).sort((a,b)=>(a[0]==="—")-(b[0]==="—")||a[0].localeCompare(b[0],"ko")),n=v.head.length+T.reduce((a,[,m])=>a+m.length,0);
+      return `<section class="oc-d${d==="부서 미상"?" un":""}"><header class="oc-dh"><div class="oc-dt"><b>${esc(d)}</b><span>${T.filter(([t])=>t!=="—").length?`팀 ${T.filter(([t])=>t!=="—").length} · `:""}${n}명</span></div>
+        ${v.head.map(h=>`<button type="button" class="oc-head" data-pid="${esc(h.id)}">${av(h,1)}<span><small>부서장</small> <b>${esc(h.name)}</b>${h.ext?` <span class="oc-ext">☎ ${esc(h.ext)}</span>`:""}</span></button>`).join("")}</header>
+        <div class="oc-teams">${T.map(([t,ms])=>`<div class="oc-t"><h4>${esc(t==="—"?"팀 미상":t)}<span>${ms.length}</span></h4>${ms.sort((a,b)=>(a.role==="팀장"?-1:0)-(b.role==="팀장"?-1:0)||(a.ext||"").localeCompare(b.ext||"")).map(mem).join("")}</div>`).join("")}</div></section>`}).join("")}</div></div>`}
 function renderPMain(){const W=$("#pMain");if(pMode!=="view")return renderPForm();const p=P.find(x=>x.id===pSel),org=$("#pOrg").value;let h="";
   if(p){const o=orgOf(p.org),ms=M.filter(m=>(m.attendees||"").includes(p.name)&&(m.org===p.org||(o&&meetingsOf(o).includes(m)))).sort((a,b)=>b.date.localeCompare(a.date));
     h+=BACK+`<div class="head"><div class="t"><div class="eyebrow">${esc(p.org)}${p.dept?" · "+esc(p.dept):""}${p.team?" · "+esc(p.team):""}</div><h2>${esc(p.name)} ${esc(p.title||"")}</h2></div>
@@ -372,7 +386,7 @@ function renderPMain(){const W=$("#pMain");if(pMode!=="view")return renderPForm(
       ${p.note?`<div class="sec"><h3>메모</h3><p>${esc(p.note)}</p></div>`:""}
       ${ms.length?`<div class="sec"><h3>참석한 미팅</h3><div class="timeline">${ms.map(m=>`<button type="button" class="tl" data-mid="${esc(m.id)}"><span class="d">${esc(m.date)}</span><span>${esc(m.org)} ${esc(m.dept||"")}</span></button>`).join("")}</div></div>`:""}</div>`}
   const chartOrg=org||(p&&p.org);
-  if(chartOrg){const c=chartHtml(chartOrg);if(c)h+=(p?"":BACK)+`<div class="body" style="${p?"border-top:1px solid var(--line)":""}"><div class="sec"><h3>${esc(chartOrg)} 조직도</h3>${c}</div><p class="basis">● 표시는 연락처(휴대폰·이메일)가 있는 인물. 노란 배경은 팀장.</p></div>`}
+  if(chartOrg){const c=chartHtml(chartOrg);if(c)h+=(p?"":BACK)+`<div class="body" style="${p?"border-top:1px solid var(--line)":""}"><div class="sec"><h3>${esc(chartOrg)} 조직도</h3>${c}</div><p class="basis">노란 동그라미 = 팀장·부서장 · 작은 점 = 연락처(휴대폰·이메일) 있음 · 숫자 = 내선. 이름을 누르면 상세.</p></div>`}
   if(!h&&!isMob()){const f=$("#pList .item");if(f&&f.dataset.id!==pSel){pSel=f.dataset.id;renderPList();return renderPMain()}}
   W.innerHTML=h||`<div class="empty">기관을 고르면 조직도가, 인물을 고르면 상세가 보입니다.</div>`;
   W.querySelectorAll("[data-pid]").forEach(b=>b.onclick=()=>{pSel=b.dataset.pid;pMode="view";renderPList();renderPMain()});
@@ -440,6 +454,28 @@ function dzOf(o){if(!DZ)return null;const K=orgKeys(o),gp=o.type==="GP",mine=x=>
   return {gp,rows,yr,us,n:com.length,usd:com.reduce((a,x)=>a+(+x.c.us||0),0),y0:yrs[0],y1:yrs[yrs.length-1],fees,lbls:Object.keys(lbls).sort((a,b)=>lbls[b]-lbls[a])}}
 const eok=v=>DZ&&DZ.usd&&v?`≈ ${n2(v*DZ.usd/1e8)}억`:"";
 const amtTxt=(cy,am)=>am==null||am===""?"":cy==="KRW"?`${n2(am/1e8)}억원`:`${esc(cy||"")} ${n2(am/1e6)}M`;
+// 지분·그룹 관계(사용자 요청 2026-11-23: 기관마다 최신 지분관계를 시각화) — 데이터는 암호화된 DB 의 orgs[].own
+// {kind, group, basis, regulator, holders[{n,p,note}], pending[{n,p,date,st,note,grp}], events[{d,t}], asof, src[{t,url,date}], notes}
+// 위: 주주(또는 주무부처) 카드 → 가운데: 이 기관 → 아래: 앱에 있는 같은 그룹 기관(누르면 그 기관). 인수 예정은 점선·노랑.
+const OWN_PUB=/^(독립|공공|정부|공공·정부|-)$/;
+function ownSibs(o,grp){return grp&&!OWN_PUB.test(grp)?O.filter(x=>x!==o&&x.own&&(x.own.group===grp||(x.own.pending||[]).some(p=>p.grp===grp))):[]}
+function ownHtml(o){const w=o.own;if(!w)return"";
+  const pend=(w.pending||[]).filter(p=>p&&p.n),hold=(w.holders||[]).filter(h=>h&&h.n);
+  const node=(n,cls,tag)=>`<div class="own-n${cls}">${tag?`<span class="own-tag">${esc(tag)}</span>`:""}<b>${esc(n.n)}</b>${n.p?`<span class="own-p">${esc(n.p)}</span>`:""}${n.note?`<small>${esc(n.note)}</small>`:""}</div>`;
+  const top=[...(w.regulator?[node({n:w.regulator,note:w.basis||""}," reg","감독")]:[]),...hold.map((h,i)=>node(h,i?"":" main",pend.length?"현재":"")),...pend.map(p=>node({n:p.n,p:p.p,note:[p.date,p.st].filter(Boolean).join(" · ")}," pend","인수 예정"))];
+  const chip=x=>`<button type="button" class="chip own-c" data-oid="${esc(x.id)}">${esc(x.name)}</button>`;
+  const sib=ownSibs(o,w.group),pg=pend.map(p=>p.grp).find(Boolean),psib=pg&&pg!==w.group?ownSibs(o,pg):[];
+  const ev=(w.events||[]).filter(e=>e&&e.t);
+  const src=(w.src||[]).filter(x=>x&&x.t).map(x=>/^https?:\/\//.test(x.url||"")?`<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.t)}</a>${x.date?` (${esc(x.date)})`:""}`:esc(x.t));
+  return `<h3>지분·그룹 관계 <span class="h-sub">${esc(w.asof?w.asof+" 기준":"")}</span></h3>
+    <div class="own">${top.length?`<div class="own-top">${top.join("")}</div><div class="own-ln${pend.length?" pend":""}" aria-hidden="true"></div>`:""}
+      <div class="own-me"><b>${esc(o.name)}</b><small>${esc([w.kind,w.group&&!OWN_PUB.test(w.group)?w.group:"",!w.regulator&&w.basis?w.basis:""].filter(Boolean).join(" · "))}</small></div>
+      ${sib.length?`<div class="own-sib"><span>같은 그룹 · ${esc(w.group)}</span>${sib.map(chip).join("")}</div>`:""}
+      ${psib.length?`<div class="own-sib pend"><span>인수 뒤 같은 그룹 · ${esc(pg)}</span>${psib.map(chip).join("")}</div>`:""}</div>
+    ${pend.some(p=>p.note)?`<p class="own-note">${pend.filter(p=>p.note).map(p=>esc(p.note)).join(" / ")}</p>`:""}
+    ${ev.length?`<ul class="own-ev">${ev.map(e=>`<li><span>${esc(e.d||"")}</span>${esc(e.t)}</li>`).join("")}</ul>`:""}
+    ${w.notes?`<p class="own-note">${esc(w.notes)}</p>`:""}
+    ${src.length?`<p class="basis">출처: ${src.join(" · ")}</p>`:""}`}
 function fillODash(o){const el=$("#oDash");if(!el)return;
   if(!DZ){el.hidden=true;Dash.data().then(D=>{if(!D)return;if(!DZ)DZ=dzIndex(D);const cur=O.find(x=>x.id===oSel);if(cur&&cur.id===o.id&&tab==="orgs"&&oMode==="view")fillODash(cur)});return}
   const z=dzOf(o);if(!z){el.hidden=true;el.innerHTML="";return}
@@ -584,7 +620,7 @@ function markNew(){let seen="";try{seen=localStorage.getItem("kbnote-seen")||""}
   if(NEWS.size||UPDS.size)toast(`지난번 이후 새 미팅 ${NEWS.size}건${UPDS.size?` · 수정 ${UPDS.size}건`:""}`)}
 function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];indexPosters();indexSearch();markNew();
   mSel=M.length?M[0].id:null;oSel=null;pSel=null;
-  authorsRefresh();orgSelRefresh();stats();renderTab();
+  authorsRefresh();orgSelRefresh();oGroups();stats();renderTab();
   $("#asof").textContent=j.generatedAt?`${j.generatedAt} 업데이트`:"";ASOF=(j.generatedAt||"").slice(5).replace("-","/");renderMList();document.body.classList.add("ready")}
 // 월 이동 · 맨 위로 · 고정 머리(월·기관 구분줄)가 붙을 자리 = 헤더 바로 아래
 $("#mJump").onchange=e=>{const k=e.target.value;e.target.value="";const hd=k&&document.querySelector(`#mList .mhead[data-ym="${k}"]`);if(!hd)return;
