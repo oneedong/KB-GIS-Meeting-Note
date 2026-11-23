@@ -531,7 +531,7 @@ body.gs-on .band{z-index:31}
 .own-sib.pend .chip.own-c{border-style:dashed;border-color:var(--kb-yellow)}
 .own-note{margin:10px 0 0;font-size:12.5px;color:var(--fg);opacity:.9;max-width:none}
 .own-ev{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:3px;font-size:12.5px}
-.own-ev li{display:grid;grid-template-columns:84px minmax(0,1fr);gap:8px}
+.own-ev li{display:grid;grid-template-columns:84px minmax(0,1fr);gap:8px;margin:0;line-height:1.55}
 .own-ev li span{font:500 11.5px var(--f-mono);color:var(--muted);padding-top:1px}
 .o-own .basis a{color:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:2px;overflow-wrap:anywhere}
 @media (max-width:760px),(pointer:coarse){.chip.own-c{min-height:36px;padding:6px 12px}}
