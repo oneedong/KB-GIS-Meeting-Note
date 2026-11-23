@@ -363,3 +363,30 @@ body.dashmode .page{max-width:var(--page-max)}   /* 2026-11-17 PC 넓게: 공통
 .a3 .a3ch .ch text{fill:#555}
 .a3 .a3ch .ch .vl{fill:#1E1E1E}
 .a3 .a3ch .ch .gl{stroke:#E5E5E5}
+/* PC 압축(사용자 요청 2026-11-23: '대시보드 좀 더 압축해서 — PC 에서 차트·도표가 너무 넓어') — 간격·여백·표 줄 높이·카드 크기를 줄이고
+   여러 블록이 한 줄에 들어가게. 휴대폰(760px 이하)은 그대로. */
+@media (min-width:761px){
+  .dz-main,.dz-body,.ypanel{gap:10px}
+  .brow{gap:10px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .pnl{padding:10px 12px;border-radius:8px}
+  .bh{margin:0 0 6px}
+  .bh h3,.pnl>h3{font-size:13.5px}
+  .kcards{gap:8px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+  .kc{padding:8px 11px 8px;gap:2px;border-top-width:3px}
+  .kc-v{font-size:21px}.kcards.big .kc-v{font-size:23px}
+  .kc-bar{height:5px;margin:2px 0 0}
+  .kc-s,.kc-l{font-size:12px}.kc-n{font-size:11.5px}
+  .dt{font-size:12.5px}
+  .dt th,.dt td{padding:4px 8px}
+  .dt thead th{font-size:11.5px}
+  .compact .dt th,.compact .dt td{padding:3px 7px}
+  .dt tr.sec th{padding:7px 8px 4px}
+  .hb{gap:3px}.hb-r{font-size:12px}.hb-t{height:10px}
+  .lg{margin:-2px 0 2px}
+  .tb{gap:6px;margin:0 0 6px}
+  .quickg{gap:6px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}.qk{padding:6px 9px}
+}
+@media (min-width:1400px){
+  /* 넓은 PC: 혼자 한 줄 전체를 쓰던 차트는 폭을 줄여 가운데로 퍼지지 않게 */
+  .dz-body>.ch-blk{max-width:1100px}
+}

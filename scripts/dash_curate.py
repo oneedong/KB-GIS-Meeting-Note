@@ -391,6 +391,18 @@ def _org_fees(d):
             if c["k"] == "fe": c.pop("d", None)                           # 보수 조건(2010~21 은 금액 대신 조건 글)
         if any(c["k"] == "fe" for c in hi["cols"]) and hi.get("card") and not hi["card"].get("wide"): hi["card"]["wide"] = "fe"   # 휴대폰 카드에도 한 줄 전체로
 
+def _compact_demo(d):
+    """요약 쪽을 PC 에서 덜 넓게(사용자 요청 2026-11-23: '압축해서'): 혼자 한 줄을 다 차지하던
+    '연도별 자산군별 수익' 차트와 'Hedge Fund 시딩손익' 표를 한 줄에 나란히."""
+    demo = next((s for s in d["sheets"] if s["name"] == "대시보드(Demo)"), None)
+    v = (demo or {}).get("view") or []
+    ia = next((i for i, b in enumerate(v) if b.get("t") == "col" and b.get("id") == "asset"), None)
+    ih = next((i for i, b in enumerate(v) if b.get("t") == "table" and b.get("id") == "hf"), None)
+    if ia is None or ih is None: return
+    hf = v.pop(ih); ia = next(i for i, b in enumerate(v) if b.get("id") == "asset")
+    v[ia] = {"t": "row", "blocks": [v[ia], hf]}
+
+
 def curate(d):
     """dash.json(dict)을 제자리에서 다듬는다. 두 번 돌려도 결과가 같다."""
     sheets = [s for s in d["sheets"] if not any(re.search(p, s["name"]) for p in HIDE)]
@@ -403,6 +415,7 @@ def curate(d):
     _org_fees(d)
     _mark_krw(d)
     _money_decimals(d)
+    _compact_demo(d)
     ordered, used = [], set()
     for grp, items in LAYOUT:
         for pat, short in items:
