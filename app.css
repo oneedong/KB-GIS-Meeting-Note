@@ -400,8 +400,8 @@ a.contact{color:inherit;font-weight:600;text-decoration:underline;text-decoratio
 @media (max-width:560px){.dzr{grid-template-columns:40px minmax(0,1fr)}.dzr .a{grid-column:2;text-align:left}.dzr .a small{display:inline;margin-left:6px}}
 /* 통합 검색 */
 body.gs-on{overflow:hidden}
-.gs{position:fixed;inset:0;z-index:30;background:rgba(20,18,15,.45);display:flex;justify-content:center;align-items:flex-start;padding:calc(env(safe-area-inset-top,0px) + 56px) 16px 16px}
-.gs-card{width:min(760px,100%);max-height:calc(100vh - 88px);max-height:calc(100dvh - 88px);background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
+.gs{position:fixed;inset:0;z-index:30;background:rgba(20,18,15,.38);display:flex;justify-content:flex-start;align-items:flex-start;padding:calc(var(--stick,56px) + 6px) 0 16px}
+.gs-card{width:min(760px,100%);max-height:calc(100vh - var(--stick,56px) - 24px);max-height:calc(100dvh - var(--stick,56px) - 24px);background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
 :root[data-fs="l"] .gs-card{zoom:1.1}
 :root[data-fs="xl"] .gs-card{zoom:1.22}
 .gs-bar{display:flex;gap:8px;align-items:center;padding:8px 10px 8px 14px;border-bottom:1px solid var(--line)}
@@ -472,3 +472,33 @@ body.gs-on{overflow:hidden}
   .ocol .kv{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
 }
 .dzr .m small.rcv{color:var(--fg);opacity:.8}
+
+/* 머리줄의 긴 전체 검색창(사용자 요청 2026-11-23: 맨 위에 길게). 결과 창(#gs)은 그 바로 아래 — 머리줄은 결과 창 위에 남는다 */
+.hsearch{flex:1 1 320px;max-width:1280px;margin:0 24px 0 24px;display:flex;align-items:center;gap:8px;height:40px;padding:0 6px 0 13px;border-radius:10px;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);transition:background .15s,border-color .15s;min-width:0}
+.hsearch:hover{background:rgba(255,255,255,.2)}
+.hsearch:focus-within{background:var(--panel);border-color:var(--kb-yellow)}
+.hsearch svg{width:18px;height:18px;flex:none;fill:none;stroke:rgba(255,255,255,.9);stroke-width:2.2;stroke-linecap:round}
+.hsearch:focus-within svg{stroke:var(--muted)}
+.hsearch input{flex:1;min-width:0;width:auto;border:0;border-radius:0;background:transparent;color:#fff;font-size:14px;padding:6px 0;outline:none}
+.hsearch input::placeholder{color:rgba(255,255,255,.78)}
+.hsearch:focus-within input{color:var(--fg)}
+.hsearch:focus-within input::placeholder{color:var(--muted)}
+.hs-k{flex:none;font:600 11px var(--f-mono);color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.3);border-radius:5px;padding:1px 6px}
+.hsearch:focus-within .hs-k,body.gs-on .hs-k{display:none}
+.hs-x{display:none;flex:none;border:0;background:var(--soft);color:var(--fg);font:600 12.5px var(--f-body);border-radius:7px;padding:5px 10px;cursor:pointer}
+body.gs-on .hs-x{display:inline-block}
+body:not(.ready) .hsearch{visibility:hidden}
+body.gs-on .band{z-index:31}
+.brand>.hr{margin-left:auto}   /* 검색창 오른쪽(휴대폰은 제목 오른쪽)으로 */
+@media (max-width:1100px) and (min-width:761px){.hr .meta-r{display:none}.hsearch{margin-left:16px}}
+@media (max-width:760px){
+  .brand{flex-wrap:wrap;row-gap:8px}
+  .hsearch{order:9;flex:1 0 100%;max-width:none;margin:0;height:40px}
+  .hsearch input{font-size:16px}     /* 16px 미만이면 iOS 가 누를 때 화면을 확대 */
+  .hs-k{display:none}
+  .hs-x{min-height:32px}
+  .gs{top:var(--stick,110px);padding:0}
+  .gs-card{max-height:none;padding-top:0}
+}
+@media (pointer:coarse){.hs-k{display:none}}

@@ -466,14 +466,20 @@ function fillODash(o){const el=$("#oDash");if(!el)return;
 // ═════ 통합 검색(머리줄 돋보기 · Ctrl+K) — 미팅·기관·인물·대시보드·리서치·운용보고서를 한 번에 ═════
 // 검색어 넓히기(기관 약칭·한영 표기)는 각 탭 검색과 같다(terms). 결과를 누르면 그 탭의 해당 항목으로 간다.
 const GS={after:null,dz:null,rs:null,rp:null,lu:null,dzSt:"",rsSt:"",rpSt:"",luSt:"",t:0};
-function gsOpen(){const el=$("#gs"),i=$("#gsq");if(!el.hidden){i.focus();return}
+function gsOpen(){const el=$("#gs"),i=$("#gsq");if(!el.hidden){if(document.activeElement!==i)i.focus();return}
   el.hidden=false;document.body.classList.add("gs-on");try{history.pushState({gs:1},"",location.hash)}catch(e){}
-  i.focus();i.select();gsRun();
+  gsPlace();if(document.activeElement!==i){i.focus();i.select()}gsRun();
   if(!GS.dz){GS.dzSt="loading";Dash.data().then(D=>{GS.dz=D;GS.dzSt=D?"ready":"none";if(D&&!DZ)DZ=dzIndex(D);if(!el.hidden)gsRun()})}
   if(!GS.rs){GS.rsSt="loading";Research.data().then(R=>{GS.rs=R;GS.rsSt=R?"ready":"none";if(!el.hidden)gsRun()})}
   if(!GS.rp){GS.rpSt="loading";Reports.data().then(R=>{GS.rp=R;GS.rpSt=R?"ready":"none";if(!el.hidden)gsRun()})}
   if(!GS.lu){GS.luSt="loading";Lineup.data().then(R=>{GS.lu=R;GS.luSt=R?"ready":"none";if(!el.hidden)gsRun()})}}
-function gsHide(){$("#gs").hidden=true;document.body.classList.remove("gs-on")}
+function gsHide(){$("#gs").hidden=true;document.body.classList.remove("gs-on");$("#gsq").blur()}
+// 머리줄의 긴 검색창(사용자 요청 2026-11-23: 맨 위에 길게) — 결과 창은 PC 에선 검색창 바로 아래 같은 폭, 휴대폰에선 머리줄 아래 전체
+function gsPlace(){const c=$("#gs .gs-card"),r=$("#hsearch").getBoundingClientRect();
+  if(isMob()){c.style.width=c.style.marginLeft="";return}
+  const z=parseFloat(getComputedStyle(c).zoom)||1,w=Math.min(innerWidth-16,Math.max(r.width,640)),l=Math.max(8,Math.min(r.left,innerWidth-w-8));c.style.width=w/z+"px";c.style.marginLeft=l/z+"px"}   /* 글자 크게(zoom)면 나눠 준다 */
+addEventListener("resize",()=>{if(!$("#gs").hidden)gsPlace()});
+const gsPh=()=>{$("#gsq").placeholder=isMob()?"전체 검색 — 미팅·기관·인물·대시보드…":"전체 검색 — 미팅·기관·인물·대시보드·리서치·운용보고서·라인업"};gsPh();mq.addEventListener?.("change",gsPh);
 function gsClose(fromPop){if($("#gs").hidden)return;gsHide();if(!fromPop&&history.state&&history.state.gs){try{history.back()}catch(e){}}}
 // 결과를 누르면: 검색 창의 기록을 먼저 되돌린 뒤 이동(휴대폰 뒤로가기가 꼬이지 않게)
 function gsGo(fn){gsHide();if(history.state&&history.state.gs){GS.after=fn;try{history.back();setTimeout(()=>{if(GS.after){const f=GS.after;GS.after=null;f()}},500);return}catch(e){GS.after=null}}fn()}
@@ -540,7 +546,8 @@ function gsRun(){const raw=$("#gsq").value,q=raw.trim().toLowerCase(),B=$("#gsBo
     else if(k==="o"){oStarOnly=false;$("#oType").value="";$("#oq").value=v;oSel=null;setTab("orgs")}
     else{$("#pOrg").value="";pOrg="";$("#pq").value=v;pSel=null;setTab("people")}}))}
 function mResetFilters(){["mCat","mType","mAsset","mAuthor","mFlag"].forEach(i=>$("#"+i).value="");starOnly=actOnly=newOnly=cutOnly=false}
-$("#gsBtn").onclick=gsOpen;$("#gsClose").onclick=()=>gsClose();
+$("#gsq").addEventListener("focus",gsOpen);$("#gsq").addEventListener("click",gsOpen);$("#gsClose").onclick=()=>gsClose();
+document.querySelector(".band").addEventListener("click",e=>{if(!$("#gs").hidden&&!e.target.closest("#hsearch"))gsClose()});   /* 머리줄의 다른 곳(탭 등)을 누르면 결과 창 닫기 */
 $("#gs").addEventListener("click",e=>{if(e.target.id==="gs")gsClose()});   /* PC: 바깥(어두운 곳)을 누르면 닫기 */
 $("#gsq").addEventListener("input",()=>{clearTimeout(GS.t);GS.t=setTimeout(gsRun,150)});
 $("#gsq").addEventListener("keydown",e=>{if(e.key==="Enter"){const f=$("#gsBody .gs-it");if(f){e.preventDefault();f.click()}}else if(e.key==="Escape"){e.preventDefault();e.stopPropagation();gsClose()}});

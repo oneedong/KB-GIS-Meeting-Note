@@ -342,7 +342,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator('#rpTop [data-v="disc"]').click();
   await page.locator('#rpBody .rp-dc').first().waitFor();
   ok('운용보고서: 공시·확인(펀드 단위 이슈·누락·확인)', (await page.locator('#rpBody .rp-fl').count()) === 1 && (await page.locator('#rpBody .rp-dc').count()) === 2 && (await page.textContent('#rpBody')).includes('가상 공시 누락 하나'));
-  await page.click('#gsBtn');
+  await page.click('#gsq');
   await page.fill('#gsq', 'Shared Borrower');
   await page.locator('#gsBody [data-grp]').first().waitFor({ timeout: 5000 });
   ok('통합 검색: 운용보고서 이슈자산도', (await page.locator('#gsBody [data-grp]').count()) === 1 && (await page.textContent('#gsBody')).includes('운용보고서'));
@@ -384,7 +384,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
     await page.screenshot({ path: join(ROOT, 'tests/_1920-lineup.png') });
     await page.setViewportSize({ width: vp.width, height: vp.height });
   }
-  await page.click('#gsBtn');
+  await page.click('#gsq');
   await page.fill('#gsq', 'Senior Loan');
   await page.locator('#gsBody [data-glu]').first().waitFor({ timeout: 5000 });
   ok('통합 검색: 라인업 펀드도', (await page.locator('#gsBody [data-glu]').count()) === 1);
@@ -495,7 +495,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator('#mStarOnly').click();
   ok('관심 모아보기(관심 기관 + 관심 미팅)', (await page.locator('#mList .so').count()) === 1 && (await page.locator('#mList .item').count()) === 1);
   await page.locator('#mStarOnly').click();
-  await page.click('#gsBtn');
+  await page.click('#gsq');
   await page.fill('#gsq', '샘공');
   await page.locator('#gsBody .gs-g', { hasText: '대시보드' }).waitFor({ timeout: 5000 });
   ok('통합 검색: 미팅·기관·인물·대시보드를 한 번에(약칭으로)', (await page.locator('#gsBody .gs-gh b').allInnerTexts()).join(',') === '미팅노트,기관,인물,대시보드' &&(await page.locator('#gsBody [data-gm]').count()) === 1
@@ -593,7 +593,7 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
     && xc.includes('인보이스 번호') && xc.includes('가상 연내 계획 메모') && (await page.locator('#dzBody .kc').count()) === 4);
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-fees.png`), fullPage: vp.width < 760 });
   if (vp.width >= 760) {   // 통합 검색이 원장 표도 찾는다
-    await page.click('#gsBtn'); await page.fill('#gsq', 'Epsilon');
+    await page.click('#gsq'); await page.fill('#gsq', 'Epsilon');
     await page.locator('#gsBody', { hasText: '입금 원장' }).waitFor({ timeout: 5000 }).catch(() => {});
     ok('통합 검색: 수수료 원장 행도', (await page.textContent('#gsBody')).includes('입금 원장'));
     await page.keyboard.press('Escape');

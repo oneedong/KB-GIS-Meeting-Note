@@ -39,10 +39,9 @@
   <div class="brand">
     <div class="mark">KB</div>
     <div><div class="sub">글로벌상품영업부</div><h1>KB GIS</h1></div>
-    <div class="grow"></div>
+    <div class="hsearch" id="hsearch" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><input id="gsq" type="search" placeholder="전체 검색 — 미팅·기관·인물·대시보드·리서치·운용보고서·라인업" aria-label="통합 검색 (미팅·기관·인물·대시보드·리서치·운용보고서·라인업)" autocomplete="off" enterkeyhint="search"><kbd class="hs-k" aria-hidden="true">Ctrl K</kbd><button class="hs-x" id="gsClose" type="button">닫기</button></div>
     <div class="hr">
       <div class="meta-r"><div class="stats" id="stats">불러오는 중…</div><div class="asof" id="asof"></div></div>
-      <button class="iconbtn gsbtn" id="gsBtn" type="button" aria-label="통합 검색 (미팅·기관·인물·대시보드·리서치·운용보고서·라인업)" title="통합 검색 (Ctrl+K)"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button>
       <button class="iconbtn fsbtn" id="fsBtn" type="button" aria-label="글자 크기" title="글자 크기"><span aria-hidden="true">가</span></button>
       <button class="iconbtn" id="themeBtn" type="button" aria-label="다크 모드로" title="다크 모드로"><svg class="moon" viewBox="0 0 24 24"><path d="M19.5 14.6A7.6 7.6 0 0 1 9.4 4.5a7.6 7.6 0 1 0 10.1 10.1z"/></svg><svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5 7 7M17 17l1.5 1.5M5.5 18.5 7 17M17 7l1.5-1.5"/></svg></button>
       <button class="iconbtn lockbtn" id="lockBtn" type="button" aria-label="잠그기 (이 기기에서 비밀번호 지우기)" title="잠그기"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></button>
@@ -161,7 +160,6 @@
 </div>
 <div class="gs" id="gs" role="dialog" aria-modal="true" aria-label="통합 검색" hidden>
   <div class="gs-card">
-    <div class="gs-bar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><input id="gsq" type="search" placeholder="미팅·기관·인물·대시보드·리서치·운용보고서·라인업 전체에서 찾기" aria-label="통합 검색어" autocomplete="off" enterkeyhint="search"><button class="btn sm" id="gsClose" type="button">닫기</button></div>
     <div class="gs-body" id="gsBody"></div>
   </div>
 </div>
