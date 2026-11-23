@@ -341,3 +341,25 @@ body.dashmode .page{max-width:var(--page-max)}   /* 2026-11-17 PC 넓게: 공통
 .dt tr.sf.ss td{font-weight:700;background:var(--sel)}
 .cd-ft.ss{background:var(--sel)}
 .dt td.nw{white-space:nowrap}   /* 원장 입금(건·최근) 칸: 날짜가 줄바꿈되지 않게 */
+/* 한눈에(A3) — 대시보드(Demo) 시트 인쇄 영역을 엑셀 배치 그대로(2026-11-23) */
+.a3tools{justify-content:space-between;margin-bottom:8px}
+.a3cap{font-size:12px;color:var(--muted)}
+.a3wrap{overflow:auto;touch-action:pan-x pan-y;background:#fff;border:1px solid var(--line);border-radius:8px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.a3{position:relative;margin:0 auto;background:#fff;color:#1E1E1E;font-family:"Malgun Gothic","맑은 고딕",var(--f-body);line-height:1.25;font-variant-numeric:tabular-nums}
+.a3 .a3c{position:absolute;box-sizing:border-box;display:flex;padding:0 3px;overflow:hidden;white-space:nowrap}
+.a3 .a3c span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.a3 .a3c.w{white-space:normal}
+.a3 .a3c.sp{overflow:visible;z-index:1}
+.a3 .a3c.sp span{flex:none}
+.a3 .a3c.w span{display:block}
+.a3 .a3bar{position:absolute;box-sizing:border-box;padding:0 8px;display:flex;align-items:center}
+.a3 .a3bar::before{content:"";position:absolute;left:8px;right:8px;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:#EDE7D9}
+.a3 .a3bar i{position:relative;display:block;height:4px;border-radius:2px;background:var(--kb-yellow,#FFBC00)}
+.a3 .a3ch{position:absolute;background:#fff;display:flex;flex-direction:column;padding:2px 4px}
+.a3 .a3ch .chslot{flex:1;min-height:0;display:flex;flex-direction:column}
+.a3 .a3ch .lg{margin:0 0 2px;font-size:11px;color:#555}
+.a3 .a3ch .chw{flex:1;min-height:0}
+.a3 .a3ch .ch{height:100%}
+.a3 .a3ch .ch text{fill:#555}
+.a3 .a3ch .ch .vl{fill:#1E1E1E}
+.a3 .a3ch .ch .gl{stroke:#E5E5E5}

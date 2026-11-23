@@ -294,6 +294,83 @@ for name, blocks in hist:
     out_sheets.append(dict(name=name, short=name, group="이력", cols=[], rows=[], rh=[], hs=0, hdr=0, view=blocks))
 for w in hwarn: print("경고 — 이력 쪽을 만들지 못함:", w, file=sys.stderr)
 
+# ── 한눈에(A3): 대시보드(Demo) 시트의 인쇄 영역을 엑셀 배치 그대로 — 칸 위치·크기·서식·글자 크기 + 차트 자리·KPI 달성 막대
+#    (사용자 요청 2026-11-23: '앱에도 대시보드 A3처럼 한눈에'). 앱 dash.js paintA3 이 절대 위치로 그려 화면에 맞춘다.
+def a3_layout(name):
+    from openpyxl.utils import range_boundaries
+    raw = next((x for x in sheets if x["name"] == name), None)
+    if raw is None or name not in wb.sheetnames: return None
+    ws = wb[name]
+    pa = ws.print_area if isinstance(ws.print_area, str) else (ws.print_area[0] if ws.print_area else None)
+    if pa: _, _, maxc, maxr = range_boundaries(pa.split("!")[-1].replace("$", ""))
+    else: maxr, maxc = ws.max_row, ws.max_column
+    maxr = min(maxr, len(raw["rows"]))
+    # LibreOffice 내보내기는 앞쪽 빈 행·열(예: A열)을 빼므로, 첫 글자 칸을 엑셀에서 찾아 자리 차이(dr, dc)를 구한다
+    occ = set(); lo = []
+    for r, row in enumerate(raw["rows"]):
+        c = 0
+        for cell in row:
+            while (r, c) in occ: c += 1
+            for a in range(cell["rs"]):
+                for b in range(cell["cs"]): occ.add((r + a, c + b))
+            lo.append((r, c, cell)); c += cell["cs"]
+    t0 = next(((r, c, cell["t"]) for r, c, cell in lo if cell["t"]), None)
+    if not t0: return None
+    hit = next(((er - 1 - t0[0], ec - 1 - t0[1]) for er in range(t0[0] + 1, t0[0] + 4) for ec in range(t0[1] + 1, t0[1] + 6)
+                if str(ws.cell(er, ec).value or "").strip() and str(ws.cell(er, ec).value).strip().split()[0] in t0[2]), None)
+    if hit is None:
+        print("경고 — 한눈에(A3): 엑셀과 칸 자리를 맞추지 못해 만들지 않음", t0[2][:20], file=sys.stderr); return None
+    dr, dc = hit
+    cells = []
+    for r, c, cell in lo:
+        R, C = r + dr, c + dc
+        if R >= maxr or C >= maxc or R < 0 or C < 0: continue
+        if not (cell["t"] or (cell["bg"] and cell["bg"] != "#FFFFFF") or cell["bd"] != "0000"): continue
+        x = ws.cell(R + 1, C + 1)
+        sz = float(x.font.sz) if x.font and x.font.sz else 11.0
+        va = (x.alignment.vertical or "center") if x.alignment else "center"
+        wr = 1 if (x.alignment and x.alignment.wrap_text) or "\n" in cell["t"] else 0
+        cells.append([R, C, cell["t"], st(cell), min(cell["cs"], maxc - C), min(cell["rs"], maxr - R), round(sz, 1), va[:1], wr])
+    from openpyxl.utils import get_column_letter
+    def colw(i):   # 엑셀 열 i(0부터)의 화면 폭(px)
+        j = i - dc
+        if 0 <= j < len(raw["cols"]): return raw["cols"][j]
+        w = ws.column_dimensions[get_column_letter(i + 1)].width if get_column_letter(i + 1) in ws.column_dimensions else None
+        return round((w or 8.43) * 7 + 5)
+    cols = [colw(i) for i in range(maxc)]
+    # 행 높이는 엑셀 값(pt → px). LibreOffice 내보내기의 height 는 세로 병합 칸 높이가 섞여 쓰지 않는다
+    dflt = (ws.sheet_format.defaultRowHeight if ws.sheet_format and ws.sheet_format.defaultRowHeight else 15)
+    rh = []
+    for r in range(maxr):
+        d = ws.row_dimensions[r + 1] if (r + 1) in ws.row_dimensions else None
+        if d is not None and d.hidden: rh.append(0); continue
+        rh.append(round(((d.ht if d is not None and d.ht else None) or dflt) * 96 / 72, 1))
+    charts = []
+    for ch in getattr(ws, "_charts", []):
+        a = ch.anchor
+        try: f, t = a._from, a.to
+        except AttributeError: continue
+        title = str(ws.cell(f.row, f.col + 1).value or "")    # 차트 바로 위 칸의 제목(예: B21 '연도별 수익')
+        ref = "yr" if "연도별" in title else ("mo" if "월별" in title else None)
+        if ref: charts.append({"ref": ref, "r0": f.row, "c0": f.col, "r1": t.row, "c1": t.col,
+                               "o": [round(f.rowOff / 9525), round(f.colOff / 9525), round(t.rowOff / 9525), round(t.colOff / 9525)]})
+    bars = []
+    lab = next(((r, c) for r in range(1, 12) for c in range(1, maxc + 1) if "PA 수수료수익" in str(ws.cell(r, c).value or "")), None)
+    if lab:
+        r = lab[0]; starts = [c for c in range(1, maxc + 1) if ws.cell(r, c).value not in (None, "")]
+        for i, c in enumerate(starts):
+            p = num(ws.cell(r + 3, c).value)
+            if p is not None: bars.append({"r": r + 2, "c0": c - 1, "c1": (starts[i + 1] - 2) if i + 1 < len(starts) else maxc - 1, "p": p})
+    return {"cols": cols, "rh": rh, "cells": cells, "charts": charts, "bars": bars}
+
+for s in out_sheets:
+    if s["name"] == "대시보드(Demo)":
+        try:
+            a3 = a3_layout(s["name"])
+            if a3: s["a3"] = a3
+        except Exception as e:
+            print("경고 — 한눈에(A3)를 만들지 못함:", e, file=sys.stderr)
+
 data = {
     "kind": "dashboard", "v": 2,
     "generatedAt": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).strftime("%Y-%m-%d %H:%M"),

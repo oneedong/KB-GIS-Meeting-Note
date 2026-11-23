@@ -156,14 +156,15 @@ const Dash = (() => {
   function paintPage() {
     const isSum = sel === SUM, s = isSum ? sheetBy(DEMO) : sheetBy(sel);
     const ck = (D.summary && D.summary.check) || { ok: 0, n: 0, fails: [] }, fx = D.fx || {};
-    const canView = hasView(s), canGrid = s && s.rows && s.rows.length;
-    const m = !canView ? "g" : (mode[sel] || "v");
-    gridView = null;
+    const canView = hasView(s), canGrid = s && s.rows && s.rows.length, canA3 = isSum && !!(s && s.a3);
+    let m = !canView ? "g" : (mode[sel] || (canA3 ? "a" : "v"));
+    if (m === "a" && !canA3) m = "v";
+    gridView = null; a3View = null;
     const title = isSum ? "대시보드 요약" : s.short;
     const eyebrow = isSum ? `기준일 ${h(D.asof)} · ${h(D.generatedAt)} 업데이트` : `${h(s.group)} · ${s.asofl ? h(s.asofl) : `기준일 ${h(D.asof)}`}`;
     const meta = isSum ? `<div class="dz-meta"><span>USDKRW <b>${num(fx.usd, 2)}</b></span><span>EURKRW <b>${num(fx.eur, 2)}</b></span>
         ${ck.ok !== ck.n ? `<button type="button" class="ck ng" data-s="검증" title="${h((ck.fails || []).join(" / "))}">검증 ${ck.ok}/${ck.n} 확인 필요</button>` : ""}</div>` : "";   // 엑셀 정합성 검증은 어긋날 때만 보인다
-    const seg = canView && canGrid ? `<div class="seg dz-seg" role="group" aria-label="보기 방식"><button type="button" data-m="v" aria-pressed="${m === "v"}">정리 화면</button><button type="button" data-m="g" aria-pressed="${m === "g"}">엑셀 원본</button></div>` : "";
+    const seg = canView && canGrid ? `<div class="seg dz-seg" role="group" aria-label="보기 방식">${canA3 ? `<button type="button" data-m="a" aria-pressed="${m === "a"}">한눈에</button>` : ""}<button type="button" data-m="v" aria-pressed="${m === "v"}">정리 화면</button><button type="button" data-m="g" aria-pressed="${m === "g"}">엑셀 원본</button></div>` : "";
     const gs = isSum && m === "v" ? `<div class="gfind"><input type="search" id="gq" placeholder="대시보드 전체에서 찾기 (운용사·펀드·기관…)" aria-label="대시보드 전체에서 찾기" autocomplete="off"></div>` : "";
     $("#dzMain").innerHTML = `
       <div class="dz-head"><div class="t"><div class="eyebrow">${eyebrow}</div><h2>${h(title)}</h2>${!isSum && s.short !== s.name ? `<div class="sub2">${h(s.name)}</div>` : ""}</div>${meta}${seg}</div>
@@ -172,6 +173,7 @@ const Dash = (() => {
     const ckb = $("#dzMain .ck[data-s]"); if (ckb && sheetBy("검증")) ckb.onclick = () => go("검증");
     const body = $("#dzBody");
     if (m === "g") { paintGrid(s, body); return; }
+    if (m === "a") { paintA3(s, body); return; }
     const blocks = s.view.slice();
     if (isSum) blocks.push({ t: "links" }, { t: "basis" });
     renderBlocks(blocks, body, sel);
@@ -335,10 +337,10 @@ const Dash = (() => {
     if (y1 < y0) return `M${x},${y0}V${y1 + r}Q${x},${y1} ${x + r},${y1}H${x + w - r}Q${x + w},${y1} ${x + w},${y1 + r}V${y0}Z`;
     return `M${x},${y0}V${y1 - r}Q${x},${y1} ${x + r},${y1}H${x + w - r}Q${x + w},${y1} ${x + w},${y1 - r}V${y0}Z`;
   }
-  function colChart(b, W) {
+  function colChart(b, W, Hfix) {
     const n = b.cats.length, S = b.series, col = colorsFor(b), stack = !!b.stack;
-    W = Math.max(260, Math.round(W || 520));
-    const H = Math.round(Math.max(200, Math.min(290, W * 0.4))), L = 40, R = 6, T = 22, B = 26;
+    W = Math.max(Hfix ? 120 : 260, Math.round(W || 520));
+    const H = Hfix ? Math.round(Hfix) : Math.round(Math.max(200, Math.min(290, W * 0.4))), L = 40, R = 6, T = 22, B = 26;
     let lo = 0, hi = 0;
     for (let i = 0; i < n; i++) {
       if (stack) { let p = 0, q = 0; S.forEach((s) => { const v = s.v[i] || 0; if (v >= 0) p += v; else q += v; }); hi = Math.max(hi, p); lo = Math.min(lo, q); }
@@ -675,6 +677,101 @@ const Dash = (() => {
     }
   }
 
+  // ── 한눈에(A3) — 대시보드(Demo) 시트 인쇄 영역을 엑셀 배치 그대로 화면에 맞춰(사용자 요청 2026-11-23) ──
+  //    칸 = 절대 위치(열 폭·행 높이 그대로), 차트 = 엑셀 차트 자리에 정리 화면과 같은 데이터로, KPI 달성 막대 = 4행 아래 막대.
+  function paintA3(s, host) {
+    const A = s.a3, X = [0], Y = [0];
+    A.cols.forEach((w) => X.push(X[X.length - 1] + w)); A.rh.forEach((v) => Y.push(Y[Y.length - 1] + v));
+    const W = X[X.length - 1], H = Y[Y.length - 1];
+    const byId = {}; walk(s.view || [], (b) => { if (b.id && b.t === "col") byId[b.id] = b; });
+    const box = (r0, c0, r1, c1) => `left:${X[c0]}px;top:${Y[r0]}px;width:${X[c1] - X[c0]}px;height:${Y[r1] - Y[r0]}px`;
+    let out = "";
+    // 엑셀처럼 글자가 옆의 빈 칸으로 넘쳐 보이게: 글자 있는 칸(병합 포함) 자리표
+    const nc = A.cols.length, full = new Set();
+    A.cells.forEach(([r, c, t, , cs, rs]) => { if (t) for (let a = 0; a < rs; a++) for (let b = 0; b < cs; b++) full.add((r + a) + ":" + (c + b)); });
+    A.cells.forEach(([r, c, t, k, cs, rs, sz, va, wr]) => {
+      const st = D.styles[k] || [], al = st[4], nm = t && NUMRE.test(t.trim());
+      const ja = al === "center" ? "center" : (al === "right" || (nm && al !== "left")) ? "flex-end" : "flex-start";
+      const ai = va === "t" ? "flex-start" : va === "b" ? "flex-end" : "center";
+      const fs = Math.round(sz * 4 / 3 * 10) / 10;
+      let spill = 0;
+      if (t && !wr && rs === 1 && ja !== "center") {
+        if (ja === "flex-start") { let e = c + cs; while (e < nc && !full.has(r + ":" + e)) e++; spill = X[e] - X[c + cs]; }
+        else { let e = c - 1; while (e >= 0 && !full.has(r + ":" + e)) e--; spill = X[c] - X[e + 1]; }
+      }
+      const sp = spill > 2 ? ` style="max-width:${X[c + cs] - X[c] + spill - 6}px"` : "";
+      out += `<div class="a3c s${k}${wr ? " w" : ""}${spill > 2 ? " sp" : ""}${isNoBg(k) ? " nb" : ""}" style="${box(r, c, r + rs, c + cs)};justify-content:${ja};align-items:${ai};font-size:${fs}px${al === "center" ? ";text-align:center" : ""}"${t ? ` title="${h(t)}"` : ""}>${t ? `<span${sp}>${h(t).replace(/\n/g, "<br>")}</span>` : ""}</div>`;
+    });
+    (A.bars || []).forEach((b) => {
+      const p = Math.max(0, Math.min(1, b.p || 0));
+      out += `<div class="a3bar" style="${box(b.r, b.c0, b.r + 1, b.c1 + 1)}"><i style="width:${(p * 100).toFixed(1)}%"></i></div>`;
+    });
+    const mounts = [];
+    (A.charts || []).forEach((c, i) => {
+      const b = byId[c.ref]; if (!b) return;
+      const [ro, co, ro2, co2] = c.o || [0, 0, 0, 0];
+      const l = X[c.c0] + co, t = Y[c.r0] + ro, w = X[c.c1] + co2 - l, hh = Y[c.r1] + ro2 - t;
+      const id = "a3ch" + i;
+      out += `<div class="a3ch" id="${id}" style="left:${l}px;top:${t}px;width:${w}px;height:${hh}px"><div class="chslot"></div></div>`;
+      mounts.push(() => {
+        const el = document.getElementById(id); if (!el) return;
+        const one = Object.assign({}, b, { title: "" });
+        $(".chslot", el).innerHTML = colChart(one, w, hh - (one.series.length > 1 ? 22 : 4));
+      });
+    });
+    const zKey = "kbnote-a3z", saved = LS.get(zKey, null);
+    host.innerHTML = `
+      <div class="sh-tools a3tools"><span class="a3cap">엑셀 「대시보드」 시트(A3 인쇄 영역) 그대로 · 차트는 정리 화면과 같은 데이터</span>
+        <div class="sh-zoom" role="group" aria-label="확대"><button type="button" class="btn sm" id="zOut" aria-label="축소">−</button><span id="zLab">100%</span><button type="button" class="btn sm" id="zIn" aria-label="확대">+</button><button type="button" class="btn sm" id="zFit">화면 맞춤</button></div></div>
+      <div class="a3wrap" id="a3wrap"><div class="a3" id="a3" style="width:${W}px;height:${H}px">${out}</div></div>`;
+    mounts.forEach((fn) => fn());
+    const wrap = $("#a3wrap"), cv = $("#a3");
+    // 칸에 다 안 들어가는 글자는 엑셀 '셀에 맞춤'처럼 글자를 줄인다(최소 65%)
+    $$(".a3c > span", cv).forEach((sp) => {
+      const d = sp.parentElement; if (d.classList.contains("w")) return;
+      const avail = sp.style.maxWidth ? parseFloat(sp.style.maxWidth) : d.clientWidth - 6;
+      if (sp.scrollWidth > avail + 0.5) { const f = parseFloat(d.style.fontSize) || 14; d.style.fontSize = Math.max(f * 0.65, f * avail / sp.scrollWidth).toFixed(1) + "px"; }
+    });
+    const fitZ = () => {
+      const r = wrap.getBoundingClientRect(), wz = (wrap.clientWidth - 2) / W;
+      if (mob()) return Math.max(0.15, wz);
+      const hz = (window.innerHeight - Math.max(r.top, 0) - 16) / H;
+      return Math.max(0.3, Math.min(wz, hz >= 0.55 ? hz : wz));   // PC: 한 화면에 다 보이게(너무 작아지면 폭 맞춤)
+    };
+    let z = 1;
+    const setZ = (v, keep) => {
+      z = Math.max(0.15, Math.min(2.5, Math.round(v * 100) / 100));
+      cv.style.zoom = z; $("#zLab").textContent = Math.round(z * 100) + "%";
+      if (keep) LS.set(zKey, z); else if (keep === false) LS.set(zKey, null);
+    };
+    $("#zIn").onclick = () => setZ(z + 0.1, true); $("#zOut").onclick = () => setZ(z - 0.1, true); $("#zFit").onclick = () => setZ(fitZ(), false);
+    setZ(saved != null ? saved : fitZ());
+    a3View = { fit: () => { if (LS.get(zKey, null) == null) setZ(fitZ()); } };
+    // 손가락: 두 손가락으로 확대·축소, 두 번 누르면 100% ↔ 화면 맞춤(누른 자리 기준)
+    const zoomAt = (nz, mx, my) => {
+      const cx = (wrap.scrollLeft + mx) / z, cy = (wrap.scrollTop + my) / z;
+      setZ(nz, true); wrap.scrollLeft = cx * z - mx; wrap.scrollTop = cy * z - my;
+    };
+    let p0 = null, lastTap = 0;
+    const dist = (e) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const mid = (e) => { const r = wrap.getBoundingClientRect(); return [(e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top]; };
+    wrap.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 2) { p0 = { d: dist(e), z }; e.preventDefault(); return; }
+      if (e.touches.length === 1) {
+        const now = Date.now();
+        if (now - lastTap < 300) {
+          e.preventDefault(); const r = wrap.getBoundingClientRect(), t = e.touches[0];
+          if (z < 0.9) zoomAt(1, t.clientX - r.left, t.clientY - r.top); else setZ(fitZ(), false);
+          lastTap = 0; return;
+        }
+        lastTap = now;
+      }
+    }, { passive: false });
+    wrap.addEventListener("touchmove", (e) => { if (p0 && e.touches.length === 2) { e.preventDefault(); const [mx, my] = mid(e); zoomAt(p0.z * dist(e) / p0.d, mx, my); } }, { passive: false });
+    wrap.addEventListener("touchend", (e) => { if (e.touches.length < 2) p0 = null; });
+  }
+  let a3View = null;
+
   // ── 엑셀 원본(서식 그대로의 격자) ──────────────────────
   let styleEl = null;
   function buildStyles() {
@@ -687,7 +784,7 @@ const Dash = (() => {
       if (/^(left|right|center)$/.test(al)) r.push(`text-align:${al}`);
       const sides = ["top", "bottom", "left", "right"];
       String(bd || "0000").split("").forEach((w, j) => { if (+w) r.push(`border-${sides[j]}:${w}px solid #222`); });
-      if (r.length) css.push(`.xs td.s${k}{${r.join(";")}}`);
+      if (r.length) css.push(`.xs td.s${k},.a3 .a3c.s${k}{${r.join(";")}}`);
     });
     if (!styleEl) { styleEl = document.createElement("style"); document.head.appendChild(styleEl); }
     styleEl.textContent = css.join("\n");
@@ -815,6 +912,7 @@ const Dash = (() => {
   window.addEventListener("resize", () => {
     if (!D || !$("#dzBody")) return;
     if (gridView) { gridView.size(); gridView.sticky(); }
+    if (a3View && $("#a3")) a3View.fit();
     clearTimeout(rt); rt = setTimeout(() => {
       if (!document.body.classList.contains("dashmode")) return;
       if (lastMob !== mob()) { paint(); return; }
