@@ -129,5 +129,56 @@
    "createdAt": "2026-01-15T00:00:00.000Z",
    "updatedAt": "2026-01-15T00:00:00.000Z"
   }
- ]
+ ],
+ "tap": {
+  "year": 2027,
+  "asof": "2026-01-20",
+  "basis": "가상 데이터",
+  "classes": [
+   {
+    "key": "PC",
+    "name": "Private Credit",
+    "subs": [
+     "PD/DL"
+    ],
+    "summary": [
+     "가상 요약: 내년 DL 검토 기관 1곳"
+    ],
+    "sched": [
+     {
+      "t": "12월",
+      "org": "샘플공제회",
+      "do": "가상 계획 확인"
+     }
+    ],
+    "items": [
+     {
+      "org": "샘플공제회",
+      "orgId": "sample",
+      "tier": 1,
+      "strat": "DL",
+      "said": "가상 발언: 내년 DL 검토",
+      "cond": "가상 조건",
+      "when": "2027 1Q",
+      "act": "가상 액션",
+      "src": [
+       "20260115-sample-lp"
+      ]
+     }
+    ]
+   },
+   {
+    "key": "PE",
+    "name": "Private Equity",
+    "subs": [
+     "PE Buyout"
+    ],
+    "summary": [
+     "가상 요약: PE"
+    ],
+    "sched": [],
+    "items": []
+   }
+  ]
+ }
 }

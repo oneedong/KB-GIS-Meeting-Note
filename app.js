@@ -52,14 +52,15 @@ function memoText(r){const {m,d}=md(r.date),att=parseAtt(r.attendees);
 // ── 탭 ──
 const tabY={};
 function setTab(t,push=true){if(t!==tab)tabY[tab]=scrollY;tab=t;document.querySelectorAll(".tab,.bnav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t?"true":"false"));
-  ["meetings","orgs","demand","people","dash","research","reports","lineup"].forEach(k=>$("#p-"+k).hidden=k!==t);document.body.classList.toggle("dashmode",t==="dash");document.body.classList.toggle("rpmode",t==="reports");
+  ["meetings","orgs","demand","tap","people","dash","research","reports","lineup"].forEach(k=>$("#p-"+k).hidden=k!==t);document.body.classList.toggle("dashmode",t==="dash");document.body.classList.toggle("rpmode",t==="reports");
   if(push){try{history.replaceState(null,"","#"+t)}catch(e){}}
   renderTab();window.scrollTo({top:tabY[t]||0});fabSync()}   /* 다른 탭에 다녀와도 보던 자리 그대로 */
 document.querySelectorAll(".tab,.bnav button").forEach(b=>b.onclick=()=>{if(b.dataset.tab===tab){const sec=$("#p-"+tab);   /* 현재 탭을 다시 누르면: 상세 닫기 → 맨 위로 */
   if(isMob()&&sec&&sec.classList.contains("detail"))closeDetail();else{scrollTo({top:0,behavior:smooth()});const L=sec&&sec.querySelector(".list");if(L)L.scrollTo({top:0,behavior:smooth()})}return}setTab(b.dataset.tab)});
 mq.addEventListener?.("change",()=>{if(!isMob())document.querySelectorAll(".split.detail").forEach(s=>s.classList.remove("detail"));if(tab==="demand")renderDemand();fabSync()});
-function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,people:()=>{renderPList();renderPMain()},dash:()=>Dash.render(),research:()=>Research.render(),reports:()=>Reports.render(),lineup:()=>Lineup.render()})[tab]()}
+function renderTab(){({meetings:()=>{renderMList();renderMMain()},orgs:()=>{renderOList();renderOMain()},demand:renderDemand,tap:()=>Tap.render(),people:()=>{renderPList();renderPMain()},dash:()=>Dash.render(),research:()=>Research.render(),reports:()=>Reports.render(),lineup:()=>Lineup.render()})[tab]()}
 function gotoOrg(name){const o=orgOf(name);if(!o){toast("기관 프로필이 아직 없습니다. 기관 탭에서 추가하세요.");return}oSel=o.id;oMode="view";setTab("orgs");openDetail()}
+function goOrg(id){oSel=id;oMode="view";setTab("orgs");openDetail()}   /* 다른 탭(태핑 플랜 등)에서 기관 상세로 */
 function gotoMeeting(id){mSel=id;mMode="view";setTab("meetings");if(isMob()){openDetail();return}setTimeout(()=>{const el=document.querySelector(`#mList [data-id="${CSS.escape(id)}"]`);if(el)el.scrollIntoView({block:"nearest"})},30)}
 function gotoPerson(id){const p=P.find(x=>x.id===id);if(!p)return;pSel=id;pMode="view";setTab("people");openDetail()}
 
@@ -281,6 +282,7 @@ function renderOMain(){const W=$("#oMain");if(oMode!=="view")return renderOForm(
     ${o.summary?`<div class="sec o-st"><h3>최신 스탠스</h3><p>${esc(o.summary)}</p></div>`:""}
     <div class="kv o-kv">${[["선호·제약",o.prefs],["티켓",o.ticket],["심사·의사결정",o.process],["조직·인사",o.hr]].filter(x=>x[1]).map(([k,v])=>`<div><span>${k}</span>${esc(v)}</div>`).join("")}</div>
     ${sig.length?`<div class="sec o-sig"><h3>전략 시그널</h3><div class="sigrows">${sig.map(([k,v])=>`<div class="sigrow"><b>${esc(k)}</b><span class="sg s-${esc(v.s)}">${esc(v.s)}</span><span>${esc(v.note)}</span><span class="d">${esc(v.date||"")}</span></div>`).join("")}</div></div>`:""}
+    ${tapOrgHtml(o)}
     <div class="sec o-tl"><h3>미팅 이력</h3>${ms.length?`<div class="timeline">${ms.map(m=>{const {secs,take}=parseBody(m.body);const first=(take.length?take.map(t=>"→ "+t):secs.flatMap(s=>s.b)).slice(0,2).join(" / ");
       return `<button type="button" class="tl" data-mid="${esc(m.id)}"><span class="d">${esc(m.date)}</span><span style="min-width:0"><b>${esc(m.dept||m.category||"")}</b> ${esc(parseAtt(m.attendees).map(a=>a.who).join(", "))}${m.truncated?` <span class="chip cut">✂ 잘림</span>`:""}<span class="s">${esc(first)}</span>${m.nextAction?`<span class="s nx"><b>다음 액션</b> ${esc(m.nextAction)}</span>`:""}</span></button>`}).join("")}</div>`:`<p class="ro">기록된 미팅이 없습니다.</p>`}</div>
   </div><aside class="oside">
@@ -291,6 +293,7 @@ function renderOMain(){const W=$("#oMain");if(oMode!=="view")return renderOForm(
     <p class="basis o-bs">${esc(o.basis||"")}${o.updatedAt?` · 최종 수정 ${esc(o.updatedAt.slice(0,10))}`:""}</p>
   </div>`;
   W.querySelectorAll("[data-mid]").forEach(b=>b.onclick=()=>gotoMeeting(b.dataset.mid));
+  W.querySelectorAll("[data-tapc]").forEach(b=>b.onclick=()=>{Tap.open(b.dataset.tapc);setTab("tap")});
   W.querySelectorAll("[data-pid]").forEach(b=>b.onclick=()=>gotoPerson(b.dataset.pid));
   W.querySelectorAll(".own-c[data-oid]").forEach(b=>b.onclick=()=>{oSel=b.dataset.oid;oMode="view";renderOList();renderOMain();if(isMob())scrollTo({top:0});else $("#oMain").scrollIntoView({block:"nearest"})});
   const c=$("#oChart");if(c)c.onclick=()=>{pOrg=o.name;pSel=null;pMode="view";$("#pOrg").value=o.name;setTab("people");openDetail()};
@@ -391,6 +394,7 @@ function renderPMain(){const W=$("#pMain");if(pMode!=="view")return renderPForm(
   W.innerHTML=h||`<div class="empty">기관을 고르면 조직도가, 인물을 고르면 상세가 보입니다.</div>`;
   W.querySelectorAll("[data-pid]").forEach(b=>b.onclick=()=>{pSel=b.dataset.pid;pMode="view";renderPList();renderPMain()});
   W.querySelectorAll("[data-mid]").forEach(b=>b.onclick=()=>gotoMeeting(b.dataset.mid));
+  W.querySelectorAll("[data-tapc]").forEach(b=>b.onclick=()=>{Tap.open(b.dataset.tapc);setTab("tap")});
   const e=$("#pEdit");if(e)e.onclick=()=>{pMode="edit";confirmDel=false;renderPMain()}}
 function renderPForm(){const p=pMode==="edit"?P.find(x=>x.id===pSel)||{}:{org:$("#pOrg").value||""};
   const F=(id,l,v,ph="")=>`<label>${l}<input id="${id}" value="${esc(v)}" placeholder="${esc(ph)}"></label>`;
@@ -459,6 +463,10 @@ const amtTxt=(cy,am)=>am==null||am===""?"":cy==="KRW"?`${n2(am/1e8)}억원`:`${e
 // 위: 주주(또는 주무부처) 카드 → 가운데: 이 기관 → 아래: 앱에 있는 같은 그룹 기관(누르면 그 기관). 인수 예정은 점선·노랑.
 const OWN_PUB=/^(독립|공공|정부|공공·정부|-)$/;
 function ownSibs(o,grp){return grp&&!OWN_PUB.test(grp)?O.filter(x=>x!==o&&x.own&&(x.own.group===grp||(x.own.pending||[]).some(p=>p.grp===grp))):[]}
+/* 기관 상세의 '2027 태핑 플랜'(태핑 플랜 탭과 같은 데이터, 2026-11-27) — 자산군마다 구분·전략·다음 액션, 누르면 그 자산군 탭 */
+const TAP_TIER={1:"우선 태핑",2:"2027 계획 확인",3:"재개 대기·조건부",4:"제외"};
+function tapOrgHtml(o){const L=typeof Tap!=="undefined"?Tap.of(o.id):[];if(!L.length)return"";const T=Tap.data();
+  return `<div class="sec o-tap"><h3>${esc(T.year)} 태핑 플랜</h3><div class="taprows">${L.map(({c,i})=>`<button type="button" class="taprow" data-tapc="${esc(c.key)}"><b>${esc(c.name)}</b><span class="tpt t${i.tier}">${esc(TAP_TIER[i.tier]||"")}</span><span class="st">${esc(i.strat)}</span>${i.act?`<span class="ac">${esc(i.act)}</span>`:""}</button>`).join("")}</div></div>`}
 function ownHtml(o){const w=o.own;if(!w)return"";
   const pend=(w.pending||[]).filter(p=>p&&p.n),hold=(w.holders||[]).filter(h=>h&&h.n);
   const node=(n,cls,tag)=>`<div class="own-n${cls}">${tag?`<span class="own-tag">${esc(tag)}</span>`:""}<b>${esc(n.n)}</b>${n.p?`<span class="own-p">${esc(n.p)}</span>`:""}${n.note?`<small>${esc(n.note)}</small>`:""}</div>`;
@@ -596,9 +604,9 @@ async function copy(t){try{await navigator.clipboard.writeText(t);toast("메모 
   catch(e){const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("복사했습니다.")}catch(_){toast("복사하지 못했습니다.")}ta.remove()}}
 
 // ── 초기화 ──
-const h=(location.hash||"").replace("#","");if(["meetings","orgs","demand","people"].includes(h))setTab(h,false);else renderTab();
+const h=(location.hash||"").replace("#","");if(["meetings","orgs","demand","tap","people"].includes(h))setTab(h,false);else renderTab();
 fabSync();
-addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");if(t!==tab&&["meetings","orgs","demand","people","dash","research","reports","lineup"].includes(t))setTab(t,false)});
+addEventListener("hashchange",()=>{const t=(location.hash||"").replace("#","");if(t!==tab&&["meetings","orgs","demand","tap","people","dash","research","reports","lineup"].includes(t))setTab(t,false)});
 // 암호화된 DB(data.enc.json)를 풀어서 읽기 전용으로 보여준다. 미팅 추가·수정은 Claude에 미팅노트 텍스트를 주면
 // data.enc.json 을 갱신해 다시 배포한다(CLAUDE.md).
 ["#mNew","#oNew","#pNew"].forEach(s=>$(s).hidden=true);fabSync();
@@ -618,7 +626,7 @@ function markNew(){let seen="";try{seen=localStorage.getItem("kbnote-seen")||""}
   if(seen)M.forEach(r=>{if((r.createdAt||"")>seen)NEWS.add(r.id);else if((r.updatedAt||"")>seen)UPDS.add(r.id)});
   try{if(latest)localStorage.setItem("kbnote-seen",latest)}catch(e){}  // 다음에 열 때는 이번 것 이후만 새 소식
   if(NEWS.size||UPDS.size)toast(`지난번 이후 새 미팅 ${NEWS.size}건${UPDS.size?` · 수정 ${UPDS.size}건`:""}`)}
-function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];indexPosters();indexSearch();markNew();
+function load(j){M=(j.meetings||[]).sort((a,b)=>(b.date||"").localeCompare(a.date||""));O=j.orgs||[];P=j.people||[];Tap.set(j.tap);indexPosters();indexSearch();markNew();
   mSel=M.length?M[0].id:null;oSel=null;pSel=null;
   authorsRefresh();orgSelRefresh();oGroups();stats();renderTab();
   $("#asof").textContent=j.generatedAt?`${j.generatedAt} 업데이트`:"";ASOF=(j.generatedAt||"").slice(5).replace("-","/");renderMList();document.body.classList.add("ready")}
@@ -635,7 +643,7 @@ topBtn.onclick=()=>scrollTo({top:0,behavior:smooth()});
 addEventListener("keydown",e=>{const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"");
   if((e.ctrlKey||e.metaKey)&&!e.altKey&&e.key.toLowerCase()==="k"&&$("#gate").hidden&&document.body.classList.contains("ready")){e.preventDefault();gsOpen();return}
   if(!$("#gs").hidden){if(e.key==="Escape"){e.preventDefault();gsClose()}return}   /* 통합 검색 창이 열려 있으면 그 창만 */
-  if(e.key==="/"&&!typing&&$("#gate").hidden){/* 비밀번호 화면이 아닐 때만 */const box={meetings:"#mq",orgs:"#oq",demand:"#dq",people:"#pq"}[tab];if(tab==="dash"){if(Dash.focusFind())e.preventDefault()}else if(box){e.preventDefault();$(box).focus();$(box).select()}}
+  if(e.key==="/"&&!typing&&$("#gate").hidden){/* 비밀번호 화면이 아닐 때만 */const box={meetings:"#mq",orgs:"#oq",demand:"#dq",tap:"#tpq",people:"#pq"}[tab];if(tab==="dash"){if(Dash.focusFind())e.preventDefault()}else if(box){e.preventDefault();$(box).focus();$(box).select()}}
   else if(e.key==="Escape"&&typing&&document.activeElement.type==="search"&&document.activeElement.value){document.activeElement.value="";document.activeElement.dispatchEvent(new Event("input"))}});
 addEventListener("offline",()=>toast("오프라인 — 마지막으로 받은 사본을 보여줍니다"));addEventListener("online",()=>toast("다시 연결됐습니다"));
 Vault.boot(j=>{load(j);if(!navigator.onLine)setTimeout(()=>toast("오프라인 — 마지막으로 받은 사본입니다"),2600)});

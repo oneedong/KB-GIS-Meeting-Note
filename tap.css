@@ -1,0 +1,75 @@
+/* 태핑 플랜 탭(2026-11-27) — 표 중심. PC 는 한 줄 표, 휴대폰은 같은 표를 카드처럼 */
+.tp-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:10px}
+.tp-head h2{margin:2px 0 0;font:700 21px/1.3 var(--f-display)}
+.tp-bar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.tp-seg button small{font-weight:500;opacity:.75;margin-left:2px}
+.tp-tools{display:flex;gap:8px;flex-wrap:wrap}
+.tp-tools select,.tp-tools input{font:inherit;font-size:13.5px;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-height:34px}
+.tp-tools select{width:auto}
+.tp-tools input{width:260px}
+.tp-top{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;margin-bottom:16px;align-items:start}
+.tp-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tp-box h3,.tp-tier h3{margin:0 0 8px;font:700 14.5px/1.35 var(--f-body)}
+.tp-box h3 small,.tp-tier h3 small{font-weight:500;font-size:12px;color:var(--muted);margin-left:6px}
+.tp-sum{margin:0;padding-left:18px;font-size:13.5px;line-height:1.6}
+.tp-sum li{margin:2px 0}
+.tp-sched{width:100%;border-collapse:collapse;font-size:13px}
+.tp-sched td{padding:5px 6px;border-top:1px solid var(--line);vertical-align:top}
+.tp-sched tr:first-child td{border-top:0}
+.tp-sched td.w{white-space:nowrap;font-weight:700;color:var(--muted);width:1%}
+.tp-sched td.o{font-weight:600;width:32%}
+.tp-tier{margin:0 0 18px}
+.tp-tg{all:unset;cursor:pointer;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.tp-tg:focus-visible{outline:2px solid var(--kb-yellow);outline-offset:2px}
+.tp-tg b{font-weight:700;color:var(--fg)}
+.tp-tg::after{content:"접기";font:500 11.5px var(--f-body);color:var(--muted);margin-left:4px}
+.tp-tier.closed .tp-tg::after{content:"펼치기"}
+.tp-n{display:inline-grid;place-items:center;min-width:20px;height:20px;border-radius:5px;background:var(--soft);font:700 12px var(--f-body);color:var(--fg)}
+.tp-tier.t1 .tp-n{background:var(--kb-yellow);color:#2A2621}
+.tp-tw{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.tp-t{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;line-height:1.5}
+.tp-t th{background:var(--soft);text-align:left;font-weight:700;font-size:12px;color:var(--muted);padding:7px 8px;border-bottom:1px solid var(--line)}
+.tp-t td{padding:8px;border-top:1px solid var(--line);vertical-align:top;word-break:keep-all;overflow-wrap:anywhere}
+.tp-t tbody tr:first-child td{border-top:0}
+.tp-t th:nth-child(1){width:12%} .tp-t th:nth-child(2){width:10%} .tp-t th:nth-child(3){width:23%} .tp-t th:nth-child(4){width:18%}
+.tp-t th:nth-child(5){width:7%} .tp-t th:nth-child(6){width:12%} .tp-t th:nth-child(7){width:12%} .tp-t th:nth-child(8){width:6%}
+.tp-o .link{font-weight:700;text-align:left}
+.tp-o small{display:block;color:var(--muted);font-size:11.5px}
+.tp-hear{display:inline-block;margin-left:5px;font:600 10.5px/1.6 var(--f-body);padding:0 5px;border-radius:4px;background:var(--s-watch-bg);color:var(--s-watch);vertical-align:1px}
+.tp-st{font-weight:600}
+.tp-cond,.tp-when{color:var(--muted)}
+.tp-sg{display:inline-flex;align-items:center;flex-wrap:wrap;gap:3px;margin:0 4px 3px 0;max-width:100%}
+.tp-sg .sg{font-size:11px;padding:0 6px}
+.tp-sg small{color:var(--muted);font-size:11px}
+.tp-src{display:inline-block;margin:0 6px 2px 0;font-size:12.5px}
+.tp-none{color:var(--muted);font-size:13px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px}
+.tp-ex{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.tp-exi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px}
+.tp-exi .link{font-weight:700}
+.tp-exi small{color:var(--muted);margin-left:5px;font-size:11.5px}
+.tp-exi>div{margin-top:4px}
+@media (min-width:1600px){.tp-t{font-size:13.5px}}
+@media (max-width:1100px){.tp-top{grid-template-columns:1fr}}
+/* 휴대폰: 표 줄 → 카드(칸 이름을 앞에) */
+@media (max-width:760px){
+  .tp-head h2{font-size:19px}
+  .tp-bar{flex-direction:column;align-items:stretch}
+  .tp-seg{display:grid;grid-template-columns:repeat(2,1fr)}
+  .tp-seg button+button{border-left:0}
+  .tp-seg button:nth-child(even){border-left:1px solid var(--line)}
+  .tp-seg button:nth-child(n+3){border-top:1px solid var(--line)}
+  .tp-tools select{flex:none;min-height:40px}
+  .tp-tools input{flex:1;width:auto;min-width:0;min-height:40px}
+  .tp-tw{border:0;background:none;border-radius:0}
+  .tp-t,.tp-t tbody,.tp-t tr,.tp-t td{display:block;width:auto}
+  .tp-t thead{display:none}
+  .tp-t tr{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .tp-t td{border:0;padding:2px 0;font-size:13.5px}
+  .tp-t td:empty{display:none}
+  .tp-t td:not(.tp-o):not(.tp-said)::before{content:attr(data-l);display:inline-block;min-width:62px;margin-right:6px;font-size:11.5px;font-weight:700;color:var(--muted)}
+  .tp-t td.tp-o{font-size:15px;margin-bottom:4px}
+  .tp-t td.tp-o small{display:inline;margin-left:6px}
+  .tp-t td.tp-said{margin-bottom:4px}
+  .tp-t td.tp-sig:not(:has(.tp-sg)){display:none}
+  .tp-t td.tp-srcs:not(:has(button)){display:none}
+}

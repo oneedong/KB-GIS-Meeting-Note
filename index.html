@@ -28,6 +28,7 @@
 <link rel="stylesheet" href="./research.css">
 <link rel="stylesheet" href="./reports.css">
 <link rel="stylesheet" href="./lineup.css">
+<link rel="stylesheet" href="./tap.css">
 <script>
   // 화면 모드: 라이트(기본)·다크. 헤더 버튼으로 바꾸고 이 기기에 기억한다(설치 안내 페이지와 같은 값).
   // 그리기 전에 정해야 깜빡이지 않는다.
@@ -53,6 +54,7 @@
     <button class="tab" role="tab" data-tab="orgs" aria-selected="false">기관</button>
     <button class="tab" role="tab" data-tab="people" aria-selected="false">인물·조직도</button>
     <button class="tab" role="tab" data-tab="demand" aria-selected="false">전략 수요판</button>
+    <button class="tab" role="tab" data-tab="tap" aria-selected="false">태핑 플랜</button>
     <button class="tab" role="tab" data-tab="research" aria-selected="false">리서치</button>
     <button class="tab" role="tab" data-tab="reports" aria-selected="false">운용보고서</button>
     <button class="tab" role="tab" data-tab="lineup" aria-selected="false">라인업</button>
@@ -106,6 +108,11 @@
     <div class="legend" id="legend" style="margin-bottom:10px"></div>
     <div id="dBody"></div>
     <p class="basis" style="margin-top:10px">시그널은 미팅노트 최신 발언을 기준으로 정리한 추정치입니다. 기관 탭에서 수정하면 바로 반영됩니다. 셀을 누르면 근거와 날짜가 보입니다.</p>
+  </section>
+
+  <!-- 태핑 플랜(2027 자산군별 태핑 대상, 데이터는 DB 의 tap) -->
+  <section id="p-tap" hidden>
+    <div id="tpMain"><div class="empty">태핑 플랜을 여는 중…</div></div>
   </section>
 
   <!-- 인물·조직도 -->
@@ -172,6 +179,7 @@
   <button type="button" data-tab="orgs" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14M9 21v-5h6v5M8 10h.01M12 10h.01M16 10h.01"/></svg>기관</button>
   <button type="button" data-tab="people" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>인물</button>
   <button type="button" data-tab="demand" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>수요판</button>
+  <button type="button" data-tab="tap" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>태핑</button>
   <button type="button" data-tab="research" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h4"/></svg>리서치</button>
   <button type="button" data-tab="reports" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M9 3.5h6v3H9zM7.5 5H5v16h14V5h-2.5"/><path d="m9 13.5 2 2 4-4.5"/></svg>보고서</button>
   <button type="button" data-tab="lineup" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>라인업</button>
@@ -183,6 +191,7 @@
 <script src="./research.js"></script>
 <script src="./reports.js"></script>
 <script src="./lineup.js"></script>
+<script src="./tap.js"></script>
 <script src="./app.js"></script>
 <script>
   // 서비스워커: 오프라인에서도 열리고(마지막으로 받은 암호화 DB), 새 배포는 다음 실행 때 자동 반영.

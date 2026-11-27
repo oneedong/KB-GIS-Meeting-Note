@@ -216,7 +216,7 @@ label{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
   .mark{width:28px;height:28px;font-size:12px;line-height:28px}
   .stats{font-size:10.5px}
   .page{padding-block:12px calc(86px + env(safe-area-inset-bottom,0px))}
-  .bnav{display:grid;grid-template-columns:repeat(8,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--panel);border-top:1px solid var(--line);padding:6px max(6px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-right,0px))}
+  .bnav{display:grid;grid-template-columns:repeat(9,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--panel);border-top:1px solid var(--line);padding:6px max(6px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-right,0px))}
   .bnav button{all:unset;display:flex;flex-direction:column;align-items:center;gap:3px;font:600 10.5px var(--f-body);letter-spacing:-.02em;white-space:nowrap;color:var(--muted);padding:4px 0;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .bnav button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
   .bnav button[aria-selected="true"]{color:var(--fg)}
@@ -454,7 +454,7 @@ body.gs-on{overflow:hidden}
 .mbody>.mcol,.mbody>.mside,.obody>.ocol,.obody>.oside{display:contents}
 .mbody>.mcol>.seg{order:1}.mbody>.mside>.next{order:2}.mbody>.mside>.attendees{order:3}.mbody>.mcol>.memo,.mbody>.mcol>.raw{order:4}
 .mbody>.mcol>.cutline{order:5}.mbody>.mcol>.trunc{order:6}.mbody>.mside>.warnbox{order:7}.mbody>.mside>.meta{order:8}.mbody>.pn{order:9}
-.obody .o-st{order:1}.obody .o-kv{order:2}.obody .o-own{order:3}.obody .o-sig{order:4}.obody #oDash{order:5}.obody .o-ppl{order:6}.obody .o-tl{order:7}.obody>.o-bs{order:8}
+.obody .o-st{order:1}.obody .o-kv{order:2}.obody .o-own{order:3}.obody .o-sig{order:4}.obody .o-tap{order:4}.obody #oDash{order:5}.obody .o-ppl{order:6}.obody .o-tl{order:7}.obody>.o-bs{order:8}
 @container dmain (min-width:1000px){
   .mbody{grid-template-columns:minmax(0,1fr) clamp(300px,30%,420px);column-gap:30px;align-items:start}
   .mbody>.mcol,.mbody>.mside{display:grid;gap:20px;align-content:start;min-width:0}
@@ -579,3 +579,13 @@ body.gs-on .band{z-index:31}
   .oc-head{min-height:36px}
 }
 #oGroup{grid-column:auto}
+/* 기관 상세 '2027 태핑 플랜'(2026-11-27) */
+.taprows{display:flex;flex-direction:column;gap:6px}
+.taprow{all:unset;cursor:pointer;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:13px}
+.taprow:hover{border-color:var(--kb-yellow)}
+.taprow:focus-visible{outline:2px solid var(--kb-yellow)}
+.taprow .tpt{font:700 11px/1.6 var(--f-body);padding:0 6px;border-radius:4px;background:var(--soft);color:var(--fg)}
+.taprow .tpt.t1{background:var(--kb-yellow);color:#2A2621}
+.taprow .tpt.t4{background:var(--s-no-bg);color:var(--s-no)}
+.taprow .st{font-weight:600}
+.taprow .ac{flex-basis:100%;color:var(--muted);font-size:12.5px}

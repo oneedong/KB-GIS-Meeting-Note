@@ -5,7 +5,7 @@
 **DB는 2026년 미팅만 담는다(사용자 요청).** 2026-11-02 카톡 원문(2025-11-28~2026-10-27)으로 기존 미팅 223건에 `raw`(원문)를
 붙였다(정리본은 그대로, `legacyBody`). 2025-12 원문은 넣지 않는다. 아티팩트에서 직접 입력한 4건(10/20·21·28·29)은 카톡 원문이 없다.
 카톡 직급 약어: TJ=팀장, BJ=부장, CJ=차장, GJ=과장(검색 `SYN`에도 있음).
-앱 탭(2026-11-16 순서): 미팅노트·대시보드(엑셀 대시보드, `dash.enc.json` + 수수료 원장 `fees.enc.json` — 2026-11-17 추가, 사용자 요청)·기관·인물·조직도·전략 수요판·리서치(구독 리포트 정리, `research.enc.json`)·운용보고서(LP 관점 운용보고서 분석, `reports.enc.json`)·라인업(해외대체 펀드 라인업 엑셀, `lineup.enc.json` — 2026-11-17 추가, 사용자 요청).
+앱 탭(2026-11-27 순서): 미팅노트·대시보드(엑셀 대시보드, `dash.enc.json` + 수수료 원장 `fees.enc.json` — 2026-11-17 추가, 사용자 요청)·기관·인물·조직도·전략 수요판·태핑 플랜(2027 자산군별 태핑 대상, DB 의 `tap` — 2026-11-27 추가, 사용자 요청)·리서치(구독 리포트 정리, `research.enc.json`)·운용보고서(LP 관점 운용보고서 분석, `reports.enc.json`)·라인업(해외대체 펀드 라인업 엑셀, `lineup.enc.json` — 2026-11-17 추가, 사용자 요청).
 자매 앱: KB GIS Market(`oneedong/KB-GIS-App`).
 
 ## 절대 규칙
@@ -148,6 +148,19 @@ KPI 제출 약정 목록은 부정확(사용자 확인) — 약정 기준은 대
   → `node scripts/vault.mjs encrypt <SP>/lineup.json lineup.enc.json --salt-from data.enc.json` → 커밋(`lineup: 라인업 MM/DD 기준`, 펀드명·수치 쓰지 말 것) → push.
 - 셀 글자는 엑셀 그대로 — 앱에서 문구를 다듬지 않는다. 화면은 `lineup.js`·`lineup.css`(지표 카드는 `Dash.blocks`). 통합 검색에 펀드(`Lineup.open(no)` → 그 펀드로 이동·표시).
 - 모든 칸을 누르지 않고 바로 보여준다(사용자 요청 2026-11-17: 펀드를 눌러 펼치지 않게). 넓은 PC(본문 1700px+)는 엑셀형 한 줄 표, 그 밖은 카드.
+
+## "태핑 플랜 업데이트" (내년 자산군별로 어떤 기관을 태핑할지 — 2026-11-27 추가, 사용자 요청)
+앱 '태핑 플랜' 탭 = 자산군(Private Credit·PE·인프라·부동산)마다 구분별 기관 표 + 요약 + 태핑 일정(안) + '플랜 밖 신호'. 데이터는 **암호화된 DB `data.enc.json` 의 `tap`**(기관명·발언이라 공개 코드에 두지 않음):
+`{ year, asof, basis, classes[]: { key(PC·PE·INFRA·RE), name, subs[](전략 수요판 신호 이름), summary[], sched[{t,org,do}], items[]: { org, orgId, tier, strat, said, cond?, when?, act?, src[미팅 id], hear? } } }`.
+- tier: 1 우선 태핑(그 해 투자 의향을 직접 밝힘) · 2 계획 확인(올해 진행·관심, 내년 계획 미확인) · 3 재개 대기·조건부 · 4 제외(안 하겠다고 밝힘). GP·내부는 넣지 않는다.
+- said·cond 는 미팅노트 발언 그대로의 요지 + 괄호 날짜(M/D). 다른 기관·운용사에게 들은 내용은 `hear: 1`(앱·PDF 에 '전언'). 당부서 의견은 `act`·`sched`·'(당부서 계획·판단)'으로만 — 발언과 섞지 않는다.
+  문장은 보고서체(~함·~임), 대시('—') 대신 마침표·쉼표.
+- 고치는 순서: `vault.mjs decrypt` → `<SP>/data.json` 의 `tap` 을 고침(org = DB 기관 이름 그대로, orgId = 기관 id, src = 근거 미팅 id — 날짜로 찾고 다른 기관 미팅이면 그 미팅 id)
+  → `node scripts/vault.mjs encrypt <SP>/data.json data.enc.json` → 커밋(`data: 태핑 플랜 MM/DD`, 기관명 쓰지 말 것) → push. upsert.mjs 는 `tap` 을 그대로 둔다.
+- PDF(사용자 요청: AI 티 안 나게 표 위주): `python3 scripts/tap_pdf.py <SP>/data.json <SP>/out --font-dir <Pretendard woff2>` → 자산군별 A4 가로 보고서. PDF 는 평문 — 스크래치패드에만, 사용자에게 파일로.
+- 화면 `tap.js`·`tap.css`: PC 는 한 줄 표, 휴대폰은 같은 표를 카드로. '현재 신호' = 기관 signals 중 그 자산군 subs(전략 수요판과 같은 짧은 이름 `SHORT`), 기관 이름 → 기관 상세(app.js `goOrg`), 날짜 → 미팅.
+  '플랜 밖 신호' = 그 자산군 신호(진행·관심·약정)가 있는데 플랜에 없는 기관 — 새 미팅으로 생긴 수요를 놓치지 않게, 보이면 플랜에 넣을지 검토.
+  기관 상세에 '{year} 태핑 플랜' 줄(app.js `tapOrgHtml`, 누르면 그 자산군 탭). 가상 데이터는 `tests/fixture.json` 의 `tap`.
 
 ## 화면 수정
 - `app.js`/`app.css`는 아티팩트 페이지(lp_meeting_db.html) 원본에서 저장 기능·약어 사전을 뺀 것. KB 노랑·회색 토큰.

@@ -218,6 +218,23 @@ for (const vp of [{ name: '휴대폰', width: 390, height: 844 }, { name: 'PC', 
   await page.locator(`${tabSel}[data-tab="demand"]`).click();
   await page.screenshot({ path: join(ROOT, `tests/_${vp.width}-demand.png`) });
 
+  // 태핑 플랜 탭(2027 자산군별 태핑 대상, DB 의 tap): 우선 태핑 표·현재 신호 → 찾기 → 자산군 전환 → 기관 상세(2027 태핑 플랜 줄) → 다시 탭으로
+  await page.locator(`${tabSel}[data-tab="tap"]`).click();
+  await page.locator('#tpMain .tp-head').waitFor();
+  ok('태핑 플랜: 우선 태핑 1곳·현재 신호·근거 미팅', (await page.locator('#tpMain .tp-t tbody tr').count()) === 1 && (await page.textContent('#tpMain .tp-tier.t1')).includes('샘플공제회')
+    && (await page.locator('#tpMain .tp-sig .sg').count()) === 1 && (await page.locator('#tpMain [data-gm]').count()) === 1);
+  await page.fill('#tpq', '없는말'); await page.waitForTimeout(450);
+  ok('태핑 플랜 찾기', (await page.locator('#tpMain .tp-t tbody tr').count()) === 0 && (await page.inputValue('#tpq')) === '없는말');
+  await page.fill('#tpq', ''); await page.waitForTimeout(450);
+  await page.locator('#tpMain .tp-seg [data-c="PE"]').click();
+  ok('태핑 플랜 자산군 전환(빈 자산군은 해당 없음)', (await page.locator('#tpMain .tp-t').count()) === 0 && (await page.textContent('#tpMain')).includes('해당 기관 없음'));
+  await page.locator('#tpMain .tp-seg [data-c="PC"]').click();
+  await page.locator('#tpMain [data-go="sample"]').first().click();
+  await page.locator('#oMain .o-tap').waitFor();
+  ok('태핑 플랜 → 기관 상세의 2027 태핑 플랜 줄', (await page.textContent('#oMain .o-tap')).includes('우선 태핑'));
+  if (vp.width < 760) await page.goBack();
+  else { await page.locator('#oMain .o-tap [data-tapc]').click(); ok('기관 상세 → 태핑 플랜 탭', await page.locator('#p-tap').isVisible()); }
+
   // 대시보드 탭: 같은 키로 열림 → 요약(지표 카드·차트·순위) → 전체 찾기 → 시트 정리 화면(필터·합계·펼침) → 엑셀 원본(머리글 고정·셀 메모)
   await page.locator(`${tabSel}[data-tab="dash"]`).click();
   await page.locator('#dzMain .kc').first().waitFor();
