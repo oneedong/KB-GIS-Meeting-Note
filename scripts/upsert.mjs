@@ -118,6 +118,14 @@ for (const p of patch.people || []) {
     db.people.push(q); log.push(`인물 추가 ${org} ${p.name}`);
   } else log.push(`인물 수정 ${org} ${p.name}`);
   for (const f of ['dept', 'team', 'role', 'ext', 'phone', 'mobile', 'email']) if (p[f]) q[f] = p[f];
+  // 같은 기관 안에서 같은 부서를 다르게 쓰지 않게(사용자 지적 2026-11-27: '대체투자부(기업)'·'대체투자부(기업금융)'이 조직도에 두 부서로 뜸).
+  // 하위 담당·파트는 team 에. 괄호·공백만 다르거나 한쪽이 다른 쪽 + 꼬리말이면 경고
+  if (p.dept) {
+    const base = (s) => String(s).replace(/\(.*?\)/g, '').replace(/\s+/g, '');
+    const near = (a, b) => base(a) === base(b) || a.startsWith(b + ' ') || b.startsWith(a + ' ') || a.startsWith(b + '(') || b.startsWith(a + '(');
+    const others = [...new Set(db.people.filter((x) => x !== q && x.org === org && x.dept && x.dept !== q.dept).map((x) => x.dept))].filter((x) => near(x, q.dept));
+    if (others.length) warns.push(`인물 ${org} ${p.name}: 부서 "${q.dept}" ↔ 기존 "${others.join('", "')}" — 같은 부서면 dept 는 기존 이름 그대로, 담당·파트는 team 에`);
+  }
   if (p.title && (!q.title || (p.lastSeen || '') >= (q.lastSeen || ''))) q.title = p.title;
   if (p.note && !(q.note || '').includes(p.note)) q.note = ((q.note || '') + ' / ' + p.note).replace(/^ \/ /, '');
   if ((p.lastSeen || '') > (q.lastSeen || '')) q.lastSeen = p.lastSeen;
